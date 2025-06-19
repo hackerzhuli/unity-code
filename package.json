@@ -1,10 +1,10 @@
 {
   "name": "unitycode",
-  "displayName": "UnityCode",
+  "displayName": "Unity Code",
   "description": "VS Code extension that helps you to work with Unity Projects",
   "version": "0.1.0",
   "type": "module",
-  "publisher": "your-publisher-name",
+  "publisher": "hackerzhuli",
   "engines": {
     "vscode": "^1.74.0"
   },
