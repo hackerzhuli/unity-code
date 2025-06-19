@@ -12,8 +12,7 @@
     "Other"
   ],
   "activationEvents": [
-    "workspaceContains:**/*.unity",
-    "workspaceContains:**/*.meta"
+    "workspaceContains:ProjectSettings/ProjectVersion.txt"
   ],
   "main": "./out/extension.js",
   "contributes": {

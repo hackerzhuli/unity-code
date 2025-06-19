@@ -29,65 +29,105 @@ export async function isUnityProjectByPath(projectPath: string): Promise<boolean
     }
 }
 
-// isInAssetsFolder function is now imported from ./utils
+/**
+ * Handle renaming of a single file and its corresponding meta file
+ * @param oldUri The original file URI
+ * @param newUri The new file URI
+ */
+async function handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
+    // Skip meta files themselves
+    if (oldUri.fsPath.endsWith('.meta') || newUri.fsPath.endsWith('.meta')) {
+        return;
+    }
+    
+    // Find which workspace folder the old file belongs to
+    const oldWorkspaceFolder = vscode.workspace.getWorkspaceFolder(oldUri);
+    const newWorkspaceFolder = vscode.workspace.getWorkspaceFolder(newUri);
+    
+    // Both old and new paths must belong to the same workspace
+    if (!oldWorkspaceFolder || !newWorkspaceFolder || 
+        oldWorkspaceFolder.uri.fsPath !== newWorkspaceFolder.uri.fsPath) {
+        return;
+    }
+    
+    // Check if this workspace is a Unity project
+    const isUnity = await isUnityProject(oldWorkspaceFolder);
+    if (!isUnity) {
+        return;
+    }
+    
+    // Check if both old and new paths are in the Assets folder of this workspace
+    const workspacePath = oldWorkspaceFolder.uri.fsPath;
+    const isOldInAssets = isInAssetsFolder(oldUri.fsPath, workspacePath);
+    const isNewInAssets = isInAssetsFolder(newUri.fsPath, workspacePath);
+    
+    if (!isOldInAssets || !isNewInAssets) {
+        return;
+    }
+    
+    await renameMetaFile(oldUri.fsPath, newUri.fsPath);
+}
 
 /**
- * @param {vscode.ExtensionContext} context
+ * Rename the meta file for a given asset file
+ * @param oldFilePath The original file path
+ * @param newFilePath The new file path
  */
-export function activate(context: vscode.ExtensionContext) {
-    console.log('CodeUnity extension is now active!');
+async function renameMetaFile(oldFilePath: string, newFilePath: string): Promise<void> {
+    const oldMetaPath = `${oldFilePath}.meta`;
+    const newMetaPath = `${newFilePath}.meta`;
+    
+    // Check if the meta file exists
+    if (fs.existsSync(oldMetaPath)) {
+        try {
+            // Rename the meta file to match the renamed file
+            fs.renameSync(oldMetaPath, newMetaPath);
+            console.log(`UnityCode: detected asset ${oldFilePath} is renamed to ${newFilePath}, so Renamed meta file ${oldMetaPath} to ${newMetaPath}`);
+        } catch (error) {
+            console.error(`UnityCode: Error renaming meta file: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+}
 
+/**
+ * Handle file rename events from VS Code
+ * @param event The file rename event
+ */
+async function onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        return;
+    }
+    
+    // Process each renamed file
+    for (const file of event.files) {
+        await handleFileRename(file.oldUri, file.newUri);
+    }
+}
+
+/**
+ * Register all event listeners and commands
+ * @param context The extension context
+ */
+function registerEventListeners(context: vscode.ExtensionContext): void {
     // Register the command to manually rename meta files
     const disposable = vscode.commands.registerCommand('codeunity.renameMetaFiles', function () {
         vscode.window.showInformationMessage('CodeUnity: Manually renaming meta files');
         // This would scan the workspace and fix any mismatched meta files
     });
 
-    context.subscriptions.push(disposable);
-    
     // Listen for file rename events using workspace API
-    const renameDisposable = vscode.workspace.onDidRenameFiles(async event => {
-        // Check if we're in a Unity project
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            return;
-        }
-        
-        // Check if this is a Unity project
-        const isUnity = await isUnityProject(workspaceFolders[0]);
-        if (!isUnity) {
-            return;
-        }
-        
-        // Process each renamed file
-        for (const file of event.files) {
-            const oldUri = file.oldUri;
-            const newUri = file.newUri;
-            
-            // Check if this is a Unity project file (not a meta file itself)
-            // and if it's in the Assets folder
-            if (!oldUri.fsPath.endsWith('.meta') && 
-                !newUri.fsPath.endsWith('.meta') && 
-                isInAssetsFolder(oldUri.fsPath)) {
-                
-                const oldMetaPath = `${oldUri.fsPath}.meta`;
-                const newMetaPath = `${newUri.fsPath}.meta`;
-                
-                // Check if the meta file exists
-                if (fs.existsSync(oldMetaPath)) {
-                    try {
-                        // Rename the meta file to match the renamed file
-                        fs.renameSync(oldMetaPath, newMetaPath);
-                        vscode.window.showInformationMessage(`Renamed meta file: ${path.basename(newMetaPath)}`);
-                    } catch (error) {
-                        vscode.window.showErrorMessage(`Error renaming meta file: ${error instanceof Error ? error.message : String(error)}`);
-                    }
-                }
-            }
-        }
-    });
+    const renameDisposable = vscode.workspace.onDidRenameFiles(onDidRenameFiles);
 
-    context.subscriptions.push(renameDisposable);
+    context.subscriptions.push(disposable, renameDisposable);
+}
+
+/**
+ * @param {vscode.ExtensionContext} context
+ */
+export function activate(context: vscode.ExtensionContext) {
+    console.log('UnityCode extension is now active!');
+    registerEventListeners(context);
 }
 
 export function deactivate() {}
