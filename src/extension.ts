@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
 import { isInAssetsFolder } from './utils.js';
+import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
 
 /**
  * Check if the workspace is a Unity project by looking for ProjectSettings/ProjectVersion.txt
@@ -119,7 +120,14 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     // Listen for file rename events using workspace API
     const renameDisposable = vscode.workspace.onDidRenameFiles(onDidRenameFiles);
 
-    context.subscriptions.push(disposable, renameDisposable);
+    // Register C# documentation hover provider
+    const hoverProvider = new CSharpDocHoverProvider();
+    const hoverDisposable = vscode.languages.registerHoverProvider(
+        { scheme: 'file', language: 'csharp' },
+        hoverProvider
+    );
+
+    context.subscriptions.push(disposable, renameDisposable, hoverDisposable);
 }
 
 /**
