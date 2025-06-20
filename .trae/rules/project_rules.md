@@ -49,7 +49,7 @@ src/
 - Implement proper error handling and logging
 
 ### Testing
-- Write unit tests using Mocha framework (test are only needed for functions that are isolated, that is, don't need VS Code to run)
+- Write unit tests using Mocha framework (tests are only needed for functions that are more isolated, that is, don't need VS Code or other complex setups to run)
 - Use ESMock for mocking ES modules
 - Run tests with `npm test` command
 
