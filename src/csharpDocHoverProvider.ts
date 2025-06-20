@@ -61,7 +61,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                     // Analyze the definition to extract symbol information
                     const symbolInfo = await this.analyzeDefinition(location, word, document);
                     if (symbolInfo) {
-                        console.log(`Symbol found via definition: ${symbolInfo.fullyQualifiedName}`);
+                        console.log(`Symbol found via definition: ${symbolInfo.type}`);
                         return symbolInfo;
                     }
                 }
@@ -100,61 +100,18 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             // Open the definition document
             const definitionDocument = await vscode.workspace.openTextDocument(definition.uri);
             
-            let symbolDetails: {
-                symbolKind: vscode.SymbolKind;
-                containerName?: string;
-                namespace?: string;
-                isMethod: boolean;
-                isClass: boolean;
-                isProperty: boolean;
-                actualSymbolName?: string;
-            } | undefined;
+            let symbolInfo: SymbolInfo | undefined;
             
             if(definition.range.isEmpty){
                 console.log('Definition range is empty, trying fallback to single top-level type.');
                 // Fallback: if range is empty, try to find a single top-level type in the file
-                symbolDetails = await this.getSymbolInfoForEmptyRange(definitionDocument, word);
+                symbolInfo = await this.getSymbolInfoForEmptyRange(definitionDocument, word);
             } else {
                 // Get detailed symbol information using document symbol provider
-                symbolDetails = await this.getDetailedSymbolInfo(definitionDocument, definition.range.start);
+                symbolInfo = await this.getSymbolInfoFromPosition(definitionDocument, definition.range.start);
             }
             
-            // Use namespace from symbol hierarchy only - no fallbacks for reliability
-            const effectiveNamespace = symbolDetails?.namespace;
-            
-            // Determine if it's Unity or .NET based on namespace only
-            const isUnity = this.isUnityDefinition(effectiveNamespace);
-            const isDotNet = this.isDotNetDefinition(effectiveNamespace);
-            
-            // Use actual symbol name from definition if available, otherwise fall back to original word
-            const actualName = symbolDetails?.actualSymbolName || word;
-            
-            // Construct fully qualified name using only reliable symbol-based namespace
-            let fullyQualifiedName = actualName;
-            if (effectiveNamespace) {
-                fullyQualifiedName = `${effectiveNamespace}.${actualName}`;
-            }
-            // No fallback namespace guessing - use only what we can reliably determine
-            
-            // If we have a container name and it's a method, update the fully qualified name
-            if (symbolDetails?.containerName && symbolDetails.isMethod) {
-                const containerFullName = effectiveNamespace ? `${effectiveNamespace}.${symbolDetails.containerName}` : symbolDetails.containerName;
-                fullyQualifiedName = `${containerFullName}.${actualName}`;
-            }
-            
-            return {
-                name: actualName,
-                fullyQualifiedName,
-                namespace: effectiveNamespace,
-                isUnity,
-                isDotNet,
-                symbolKind: symbolDetails?.symbolKind,
-                containerName: symbolDetails?.containerName,
-                isMethod: symbolDetails?.isMethod,
-                isClass: symbolDetails?.isClass,
-                isProperty: symbolDetails?.isProperty
-            };
-            
+            return symbolInfo;
         } catch (error) {
             console.error('Error analyzing definition:', error);
             return undefined;
@@ -162,77 +119,72 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     }
 
     /**
-     * Find the namespace containing a specific symbol
+     * Checks if a symbol represents a type (class, interface, struct, or enum).
+     * 
+     * @param symbol The document symbol to check
+     * @returns True if the symbol is a type, false otherwise
      */
-    private findNamespaceForSymbol(symbols: vscode.DocumentSymbol[], targetSymbol: vscode.DocumentSymbol): string | undefined {
-        const searchForSymbol = (symbolList: vscode.DocumentSymbol[], namespacePath: string[] = []): string | undefined => {
-            for (const symbol of symbolList) {
-                if (symbol === targetSymbol) {
-                    // Found the target symbol, return the current namespace path
-                    return namespacePath.length > 0 ? namespacePath.join('.') : undefined;
-                }
-                
-                if (symbol.children && symbol.children.length > 0) {
-                    // If this is a namespace, add it to the path
-                    const newPath = symbol.kind === vscode.SymbolKind.Namespace 
-                        ? [...namespacePath, symbol.name] 
-                        : namespacePath;
-                    
-                    // Recursively search children
-                    const result = searchForSymbol(symbol.children, newPath);
-                    if (result !== undefined) {
-                        return result;
-                    }
-                }
-            }
-            return undefined;
-        };
-        
-        return searchForSymbol(symbols);
+    private isTypeSymbol(symbol: vscode.DocumentSymbol): boolean {
+        return symbol.kind === vscode.SymbolKind.Class ||
+               symbol.kind === vscode.SymbolKind.Interface ||
+               symbol.kind === vscode.SymbolKind.Struct ||
+               symbol.kind === vscode.SymbolKind.Enum;
     }
 
     /**
-     * Find top-level types (non-nested types) in the symbol hierarchy
+     * Find the single top-level type in the symbol hierarchy.
+     * 
+     * Returns SymbolInfo for the top-level type if there is exactly one,
+     * otherwise returns undefined if there are multiple or no top-level types.
+     * 
+     * @param symbols The document symbols to search through
+     * @returns SymbolInfo for the single top-level type, or undefined
      */
-    private findTopLevelTypes(symbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol[] {
+    private findTopLevelType(symbols: vscode.DocumentSymbol[]): SymbolInfo | undefined {
         const topLevelTypes: vscode.DocumentSymbol[] = [];
-        
-        const searchSymbols = (symbolList: vscode.DocumentSymbol[], isInsideType: boolean = false) => {
+        let topLevelTypePath = "";
+
+        const searchSymbols = (symbolList: vscode.DocumentSymbol[], path: string, isInsideType: boolean = false) => {
             for (const symbol of symbolList) {
-                const isTypeSymbol = symbol.kind === vscode.SymbolKind.Class ||
-                                   symbol.kind === vscode.SymbolKind.Interface ||
-                                   symbol.kind === vscode.SymbolKind.Struct ||
-                                   symbol.kind === vscode.SymbolKind.Enum;
+                const isType = this.isTypeSymbol(symbol);
                 
-                if (isTypeSymbol && !isInsideType) {
+                if (isType && !isInsideType) {
                     // This is a top-level type (not nested inside another type)
                     topLevelTypes.push(symbol);
+                    topLevelTypePath = combinePath(path, symbol.name);
+                }
+
+                if(topLevelTypes.length > 1){
+                    return;
                 }
                 
                 // Recursively search children
                 if (symbol.children && symbol.children.length > 0) {
                     // If this symbol is a type, mark that we're now inside a type
-                    searchSymbols(symbol.children, isInsideType || isTypeSymbol);
+                    searchSymbols(symbol.children, combinePath(path, symbol.name), isInsideType || isType);
                 }
             }
         };
         
-        searchSymbols(symbols);
-        return topLevelTypes;
+        searchSymbols(symbols, "", false);
+        
+        // Return SymbolInfo only if there's exactly one top-level type
+        if (topLevelTypes.length === 1) {
+            const typeSymbol = topLevelTypes[0];
+            return {
+                name: typeSymbol.name,
+                type: topLevelTypePath,
+                kind: typeSymbol.kind
+            };
+        }
+        
+        return undefined;
     }
 
     /**
      * Get symbol information for empty range by checking if file contains only one top-level type
      */
-    private async getSymbolInfoForEmptyRange(document: vscode.TextDocument, _word: string): Promise<{
-        symbolKind: vscode.SymbolKind;
-        containerName?: string;
-        namespace?: string;
-        isMethod: boolean;
-        isClass: boolean;
-        isProperty: boolean;
-        actualSymbolName?: string;
-    } | undefined> {
+    private async getSymbolInfoForEmptyRange(document: vscode.TextDocument, _word: string): Promise<SymbolInfo | undefined> {
         try {
             // Get document symbols
             const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
@@ -244,49 +196,25 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 return undefined;
             }
 
-            // Find top-level types (classes, interfaces, structs, enums) - types that are not nested inside other types
-             const topLevelTypes = this.findTopLevelTypes(symbols);
-
-            // If there's exactly one top-level type, use it
-              if (topLevelTypes.length === 1) {
-                  const typeSymbol = topLevelTypes[0];
-                  
-                  // Find the namespace containing this type by searching the symbol hierarchy
-                  const namespace = this.findNamespaceForSymbol(symbols, typeSymbol);
-                  
-                  return {
-                      symbolKind: typeSymbol.kind,
-                      containerName: undefined, // This is the top-level type itself
-                      namespace,
-                      isMethod: false,
-                      isClass: typeSymbol.kind === vscode.SymbolKind.Class,
-                      isProperty: false,
-                      actualSymbolName: typeSymbol.name
-                  };
-              }
-
-            // If there are multiple top-level types or none, we can't determine which one
-            console.log(`Found ${topLevelTypes.length} top-level types, cannot determine symbol for empty range.`);
-            return undefined;
+            // Find the single top-level type, returns undefined if multiple or none found
+            const topLevelType = this.findTopLevelType(symbols);
+            
+            if (!topLevelType) {
+                console.log('Cannot determine symbol for empty range - multiple or no top-level types found.');
+            }
+            
+            return topLevelType;
             
         } catch (error) {
             console.error('Error getting symbol info for empty range:', error);
             return undefined;
         }
     }
-
+    
     /**
      * Get detailed symbol information using document symbol provider
      */
-    private async getDetailedSymbolInfo(document: vscode.TextDocument, position: vscode.Position): Promise<{
-        symbolKind: vscode.SymbolKind;
-        containerName?: string;
-        namespace?: string;
-        isMethod: boolean;
-        isClass: boolean;
-        isProperty: boolean;
-        actualSymbolName?: string;
-    } | undefined> {
+    private async getSymbolInfoFromPosition(document: vscode.TextDocument, position: vscode.Position): Promise<SymbolInfo | undefined> {
         try {
             // Get document symbols
             const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
@@ -298,26 +226,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 return undefined;
             }
 
-            // Find the symbol at the given position using only position-based lookup
-            const foundSymbol = this.findSymbolAtPositionWithPath(symbols, position);
-            if (!foundSymbol) {
-                return undefined;
-            }
-
-            const { symbol, container, symbolPath } = foundSymbol;
-            
-            // Extract namespace from symbol path - look for namespace symbols in the hierarchy
-            const namespace = this.extractNamespaceFromSymbolPath(symbolPath);
-            
-            return {
-                symbolKind: symbol.kind,
-                containerName: container?.name,
-                namespace,
-                isMethod: symbol.kind === vscode.SymbolKind.Method || symbol.kind === vscode.SymbolKind.Constructor,
-                isClass: symbol.kind === vscode.SymbolKind.Class,
-                isProperty: symbol.kind === vscode.SymbolKind.Property || symbol.kind === vscode.SymbolKind.Field,
-                actualSymbolName: symbol.name
-            };
+            return this.findSymbolAtPosition(symbols, position, "", false);
         } catch (error) {
             console.error('Error getting detailed symbol info:', error);
             return undefined;
@@ -325,30 +234,38 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     }
 
     /**
-     * Find symbol at position and track the full symbol path for namespace extraction
+     * Find symbol at position and return SymbolInfo directly
      */
-    private findSymbolAtPositionWithPath(
+    private findSymbolAtPosition(
         symbols: vscode.DocumentSymbol[], 
         position: vscode.Position,
-        symbolPath: vscode.DocumentSymbol[] = []
-    ): { symbol: vscode.DocumentSymbol; container?: vscode.DocumentSymbol; symbolPath: vscode.DocumentSymbol[] } | undefined {
+        /* the fully qualified name of the top level type that contains the symbols if exists, otherwise that path we accumulate as we go down the hierarchy */
+        topLevelTypePath: string,
+        isTopLevelTypeFound:boolean,
+    ): SymbolInfo | undefined {
         for (const symbol of symbols) {
             // Check if position is within this symbol's range
             if (symbol.range.contains(position)) {
-                const currentPath = [...symbolPath, symbol];
-                
                 // If this symbol has children, search recursively for a more specific match
                 if (symbol.children && symbol.children.length > 0) {
-                    const childResult = this.findSymbolAtPositionWithPath(symbol.children, position, currentPath);
+                    if (!isTopLevelTypeFound){
+                        topLevelTypePath = combinePath(topLevelTypePath, symbol.name);
+                        if(this.isTypeSymbol(symbol)){
+                            isTopLevelTypeFound = true;
+                        }
+                    }
+                    const childResult = this.findSymbolAtPosition(symbol.children, position, topLevelTypePath, isTopLevelTypeFound);
                     if (childResult) {
                         // Found a more specific symbol within this one
                         return childResult;
                     }
                 }
                 
-                // If no more specific child found, this symbol is our best match
-                const container = symbolPath.length > 0 ? symbolPath[symbolPath.length - 1] : undefined;
-                return { symbol, container, symbolPath: currentPath };
+                return {
+                    name: symbol.name,
+                    type: topLevelTypePath,
+                    kind: symbol.kind
+                };
             }
         }
         
@@ -356,78 +273,28 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     }
 
     /**
-     * Extract namespace from symbol path by finding namespace symbols in the hierarchy
+     * Check if type is from Unity
      */
-    private extractNamespaceFromSymbolPath(symbolPath: vscode.DocumentSymbol[]): string | undefined {
-        // Look for namespace symbols in the path and build the full namespace
-        const namespaceSymbols = symbolPath.filter(symbol => symbol.kind === vscode.SymbolKind.Namespace);
-        
-        if (namespaceSymbols.length === 0) {
-            return undefined;
-        }
-        
-        // Join all namespace names to form the full namespace
-        return namespaceSymbols.map(ns => ns.name).join('.');
+    private isUnityType(typeName: string): boolean {
+        return typeName.startsWith('UnityEngine.') || typeName.startsWith('UnityEditor.');
     }
 
     /**
-     * Check if definition is from Unity based on namespace only
+     * Check if type is from .NET
      */
-    private isUnityDefinition(namespace?: string): boolean {
-        if (!namespace) {
-            return false;
-        }
-        
-        // Check for Unity-specific namespaces
-        return namespace.startsWith('UnityEngine') || namespace.startsWith('UnityEditor');
+    private isDotNetType(typeName: string): boolean {
+        return typeName.startsWith('System.');
     }
 
     /**
-     * Check if definition is from .NET based on namespace only
-     */
-    private isDotNetDefinition(namespace?: string): boolean {
-        if (!namespace) {
-            return false;
-        }
-        
-        // Check for .NET-specific namespaces
-        return namespace.startsWith('System') || namespace.startsWith('Microsoft');
-    }
-
-    /**
-     * Generate documentation link based on symbol origin
+     * Generate documentation link based on symbol type
      */
     private generateDocumentationLink(symbolInfo: SymbolInfo): string | undefined {
-        // For methods, properties, and fields, we should link to the containing class documentation
-        // since most documentation systems organize members under their class pages
-        if (symbolInfo.isMethod || symbolInfo.isProperty) {
-            if (symbolInfo.containerName) {
-                // Create a modified symbolInfo for the container class
-                const containerSymbolInfo: SymbolInfo = {
-                    ...symbolInfo,
-                    name: symbolInfo.containerName,
-                    fullyQualifiedName: symbolInfo.namespace ? 
-                        `${symbolInfo.namespace}.${symbolInfo.containerName}` : 
-                        symbolInfo.containerName,
-                    isMethod: false,
-                    isClass: true,
-                    isProperty: false
-                };
-                
-                if (symbolInfo.isUnity) {
-                    return this.generateUnityDocLink(containerSymbolInfo);
-                } else if (symbolInfo.isDotNet) {
-                    return this.generateDotNetDocLink(containerSymbolInfo);
-                }
-            }
-            // If no container found, fall back to original behavior
-        }
-        
-        // For classes and other symbols, use the original logic
-        if (symbolInfo.isUnity) {
-            return this.generateUnityDocLink(symbolInfo);
-        } else if (symbolInfo.isDotNet) {
-            return this.generateDotNetDocLink(symbolInfo);
+        // Check if the type is from Unity or .NET
+        if (this.isUnityType(symbolInfo.type)) {
+            return this.generateUnityDocLink(symbolInfo.type);
+        } else if (this.isDotNetType(symbolInfo.type)) {
+            return this.generateDotNetDocLink(symbolInfo.type);
         }
         return undefined;
     }
@@ -435,10 +302,10 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     /**
      * Generate Unity documentation link
      */
-    private generateUnityDocLink(symbolInfo: SymbolInfo): string {
+    private generateUnityDocLink(typeName: string): string {
         // Unity documentation URL pattern
         const baseUrl = 'https://docs.unity3d.com/ScriptReference';
-        let className = symbolInfo.fullyQualifiedName;
+        let className = typeName;
         
         // Remove Unity namespace prefixes in the correct order
         if (className.startsWith('UnityEngine.UI.')) {
@@ -447,11 +314,6 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             className = className.replace(/^UnityEngine\./, '');
         } else if (className.startsWith('UnityEditor.')) {
             className = className.replace(/^UnityEditor\./, '');
-        }
-        
-        // Ensure we have a valid class name
-        if (!className || className.startsWith('.')) {
-            className = symbolInfo.name;
         }
         
         // Remove any trailing slashes or backslashes
@@ -463,33 +325,24 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     /**
      * Generate .NET documentation link
      */
-    private generateDotNetDocLink(symbolInfo: SymbolInfo): string {
+    private generateDotNetDocLink(typeName: string): string {
         // Microsoft .NET documentation URL pattern
         const baseUrl = 'https://docs.microsoft.com/en-us/dotnet/api';
-        const fullyQualifiedName = symbolInfo.fullyQualifiedName.toLowerCase();
+        const fullyQualifiedName = typeName.toLowerCase();
         return `${baseUrl}/${fullyQualifiedName}`;
     }
 
     /**
-     * Create hover content with documentation link using class name
+     * Create hover content with documentation link using type name
      */
     private createHoverWithDocLink(symbolInfo: SymbolInfo, docLink: string): vscode.Hover {
         const hoverContent = new vscode.MarkdownString();
         
-        // Extract class name for documentation link text
-        let className = symbolInfo.fullyQualifiedName;
+        // Use the type name for the documentation link text
+        const typeName = symbolInfo.type;
         
-        // For methods and other class members, extract the containing class name
-        if ((symbolInfo.isMethod || symbolInfo.isProperty) && symbolInfo.containerName) {
-            // Remove the member name to get the class name
-            const lastDotIndex = symbolInfo.fullyQualifiedName.lastIndexOf('.');
-            if (lastDotIndex !== -1) {
-                className = symbolInfo.fullyQualifiedName.substring(0, lastDotIndex);
-            }
-        }
-        
-        // Show only one line with the documentation link using class name as link text
-        hoverContent.appendMarkdown(`View docs for [${className}](${docLink})`);
+        // Show only one line with the documentation link using type name as link text
+        hoverContent.appendMarkdown(`View docs for [${typeName}](${docLink})`);
         
         // Make the markdown trusted to allow links
         hoverContent.isTrusted = true;
@@ -499,17 +352,37 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
 }
 
 /**
- * Interface for symbol information
+ * Represents symbol information for documentation hover functionality.
+ * @interface SymbolInfo
  */
 interface SymbolInfo {
+    /** The name of the symbol (e.g., "MyClass", "MyMethod") */
     name: string;
-    fullyQualifiedName: string;
-    namespace?: string; // Optional since we only use reliable symbol-based detection
-    isUnity: boolean;
-    isDotNet: boolean;
-    symbolKind?: vscode.SymbolKind;
-    containerName?: string; // For methods, this would be the class name
-    isMethod?: boolean;
-    isClass?: boolean;
-    isProperty?: boolean;
+    
+    /** 
+     * The fully qualified name of the top-level type that contains this symbol.
+     * This always points to the outermost type (class, interface, struct, enum) regardless
+     * of how deeply nested the symbol is within that type.
+     * Format: "Namespace.TopLevelTypeName"
+     */
+    type: string;
+    
+    /** The VS Code symbol kind (Class, Method, Property, etc.) */
+    kind: vscode.SymbolKind;
+}
+
+/**
+ * Combine a path and a name to create a fully qualified name.
+ * The path is optional and can be null or empty.
+ * If the path is provided, it will be prefixed with the name and separated by a dot.
+ * If the path is not provided, the name will be returned as is.
+ * @param path The path to combine with the name.
+ * @param name The name to combine with the path.
+ * @returns The combined fully qualified name.
+ */
+function combinePath(path: string, name: string): string {
+    if(!path || path.length === 0){
+        return name;
+    }
+    return path + "." + name;
 }
