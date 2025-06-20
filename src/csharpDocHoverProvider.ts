@@ -4,7 +4,16 @@ import * as vscode from 'vscode';
  * Hover provider that adds documentation links to C# symbols
  */
 export class CSharpDocHoverProvider implements vscode.HoverProvider {
-        /**
+    /**
+     * Unity packages that should use the standard Unity documentation URL instead of package-specific URLs
+     */
+    private readonly unityPackageExclusions: string[] = [
+        // Add package names here that should use standard Unity docs
+        // Example: 'com.unity.render-pipelines.core',
+        // 'com.unity.ugui' // UI package might use standard docs
+    ];
+
+    /**
      * Configuration for documentation link generation
      */
     private readonly docLinkConfigs: DocLinkConfig[] = [
@@ -58,7 +67,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             }
 
             // Generate documentation link based on symbol origin
-            const docLink = this.generateDocumentationLink(symbolInfo);
+            const docLink = await this.generateDocumentationLink(symbolInfo);
             if (!docLink) {
                 return undefined; // No documentation link available
             }
@@ -149,6 +158,11 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             } else {
                 // Get detailed symbol information using document symbol provider
                 symbolInfo = await this.getSymbolInfoFromPosition(definitionDocument, definition.range.start);
+            }
+            
+            // Add definition location to symbol info for Unity package detection
+            if (symbolInfo) {
+                symbolInfo.definitionLocation = definition;
             }
             
             return symbolInfo;
@@ -313,15 +327,138 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     }
 
     /**
+     * Checks if a file path is from any package in PackageCache
+     * @param filePath The file path to check
+     * @returns True if the file path is from a package, false otherwise
+     */
+    private isPackagePath(filePath: string): boolean {
+        // Check if the path contains Library/PackageCache directory
+        return filePath.includes('Library/PackageCache') || filePath.includes('Library\\PackageCache');
+    }
+
+    /**
+     * Extract package information from a file path
+     * @param filePath The file path to extract package info from
+     * @returns Package information or undefined if not a valid package
+     */
+    private async extractPackageInfo(filePath: string): Promise<{ name: string, version: string } | undefined> {
+        try {
+            // Match pattern like: Library/PackageCache/com.unity.localization@f2647f7408bd or Library\PackageCache\com.unity.localization@f2647f7408bd
+            const packageMatch = filePath.match(/Library[/\\]PackageCache[/\\]([^/\\@]+)@([^/\\]+)/);
+            if (packageMatch && packageMatch.length >= 3) {
+                const packageName = packageMatch[1];
+                const packageHash = packageMatch[2];
+                
+                // Construct path to package.json
+                const packageCacheIndex = filePath.indexOf('PackageCache');
+                const packageStart = filePath.indexOf(packageName, packageCacheIndex);
+                const packageDir = filePath.substring(0, packageStart + packageName.length + 1 + packageHash.length);
+                const packageJsonPath = packageDir + '/package.json';
+                
+                // Try to read the actual version from package.json
+                try {
+                    const packageJsonUri = vscode.Uri.file(packageJsonPath);
+                    const packageJsonContent = await vscode.workspace.fs.readFile(packageJsonUri);
+                    const packageJson = JSON.parse(packageJsonContent.toString());
+                    
+                    return {
+                        name: packageName,
+                        version: packageJson.version || packageHash // Fallback to hash if version not found
+                    };
+                } catch (packageJsonError) {
+                    console.warn(`Could not read package.json for ${packageName}, using hash as version:`, packageJsonError);
+                    // Fallback to using the hash as version
+                    return {
+                        name: packageName,
+                        version: packageHash
+                    };
+                }
+            }
+            return undefined;
+        } catch (error) {
+            console.error('Error extracting package info:', error);
+            return undefined;
+        }
+    }
+
+    /**
      * Generate documentation link based on symbol type using configuration
      */
-    private generateDocumentationLink(symbolInfo: SymbolInfo): string | undefined {
+    private async generateDocumentationLink(symbolInfo: SymbolInfo): Promise<string | undefined> {
+        // Check if this is a package symbol from PackageCache
+         if (symbolInfo.definitionLocation && this.isPackagePath(symbolInfo.definitionLocation.uri.fsPath)) {
+             const packageInfo = await this.extractPackageInfo(symbolInfo.definitionLocation.uri.fsPath);
+             if (packageInfo) {
+                 const packageUrl = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
+                 if (packageUrl) {
+                     return packageUrl;
+                 }
+                 // If no package-specific URL generated, fall through to standard documentation
+             }
+         }
+
+        // Fall back to standard documentation link
         const config = this.findMatchingConfig(symbolInfo.type);
         if (!config) {
             return undefined;
         }
 
         return this.generateLinkFromConfig(symbolInfo.type, config);
+    }
+
+    /**
+     * Generate package-specific documentation link based on package type
+     * @param typeName The fully qualified type name
+     * @param packageInfo The package information
+     * @returns The package documentation URL or undefined if not supported
+     */
+    private generatePackageDocumentationLink(typeName: string, packageInfo: { name: string, version: string }): string | undefined {
+        // Handle Unity packages
+        if (packageInfo.name.startsWith('com.unity')) {
+            // Skip package-specific URL if this package is in the exclusion list
+            if (this.unityPackageExclusions.includes(packageInfo.name)) {
+                return undefined; // Fall back to standard documentation
+            }
+            return this.generateUnityPackageLink(typeName, packageInfo);
+        }
+        
+        // Handle other popular packages (can be extended in the future)
+        // Example: Newtonsoft.Json, NUnit, etc.
+        // For now, return undefined to fall back to standard documentation
+        
+        console.log(`No specific documentation handler for package: ${packageInfo.name}`);
+        return undefined;
+    }
+
+    /**
+     * Generate Unity package documentation link
+     * @param typeName The fully qualified type name
+     * @param packageInfo The Unity package information
+     * @returns The Unity package documentation URL
+     */
+    private generateUnityPackageLink(typeName: string, packageInfo: { name: string, version: string }): string {
+        // Extract semantic version from the version string (remove hash/commit if present)
+        let cleanVersion = packageInfo.version;
+        
+        // Try to extract semantic version pattern (e.g., "1.5.2" from "1.5.2-preview.1" or hash)
+        const versionMatch = packageInfo.version.match(/^(\d+\.\d+(?:\.\d+)?)/); 
+        if (versionMatch) {
+            cleanVersion = versionMatch[1];
+        } else {
+            // If no semantic version found, try to read from package.json
+            // For now, use the raw version as fallback
+            console.warn(`Could not extract semantic version from: ${packageInfo.version}`);
+        }
+        
+        // Type name should already be in the correct format for Unity package docs
+        const transformedTypeName = typeName;
+        
+        // Generate Unity package documentation URL
+        // Format: https://docs.unity3d.com/Packages/com.unity.localization@1.5/api/UnityEngine.Localization.Settings.AsynchronousBehaviour.html
+        const packageUrl = `https://docs.unity3d.com/Packages/${packageInfo.name}@${cleanVersion}/api/${transformedTypeName}.html`;
+        
+        console.log(`Generated Unity package documentation URL: ${packageUrl}`);
+        return packageUrl;
     }
 
     /**
@@ -402,6 +539,9 @@ interface SymbolInfo {
     
     /** The VS Code symbol kind (Class, Method, Property, etc.) */
     kind: vscode.SymbolKind;
+    
+    /** The location where this symbol is defined (used for Unity package detection) */
+    definitionLocation?: vscode.Location;
 }
 
 /**
