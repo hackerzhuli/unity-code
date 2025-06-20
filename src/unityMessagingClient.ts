@@ -367,13 +367,19 @@ export class UnityMessagingClient {
      * Handle incoming message
      */
     private handleMessage(message: UnityMessage): void {
-        console.log(`UnityCode: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
+        // Skip logging for ping/pong messages to reduce console noise
+        if (message.type !== MessageType.Ping && message.type !== MessageType.Pong) {
+            console.log(`UnityCode: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
+        }
         
         const handler = this.messageHandlers.get(message.type);
         if (handler) {
             handler(message);
         } else {
-            console.log(`UnityCode: No handler registered for message type ${message.type} (${MessageType[message.type] || 'Unknown'})`);
+            // Skip logging for ping/pong messages to reduce console noise
+            if (message.type !== MessageType.Ping && message.type !== MessageType.Pong) {
+                console.log(`UnityCode: No handler registered for message type ${message.type} (${MessageType[message.type] || 'Unknown'})`);
+            }
         }
 
         // Handle TCP fallback messages
@@ -463,7 +469,10 @@ export class UnityMessagingClient {
         }
 
         const buffer = this.serializeMessage({ type, value });
-        console.log(`UnityCode: Sending message - Type: ${type} (${MessageType[type]}), Value: "${value}", Size: ${buffer.length} bytes, Target: ${this.unityAddress}:${this.unityPort}`);
+        // Skip logging for ping/pong messages to reduce console noise
+        if (type !== MessageType.Ping && type !== MessageType.Pong) {
+            console.log(`UnityCode: Sending message - Type: ${type} (${MessageType[type]}), Value: "${value}", Size: ${buffer.length} bytes, Target: ${this.unityAddress}:${this.unityPort}`);
+        }
 
         // Check if message is too large for UDP
         if (buffer.length >= this.UDP_BUFFER_SIZE) {
