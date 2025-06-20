@@ -20,8 +20,35 @@
       {
         "command": "codeunity.renameMetaFiles",
         "title": "CodeUnity: Rename Meta Files"
+      },
+      {
+        "command": "unitycode.refreshTests",
+        "title": "Unity Code: Refresh Tests"
       }
-    ]
+    ],
+    "configuration": {
+        "title": "Unity Code",
+        "properties": {
+          "unitycode.autoRefreshTests": {
+            "type": "boolean",
+            "default": true,
+            "description": "Automatically refresh Unity tests when C# files are saved"
+          },
+          "unitycode.refreshOnWindowFocus": {
+            "type": "boolean",
+            "default": true,
+            "description": "Automatically refresh Unity tests when VS Code window regains focus"
+          }
+      },
+      "testing": {
+        "providers": [
+          {
+            "id": "unityTests",
+            "label": "Unity Tests"
+          }
+        ]
+      }
+    }
   },
   "scripts": {
     "lint": "eslint .",
@@ -29,6 +56,9 @@
     "test": "npm run compile && npx mocha out/test/suite/*.test.js",
     "compile": "tsc",
     "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "systeminformation": "^5.26.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",

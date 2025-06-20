@@ -224,7 +224,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     /**
      * Get symbol information for empty range by checking if file contains only one top-level type
      */
-    private async getSymbolInfoForEmptyRange(document: vscode.TextDocument, word: string): Promise<{
+    private async getSymbolInfoForEmptyRange(document: vscode.TextDocument, _word: string): Promise<{
         symbolKind: vscode.SymbolKind;
         containerName?: string;
         namespace?: string;

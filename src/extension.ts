@@ -4,6 +4,10 @@ import * as path from 'path';
 import { promisify } from 'util';
 import { isInAssetsFolder } from './utils.js';
 import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
+import { UnityTestProvider } from './unityTestProvider.js';
+
+// Global reference to test provider for auto-refresh functionality
+let globalTestProvider: UnityTestProvider | null = null;
 
 /**
  * Check if the workspace is a Unity project by looking for ProjectSettings/ProjectVersion.txt
@@ -107,6 +111,84 @@ async function onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
 }
 
 /**
+ * Handle C# file save events for auto-refresh
+ */
+async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
+    // Check if auto-refresh is enabled
+    const config = vscode.workspace.getConfiguration('unitycode');
+    const autoRefreshEnabled = config.get<boolean>('autoRefreshTests', true);
+    
+    if (!autoRefreshEnabled || !globalTestProvider) {
+        return;
+    }
+
+    // Check if the saved file is a C# file
+    if (document.languageId !== 'csharp') {
+        return;
+    }
+
+    // Check if the file is in a Unity project
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!workspaceFolder) {
+        return;
+    }
+
+    const isUnity = await isUnityProject(workspaceFolder);
+    if (!isUnity) {
+        return;
+    }
+
+    console.log(`UnityCode: C# file saved: ${document.fileName}, refreshing Unity and tests...`);
+    
+    try {
+        // Refresh Unity's asset database only (no test refresh due to compilation time)
+        if (globalTestProvider.messagingClient.connected) {
+            console.log(`UnityCode: Connection status - Connected: ${globalTestProvider.messagingClient.connected}, Port: ${globalTestProvider.messagingClient.getCurrentPort()}`);
+            
+            await globalTestProvider.messagingClient.refreshAssetDatabase();
+            console.log('UnityCode: Sent refresh command to Unity (tests will not be auto-refreshed due to compilation time)');
+        } else {
+            console.log('UnityCode: Not connected to Unity, skipping refresh');
+            console.log('UnityCode: Attempting to reconnect to Unity...');
+            const reconnected = await globalTestProvider.messagingClient.refreshConnection();
+            if (reconnected) {
+                console.log('UnityCode: Reconnected successfully, sending refresh...');
+                await globalTestProvider.messagingClient.refreshAssetDatabase();
+                console.log('UnityCode: Sent refresh command to Unity');
+            } else {
+                console.log('UnityCode: Failed to reconnect to Unity');
+            }
+        }
+    } catch (error) {
+        console.error('UnityCode: Error during auto-refresh:', error);
+    }
+}
+
+/**
+ * Handle window focus events for auto-refresh
+ */
+async function onDidChangeWindowState(windowState: vscode.WindowState): Promise<void> {
+    // Check if window focus refresh is enabled
+    const config = vscode.workspace.getConfiguration('unitycode');
+    const refreshOnFocusEnabled = config.get<boolean>('refreshOnWindowFocus', true);
+    
+    if (!refreshOnFocusEnabled || !globalTestProvider || !windowState.focused) {
+        return;
+    }
+
+    console.log('UnityCode: Window regained focus, refreshing tests...');
+    
+    try {
+        // Only refresh tests when window gains focus
+        if (globalTestProvider.messagingClient.connected) {
+            await globalTestProvider.refreshTests();
+        }
+    } catch (error) {
+        console.error('UnityCode: Error during focus refresh:', error);
+    }
+}
+
+/**
  * Register all event listeners and commands
  * @param context The extension context
  */
@@ -117,8 +199,29 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         // This would scan the workspace and fix any mismatched meta files
     });
 
+    // Register the command to manually refresh tests
+    const refreshTestsDisposable = vscode.commands.registerCommand('unitycode.refreshTests', async function () {
+        if (globalTestProvider) {
+            vscode.window.showInformationMessage('Unity Code: Refreshing tests...');
+            try {
+                await globalTestProvider.refreshTests();
+                vscode.window.showInformationMessage('Unity Code: Tests refreshed successfully');
+            } catch (error) {
+                vscode.window.showErrorMessage(`Unity Code: Failed to refresh tests: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        } else {
+            vscode.window.showWarningMessage('Unity Code: Test provider not available');
+        }
+    });
+
     // Listen for file rename events using workspace API
     const renameDisposable = vscode.workspace.onDidRenameFiles(onDidRenameFiles);
+
+    // Listen for file save events for auto-refresh
+    const saveDisposable = vscode.workspace.onDidSaveTextDocument(onDidSaveDocument);
+
+    // Listen for window state changes for focus-based refresh
+    const windowStateDisposable = vscode.window.onDidChangeWindowState(onDidChangeWindowState);
 
     // Register C# documentation hover provider
     const hoverProvider = new CSharpDocHoverProvider();
@@ -127,7 +230,14 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         hoverProvider
     );
 
-    context.subscriptions.push(disposable, renameDisposable, hoverDisposable);
+    context.subscriptions.push(
+        disposable, 
+        refreshTestsDisposable,
+        renameDisposable, 
+        saveDisposable,
+        windowStateDisposable,
+        hoverDisposable
+    );
 }
 
 /**
@@ -136,6 +246,37 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
 export function activate(context: vscode.ExtensionContext) {
     console.log('UnityCode extension is now active!');
     registerEventListeners(context);
+    
+    // Initialize Unity test provider only for Unity projects
+    initializeUnityTestProvider(context);
+}
+
+/**
+ * Initialize Unity test provider for Unity projects
+ * @param context The extension context
+ */
+async function initializeUnityTestProvider(context: vscode.ExtensionContext): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        return;
+    }
+    
+    // Check if any workspace folder is a Unity project
+    for (const folder of workspaceFolders) {
+        const isUnity = await isUnityProject(folder);
+        if (isUnity) {
+            // Initialize test provider for Unity projects
+            const testProvider = new UnityTestProvider(context);
+            globalTestProvider = testProvider; // Store reference for auto-refresh
+            context.subscriptions.push({
+                dispose: () => {
+                    testProvider.dispose();
+                    globalTestProvider = null;
+                }
+            });
+            break; // Only need one test provider instance
+        }
+    }
 }
 
 export function deactivate() {}
