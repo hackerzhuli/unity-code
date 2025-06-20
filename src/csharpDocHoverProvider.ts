@@ -4,7 +4,47 @@ import * as vscode from 'vscode';
  * Hover provider that adds documentation links to C# symbols
  */
 export class CSharpDocHoverProvider implements vscode.HoverProvider {
-    
+        /**
+     * Configuration for documentation link generation
+     */
+    private readonly docLinkConfigs: DocLinkConfig[] = [
+        {
+            name: 'Unity Engine',
+            namespace: 'UnityEngine',
+            urlTemplate: 'https://docs.unity3d.com/ScriptReference/{typeName}.html',
+            namespaceRemoveLevel: 1
+        },
+        {
+            name: 'Unity UI',
+            namespace: 'UnityEngine.UI',
+            urlTemplate: 'https://docs.unity3d.com/ScriptReference/{typeName}.html',
+            namespaceRemoveLevel: 2
+        },
+        {
+            name: 'Unity Editor',
+            namespace: 'UnityEditor',
+            urlTemplate: 'https://docs.unity3d.com/ScriptReference/{typeName}.html',
+            namespaceRemoveLevel: 1
+        },
+        {
+            name: '.NET Framework',
+            namespace: 'System',
+            urlTemplate: 'https://docs.microsoft.com/en-us/dotnet/api/{typeName}',
+            isLowerCase: true
+        },
+        {
+            name: 'NUnit',
+            namespace: 'NUnit',
+            urlTemplate: 'https://docs.nunit.org/api/{typeName}.html',
+        },
+        {
+            name: 'NewtonsoftJson',
+            namespace: 'Newtonsoft.Json',
+            urlTemplate: 'https://www.newtonsoft.com/json/help/html/T_{typeName}.html',
+            dotReplacement: '_'
+        }
+    ];
+
     async provideHover(
         document: vscode.TextDocument,
         position: vscode.Position,
@@ -273,63 +313,56 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     }
 
     /**
-     * Check if type is from Unity
-     */
-    private isUnityType(typeName: string): boolean {
-        return typeName.startsWith('UnityEngine.') || typeName.startsWith('UnityEditor.');
-    }
-
-    /**
-     * Check if type is from .NET
-     */
-    private isDotNetType(typeName: string): boolean {
-        return typeName.startsWith('System.');
-    }
-
-    /**
-     * Generate documentation link based on symbol type
+     * Generate documentation link based on symbol type using configuration
      */
     private generateDocumentationLink(symbolInfo: SymbolInfo): string | undefined {
-        // Check if the type is from Unity or .NET
-        if (this.isUnityType(symbolInfo.type)) {
-            return this.generateUnityDocLink(symbolInfo.type);
-        } else if (this.isDotNetType(symbolInfo.type)) {
-            return this.generateDotNetDocLink(symbolInfo.type);
+        const config = this.findMatchingConfig(symbolInfo.type);
+        if (!config) {
+            return undefined;
         }
-        return undefined;
+
+        return this.generateLinkFromConfig(symbolInfo.type, config);
     }
 
     /**
-     * Generate Unity documentation link
+     * Find the matching configuration for a given type name
      */
-    private generateUnityDocLink(typeName: string): string {
-        // Unity documentation URL pattern
-        const baseUrl = 'https://docs.unity3d.com/ScriptReference';
-        let className = typeName;
-        
-        // Remove Unity namespace prefixes in the correct order
-        if (className.startsWith('UnityEngine.UI.')) {
-            className = className.replace(/^UnityEngine\.UI\./, '');
-        } else if (className.startsWith('UnityEngine.')) {
-            className = className.replace(/^UnityEngine\./, '');
-        } else if (className.startsWith('UnityEditor.')) {
-            className = className.replace(/^UnityEditor\./, '');
-        }
-        
-        // Remove any trailing slashes or backslashes
-        className = className.replace(/[/\\]+$/, '');
-        
-        return `${baseUrl}/${className}.html`;
+    private findMatchingConfig(typeName: string): DocLinkConfig | undefined {
+        return this.docLinkConfigs.find(config => 
+            typeName.startsWith(config.namespace + '.')
+        );
     }
 
     /**
-     * Generate .NET documentation link
+     * Generate documentation link using the provided configuration
      */
-    private generateDotNetDocLink(typeName: string): string {
-        // Microsoft .NET documentation URL pattern
-        const baseUrl = 'https://docs.microsoft.com/en-us/dotnet/api';
-        const fullyQualifiedName = typeName.toLowerCase();
-        return `${baseUrl}/${fullyQualifiedName}`;
+    private generateLinkFromConfig(typeName: string, config: DocLinkConfig): string {
+        let transformedTypeName = typeName;
+
+        // Remove namespace levels if specified (default: 0)
+        const namespaceRemoveLevel = config.namespaceRemoveLevel ?? 0;
+        if (namespaceRemoveLevel > 0) {
+            const parts = typeName.split('.');
+            if (parts.length > namespaceRemoveLevel) {
+                transformedTypeName = parts.slice(namespaceRemoveLevel).join('.');
+            }
+        }
+
+        // Replace dots with specified string if configured
+        if (config.dotReplacement !== undefined) {
+            transformedTypeName = transformedTypeName.replace(/\./g, config.dotReplacement);
+        }
+
+        // Apply lowercase transformation if specified (default: false)
+        if (config.isLowerCase === true) {
+            transformedTypeName = transformedTypeName.toLowerCase();
+        }
+
+        // Clean up any trailing slashes or backslashes
+        transformedTypeName = transformedTypeName.replace(/[/\\]+$/, '');
+
+        // Replace placeholder in URL template
+        return config.urlTemplate.replace('{typeName}', transformedTypeName);
     }
 
     /**
@@ -369,6 +402,30 @@ interface SymbolInfo {
     
     /** The VS Code symbol kind (Class, Method, Property, etc.) */
     kind: vscode.SymbolKind;
+}
+
+/**
+ * Configuration for generating documentation links for different libraries/frameworks.
+ * @interface DocLinkConfig
+ */
+interface DocLinkConfig {
+    /** Human-readable name of the library/framework */
+    name: string;
+    
+    /** Exact namespace to match against type names */
+    namespace: string;
+    
+    /** URL template with {typeName} placeholder */
+    urlTemplate: string;
+    
+    /** Number of namespace levels to remove from the type name (default: 0 = no removal) */
+    namespaceRemoveLevel?: number;
+    
+    /** Whether to convert the type name to lowercase (default: false) */
+    isLowerCase?: boolean;
+    
+    /** String to replace dots with in the type name (default: no replacement) */
+    dotReplacement?: string;
 }
 
 /**
