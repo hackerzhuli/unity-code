@@ -33,10 +33,10 @@
     "configuration": {
       "title": "Unity Code",
       "properties": {
-        "unitycode.autoRefreshTests": {
+        "unitycode.autoRefreshUnity": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically refresh Unity tests when C# files are saved"
+          "description": "Enable/disable automatic Unity asset database refresh when C# files are saved"
         },
         "unitycode.refreshOnWindowFocus": {
           "type": "boolean",

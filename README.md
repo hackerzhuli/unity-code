@@ -38,7 +38,7 @@ You can also manually refresh tests using:
 ### Configuration
 You can control the auto-refresh behavior with these settings:
 
-- `unitycode.autoRefreshTests` (default: `true`): Enable/disable automatic Unity asset database refresh when C# files are saved
+- `unitycode.autoRefreshUnity` (default: `true`): Enable/disable automatic Unity asset database refresh when C# files are saved
 - `unitycode.refreshOnWindowFocus` (default: `true`): Enable/disable automatic refresh when VS Code window regains focus
 
 ### Troubleshooting Auto-Refresh

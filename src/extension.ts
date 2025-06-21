@@ -94,7 +94,7 @@ async function onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
 async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
     // Check if auto-refresh is enabled
     const config = vscode.workspace.getConfiguration('unitycode');
-    const autoRefreshEnabled = config.get<boolean>('autoRefreshTests', true);
+    const autoRefreshEnabled = config.get<boolean>('autoRefreshUnity', true);
     
     if (!autoRefreshEnabled || !globalTestProvider) {
         return;
