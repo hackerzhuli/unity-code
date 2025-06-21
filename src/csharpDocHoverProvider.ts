@@ -1,9 +1,17 @@
 import * as vscode from 'vscode';
+import { DecompiledFileHelper, DecompiledFileInfo } from './decompiledFileHelper.js';
+import { UnityPackageHelper, PackageInfo } from './unityPackageHelper.js';
 
 /**
  * Hover provider that adds documentation links to C# symbols
  */
 export class CSharpDocHoverProvider implements vscode.HoverProvider {
+    private readonly unityPackageHelper: UnityPackageHelper | undefined;
+
+    constructor(unityPackageHelper?: UnityPackageHelper) {
+        this.unityPackageHelper = unityPackageHelper;
+    }
+
     /**
      * Unity packages that should use the standard Unity documentation URL instead of package-specific URLs
      */
@@ -67,13 +75,13 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             }
 
             // Generate documentation link based on symbol origin
-            const docLink = await this.generateDocumentationLink(symbolInfo);
-            if (!docLink) {
+            const docLinkInfo = await this.generateDocumentationLink(symbolInfo);
+            if (!docLinkInfo) {
                 return undefined; // No documentation link available
             }
 
             // Create hover content with symbol info and documentation link
-            return this.createHoverWithDocLink(symbolInfo, docLink);
+            return this.createHoverWithDocLink(symbolInfo, docLinkInfo.url, docLinkInfo.packageInfo);
 
         } catch (error) {
             console.error('Error in CSharpDocHoverProvider:', error);
@@ -327,75 +335,44 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     }
 
     /**
-     * Checks if a file path is from any package in PackageCache
-     * @param filePath The file path to check
-     * @returns True if the file path is from a package, false otherwise
-     */
-    private isPackagePath(filePath: string): boolean {
-        // Check if the path contains Library/PackageCache directory
-        return filePath.includes('Library/PackageCache') || filePath.includes('Library\\PackageCache');
-    }
-
-    /**
-     * Extract package information from a file path
-     * @param filePath The file path to extract package info from
-     * @returns Package information or undefined if not a valid package
-     */
-    private async extractPackageInfo(filePath: string): Promise<{ name: string, version: string } | undefined> {
-        try {
-            // Match pattern like: Library/PackageCache/com.unity.localization@f2647f7408bd or Library\PackageCache\com.unity.localization@f2647f7408bd
-            const packageMatch = filePath.match(/Library[/\\]PackageCache[/\\]([^/\\@]+)@([^/\\]+)/);
-            if (packageMatch && packageMatch.length >= 3) {
-                const packageName = packageMatch[1];
-                const packageHash = packageMatch[2];
-                
-                // Construct path to package.json
-                const packageCacheIndex = filePath.indexOf('PackageCache');
-                const packageStart = filePath.indexOf(packageName, packageCacheIndex);
-                const packageDir = filePath.substring(0, packageStart + packageName.length + 1 + packageHash.length);
-                const packageJsonPath = packageDir + '/package.json';
-                
-                // Try to read the actual version from package.json
-                try {
-                    const packageJsonUri = vscode.Uri.file(packageJsonPath);
-                    const packageJsonContent = await vscode.workspace.fs.readFile(packageJsonUri);
-                    const packageJson = JSON.parse(packageJsonContent.toString());
-                    
-                    return {
-                        name: packageName,
-                        version: packageJson.version || packageHash // Fallback to hash if version not found
-                    };
-                } catch (packageJsonError) {
-                    console.warn(`Could not read package.json for ${packageName}, using hash as version:`, packageJsonError);
-                    // Fallback to using the hash as version
-                    return {
-                        name: packageName,
-                        version: packageHash
-                    };
-                }
-            }
-            return undefined;
-        } catch (error) {
-            console.error('Error extracting package info:', error);
-            return undefined;
-        }
-    }
-
-    /**
      * Generate documentation link based on symbol type using configuration
      */
-    private async generateDocumentationLink(symbolInfo: SymbolInfo): Promise<string | undefined> {
+    private async generateDocumentationLink(symbolInfo: SymbolInfo): Promise<DocumentationLinkInfo | undefined> {
         // Check if this is a package symbol from PackageCache
-         if (symbolInfo.definitionLocation && this.isPackagePath(symbolInfo.definitionLocation.uri.fsPath)) {
-             const packageInfo = await this.extractPackageInfo(symbolInfo.definitionLocation.uri.fsPath);
-             if (packageInfo) {
-                 const packageUrl = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
-                 if (packageUrl) {
-                     return packageUrl;
-                 }
-                 // If no package-specific URL generated, fall through to standard documentation
-             }
-         }
+        if (symbolInfo.definitionLocation && this.unityPackageHelper && this.unityPackageHelper.isPackagePath(symbolInfo.definitionLocation.uri.fsPath)) {
+            // Only update packages when we actually need package information
+            await this.unityPackageHelper.updatePackages();
+            
+            const packageName = this.unityPackageHelper.extractPackageNameFromPath(symbolInfo.definitionLocation.uri.fsPath);
+            if (packageName) {
+                const packageInfo = this.unityPackageHelper.getPackageByName(packageName);
+                if (packageInfo) {
+                    const packageUrl = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
+                    if (packageUrl) {
+                        return { url: packageUrl, packageInfo };
+                    }
+                    // If no package-specific URL generated, fall through to standard documentation
+                }
+            }
+        }
+
+        // Check if the symbol is from a decompiled file
+        if (symbolInfo.definitionLocation) {
+            const decompiledInfo = await this.checkDecompiledFile(symbolInfo.definitionLocation.uri);
+            if (decompiledInfo.isDecompiled && decompiledInfo.assemblyName && this.unityPackageHelper) {
+                // Only update packages when we actually need assembly-to-package mapping
+                await this.unityPackageHelper.updatePackages();
+                
+                const packageInfo = this.unityPackageHelper.getPackageByAssembly(decompiledInfo.assemblyName);
+                if (packageInfo) {
+                    const packageUrl = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
+                    if (packageUrl) {
+                        return { url: packageUrl, packageInfo };
+                    }
+                    // If no package-specific URL generated, fall through to standard documentation
+                }
+            }
+        }
 
         // Fall back to standard documentation link
         const config = this.findMatchingConfig(symbolInfo.type);
@@ -403,7 +380,22 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             return undefined;
         }
 
-        return this.generateLinkFromConfig(symbolInfo.type, config);
+        const url = this.generateLinkFromConfig(symbolInfo.type, config);
+        return url ? { url, packageInfo: undefined } : undefined;
+    }
+
+    /**
+     * Check if a file is a decompiled file and extract assembly information
+     * @param uri The URI of the file to check
+     * @returns Promise<DecompiledFileInfo> Information about the decompiled file
+     */
+    private async checkDecompiledFile(uri: vscode.Uri): Promise<DecompiledFileInfo> {
+        try {
+            return await DecompiledFileHelper.analyzeUri(uri);
+        } catch (error) {
+            console.error('Error checking decompiled file:', error);
+            return { isDecompiled: false };
+        }
     }
 
     /**
@@ -412,7 +404,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
      * @param packageInfo The package information
      * @returns The package documentation URL or undefined if not supported
      */
-    private generatePackageDocumentationLink(typeName: string, packageInfo: { name: string, version: string }): string | undefined {
+    private generatePackageDocumentationLink(typeName: string, packageInfo: PackageInfo): string | undefined {
         // Handle Unity packages
         if (packageInfo.name.startsWith('com.unity')) {
             // Skip package-specific URL if this package is in the exclusion list
@@ -436,18 +428,18 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
      * @param packageInfo The Unity package information
      * @returns The Unity package documentation URL
      */
-    private generateUnityPackageLink(typeName: string, packageInfo: { name: string, version: string }): string {
-        // Extract semantic version from the version string (remove hash/commit if present)
+    private generateUnityPackageLink(typeName: string, packageInfo: PackageInfo): string {
+        // Extract major.minor version from the version string (Unity package URLs only use two components)
         let cleanVersion = packageInfo.version;
         
-        // Try to extract semantic version pattern (e.g., "1.5.2" from "1.5.2-preview.1" or hash)
-        const versionMatch = packageInfo.version.match(/^(\d+\.\d+(?:\.\d+)?)/); 
+        // Try to extract major.minor version pattern (e.g., "1.5" from "1.5.2-preview.1" or hash)
+        const versionMatch = packageInfo.version.match(/^(\d+\.\d+)/); 
         if (versionMatch) {
             cleanVersion = versionMatch[1];
         } else {
-            // If no semantic version found, try to read from package.json
+            // If no version pattern found, try to read from package.json
             // For now, use the raw version as fallback
-            console.warn(`Could not extract semantic version from: ${packageInfo.version}`);
+            console.warn(`Could not extract major.minor version from: ${packageInfo.version}`);
         }
         
         // Type name should already be in the correct format for Unity package docs
@@ -505,13 +497,18 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     /**
      * Create hover content with documentation link using type name
      */
-    private createHoverWithDocLink(symbolInfo: SymbolInfo, docLink: string): vscode.Hover {
+    private createHoverWithDocLink(symbolInfo: SymbolInfo, docLink: string, packageInfo?: PackageInfo): vscode.Hover {
         const hoverContent = new vscode.MarkdownString();
         
         // Use the type name for the documentation link text
         const typeName = symbolInfo.type;
         
-        // Show only one line with the documentation link using type name as link text
+        // Add package information if available
+        if (packageInfo) {
+            hoverContent.appendMarkdown(`From package \`${packageInfo.name}\`, version \`${packageInfo.version}\`\n\n`);
+        }
+        
+        // Show documentation link using type name as link text
         hoverContent.appendMarkdown(`View docs for [${typeName}](${docLink})`);
         
         // Make the markdown trusted to allow links
@@ -566,6 +563,18 @@ interface DocLinkConfig {
     
     /** String to replace dots with in the type name (default: no replacement) */
     dotReplacement?: string;
+}
+
+/**
+ * Information about documentation link generation result.
+ * @interface DocumentationLinkInfo
+ */
+interface DocumentationLinkInfo {
+    /** The generated documentation URL */
+    url: string;
+    
+    /** Package information if the symbol is from a Unity package */
+    packageInfo?: PackageInfo;
 }
 
 /**

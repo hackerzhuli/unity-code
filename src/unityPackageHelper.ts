@@ -65,6 +65,35 @@ export class UnityPackageHelper {
     }
 
     /**
+     * Checks if a file path is from any package in PackageCache
+     * @param filePath The file path to check
+     * @returns True if the file path is from a package, false otherwise
+     */
+    public isPackagePath(filePath: string): boolean {
+        // Check if the path contains Library/PackageCache directory
+        return filePath.includes('Library/PackageCache') || filePath.includes('Library\\PackageCache');
+    }
+
+    /**
+     * Extract package name from a file path in PackageCache
+     * @param filePath The file path to extract package name from
+     * @returns Package name or undefined if not a valid package path
+     */
+    public extractPackageNameFromPath(filePath: string): string | undefined {
+        try {
+            // Match pattern like: Library/PackageCache/com.unity.localization@f2647f7408bd or Library\PackageCache\com.unity.localization@f2647f7408bd
+            const packageMatch = filePath.match(/Library[/\\]PackageCache[/\\]([^/\\@]+)@([^/\\]+)/);
+            if (packageMatch && packageMatch.length >= 2) {
+                return packageMatch[1];
+            }
+            return undefined;
+        } catch (error) {
+            console.error('UnityCode: Error extracting package name from path:', error);
+            return undefined;
+        }
+    }
+
+    /**
      * Update packages' information by scanning the PackageCache directory
      * @returns Promise<void>
      */

@@ -223,7 +223,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
             vscode.window.showInformationMessage('Unity Code: Refreshing packages...');
             try {
                 await globalPackageHelper.updatePackages();
-                const packageCount = globalPackageHelper.getAllPackages().length;
+                const packageCount = (await globalPackageHelper.getAllPackages()).length;
                 vscode.window.showInformationMessage(`Unity Code: Packages refreshed successfully (${packageCount} packages found)`);
             } catch (error) {
                 vscode.window.showErrorMessage(`Unity Code: Failed to refresh packages: ${error instanceof Error ? error.message : String(error)}`);
@@ -242,21 +242,13 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     // Listen for window state changes for focus-based refresh
     const windowStateDisposable = vscode.window.onDidChangeWindowState(onDidChangeWindowState);
 
-    // Register C# documentation hover provider
-    const hoverProvider = new CSharpDocHoverProvider();
-    const hoverDisposable = vscode.languages.registerHoverProvider(
-        { scheme: 'file', language: 'csharp' },
-        hoverProvider
-    );
-
     context.subscriptions.push(
         disposable, 
         refreshTestsDisposable,
         refreshPackagesDisposable,
         renameDisposable, 
         saveDisposable,
-        windowStateDisposable,
-        hoverDisposable
+        windowStateDisposable
     );
 }
 
@@ -278,13 +270,19 @@ export function activate(context: vscode.ExtensionContext) {
 async function initializeUnityTestProvider(context: vscode.ExtensionContext): Promise<void> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
+        // No workspace folders, register hover provider without package helper
+        registerHoverProvider(context, undefined);
         return;
     }
+    
+    let unityProjectFound = false;
     
     // Check if any workspace folder is a Unity project
     for (const folder of workspaceFolders) {
         const isUnity = await isUnityProject(folder);
         if (isUnity) {
+            unityProjectFound = true;
+            
             // Initialize test provider for Unity projects
             const testProvider = new UnityTestProvider(context);
             globalTestProvider = testProvider; // Store reference for auto-refresh
@@ -293,13 +291,10 @@ async function initializeUnityTestProvider(context: vscode.ExtensionContext): Pr
             const packageHelper = new UnityPackageHelper(folder.uri.fsPath);
             globalPackageHelper = packageHelper;
             
-            // Perform initial package scan
-            try {
-                await packageHelper.updatePackages();
-                console.log('UnityCode: Package helper initialized and packages scanned');
-            } catch (error) {
-                console.error('UnityCode: Error during initial package scan:', error);
-            }
+            console.log('UnityCode: Package helper initialized (packages will be loaded lazily when needed)');
+            
+            // Register C# documentation hover provider with the initialized package helper
+            registerHoverProvider(context, packageHelper);
             
             context.subscriptions.push({
                 dispose: () => {
@@ -311,6 +306,26 @@ async function initializeUnityTestProvider(context: vscode.ExtensionContext): Pr
             break; // Only need one test provider instance
         }
     }
+    
+    // If no Unity project found, still register hover provider without package helper
+    if (!unityProjectFound) {
+        registerHoverProvider(context, undefined);
+    }
+}
+
+/**
+ * Register the C# documentation hover provider
+ * @param context The extension context
+ * @param packageHelper The package helper instance (optional)
+ */
+function registerHoverProvider(context: vscode.ExtensionContext, packageHelper?: UnityPackageHelper): void {
+    const hoverProvider = new CSharpDocHoverProvider(packageHelper);
+    const hoverDisposable = vscode.languages.registerHoverProvider(
+        { scheme: 'file', language: 'csharp' },
+        hoverProvider
+    );
+    
+    context.subscriptions.push(hoverDisposable);
 }
 
 /**
