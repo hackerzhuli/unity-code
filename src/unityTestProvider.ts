@@ -13,9 +13,10 @@ export class UnityTestProvider {
     private debugProfile: vscode.TestRunProfile;
     private currentTestRun: vscode.TestRun | null = null;
 
-    constructor(context: vscode.ExtensionContext) {
+    constructor(context: vscode.ExtensionContext, unityProjectPath?: string) {
         this.testController = vscode.tests.createTestController('unityTests', 'Unity Tests');
-        this.messagingClient = new UnityMessagingClient();
+        
+        this.messagingClient = new UnityMessagingClient(unityProjectPath);
         
         // Register test controller
         context.subscriptions.push(this.testController);

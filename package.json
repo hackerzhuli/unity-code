@@ -31,18 +31,18 @@
       }
     ],
     "configuration": {
-        "title": "Unity Code",
-        "properties": {
-          "unitycode.autoRefreshTests": {
-            "type": "boolean",
-            "default": true,
-            "description": "Automatically refresh Unity tests when C# files are saved"
-          },
-          "unitycode.refreshOnWindowFocus": {
-            "type": "boolean",
-            "default": true,
-            "description": "Automatically refresh Unity tests when VS Code window regains focus"
-          }
+      "title": "Unity Code",
+      "properties": {
+        "unitycode.autoRefreshTests": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh Unity tests when C# files are saved"
+        },
+        "unitycode.refreshOnWindowFocus": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh Unity tests when VS Code window regains focus"
+        }
       },
       "testing": {
         "providers": [
@@ -62,13 +62,15 @@
     "watch": "tsc -watch -p ./"
   },
   "dependencies": {
-    "systeminformation": "^5.26.2"
+    "systeminformation": "^5.26.2",
+    "yargs-parser": "^22.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
     "@types/vscode": "^1.100.0",
+    "@types/yargs-parser": "^21.0.3",
     "@typescript-eslint/eslint-plugin": "^8.34.1",
     "@typescript-eslint/parser": "^8.34.1",
     "eslint": "^9.29.0",

@@ -1,10 +1,14 @@
 import * as si from 'systeminformation';
+import * as fs from 'fs';
+import { promisify } from 'util';
+import { extractProjectPath } from './utils.js';
 
 export interface UnityProcess {
     pid: number;
     name: string;
     command?: string;
     parentPid?: number;
+    projectPath?: string;
 }
 
 export class UnityProcessDetector {
@@ -16,9 +20,10 @@ export class UnityProcessDetector {
 
     /**
      * Detects running Unity editor processes, excluding child processes and other Unity tools
+     * @param currentProjectPath Optional path to current Unity project for filtering
      * @returns Array of Unity editor process information
      */
-    public async detectUnityProcesses(): Promise<UnityProcess[]> {
+    public async detectUnityProcesses(currentProjectPath?: string): Promise<UnityProcess[]> {
         console.log('UnityCode: Starting Unity process detection...');
         console.log(`UnityCode: Platform: ${process.platform}`);
         
@@ -44,20 +49,28 @@ export class UnityProcessDetector {
             
             console.log(`UnityCode: Found ${parentProcesses.length} Unity editor processes after filtering children`);
             
-            // Convert to our interface format
-            const result: UnityProcess[] = parentProcesses.map(proc => ({
-                pid: proc.pid || 0,
-                name: proc.name || '',
-                command: proc.command,
-                parentPid: proc.parentPid
-            })).filter(proc => proc.pid > 0);
+            // Convert to our interface format and extract project paths
+            const result: UnityProcess[] = parentProcesses.map(proc => {
+                const projectPath = extractProjectPath(proc.command || '');
+                return {
+                    pid: proc.pid || 0,
+                    name: proc.name || '',
+                    command: proc.command,
+                    parentPid: proc.parentPid,
+                    projectPath
+                };
+            }).filter(proc => proc.pid > 0);
             
-            console.log(`UnityCode: Returning ${result.length} valid Unity processes`);
-            result.forEach(proc => {
-                console.log(`UnityCode: Unity process - PID: ${proc.pid}, Name: ${proc.name}`);
+            // Filter by current project path if provided
+            const filteredResult = currentProjectPath ? 
+                await this.filterByProjectPath(result, currentProjectPath) : result;
+            
+            console.log(`UnityCode: Returning ${filteredResult.length} valid Unity processes`);
+            filteredResult.forEach(proc => {
+                console.log(`UnityCode: Unity process - PID: ${proc.pid}, Name: ${proc.name}, Project: ${proc.projectPath || 'Unknown'}`);
             });
             
-            return result;
+            return filteredResult;
             
         } catch (error) {
             console.error('UnityCode: Error detecting Unity processes:', error);
@@ -135,4 +148,57 @@ export class UnityProcessDetector {
             return !hasUnityParent;
         });
     }
+    
+    /**
+     * Filters Unity processes by matching project path using file system resolution
+     * @param processes Array of Unity processes
+     * @param currentProjectPath The current project path to match against
+     * @returns Filtered array of processes that match the current project
+     */
+    private async filterByProjectPath(processes: UnityProcess[], currentProjectPath: string): Promise<UnityProcess[]> {
+        console.log(`UnityCode: Filtering processes for project: ${currentProjectPath}`);
+        
+        try {
+            // Get canonical path for current project
+            const realpath = promisify(fs.realpath);
+            const canonicalCurrentPath = await realpath(currentProjectPath);
+            console.log(`UnityCode: Canonical current project path: ${canonicalCurrentPath}`);
+            
+            const matchingProcesses: UnityProcess[] = [];
+            
+            for (const proc of processes) {
+                if (!proc.projectPath) {
+                    console.log(`UnityCode: Process ${proc.pid} has no project path, excluding`);
+                    continue;
+                }
+                
+                try {
+                    // Get canonical path for process project path
+                    const canonicalProcPath = await realpath(proc.projectPath);
+                    // Normalize paths to lowercase for case-insensitive comparison on Windows
+                    const normalizedCurrentPath = canonicalCurrentPath.toLowerCase();
+                    const normalizedProcPath = canonicalProcPath.toLowerCase();
+                    const matches = normalizedProcPath === normalizedCurrentPath;
+                    
+                    console.log(`UnityCode: Process ${proc.pid} canonical path: ${canonicalProcPath}, matches: ${matches}`);
+                    
+                    if (matches) {
+                        matchingProcesses.push(proc);
+                    }
+                } catch (error) {
+                    console.log(`UnityCode: Failed to resolve path for process ${proc.pid} (${proc.projectPath}): ${error instanceof Error ? error.message : String(error)}`);
+                    // Skip processes with unresolvable paths
+                }
+            }
+            
+            console.log(`UnityCode: Found ${matchingProcesses.length} processes matching current project`);
+            return matchingProcesses;
+            
+        } catch (error) {
+            console.error(`UnityCode: Failed to resolve current project path (${currentProjectPath}): ${error instanceof Error ? error.message : String(error)}`);
+            // Return empty array if we can't resolve the current path
+            return [];
+        }
+    }
+    
 }

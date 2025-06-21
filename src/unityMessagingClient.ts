@@ -91,8 +91,10 @@ export class UnityMessagingClient {
     private readonly HEARTBEAT_INTERVAL = 3000; // 3 seconds
     private readonly UDP_BUFFER_SIZE = 8192;
     private readonly TCP_TIMEOUT = 5000;
+    private currentProjectPath?: string;
 
-    constructor() {
+    constructor(projectPath?: string) {
+        this.currentProjectPath = projectPath;
         this.setupSocket();
     }
 
@@ -110,7 +112,7 @@ export class UnityMessagingClient {
      * Detect Unity Editor processes and return their process IDs
      */
     private async detectUnityProcesses(): Promise<number[]> {
-        const unityProcesses = await this.processDetector.detectUnityProcesses();
+        const unityProcesses = await this.processDetector.detectUnityProcesses(this.currentProjectPath);
         const processIds = unityProcesses.map((proc: UnityProcess) => proc.pid);
         
         console.log(`UnityCode: Detected ${processIds.length} Unity process PIDs: [${processIds.join(', ')}]`);

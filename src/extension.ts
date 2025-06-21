@@ -1,41 +1,17 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
-import { promisify } from 'util';
 import { isInAssetsFolder } from './utils.js';
 import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
 import { UnityTestProvider } from './unityTestProvider.js';
 import { UnityPackageHelper } from './unityPackageHelper.js';
+import { UnityProjectManager } from './unityProjectManager.js';
 
 // Global reference to test provider for auto-refresh functionality
 let globalTestProvider: UnityTestProvider | null = null;
 // Global reference to package helper for package information
 let globalPackageHelper: UnityPackageHelper | null = null;
-
-/**
- * Check if the workspace is a Unity project by looking for ProjectSettings/ProjectVersion.txt
- * @param workspaceFolder The workspace folder to check
- * @returns Promise<boolean> True if the workspace is a Unity project
- */
-export async function isUnityProject(workspaceFolder: vscode.WorkspaceFolder): Promise<boolean> {
-    return isUnityProjectByPath(workspaceFolder.uri.fsPath);
-}
-
-/**
- * Check if a directory is a Unity project by looking for ProjectSettings/ProjectVersion.txt
- * @param projectPath The project directory path to check
- * @returns Promise<boolean> True if the directory is a Unity project
- */
-export async function isUnityProjectByPath(projectPath: string): Promise<boolean> {
-    try {
-        const projectVersionPath = path.join(projectPath, 'ProjectSettings', 'ProjectVersion.txt');
-        const fsAccess = promisify(fs.access);
-        await fsAccess(projectVersionPath, fs.constants.F_OK);
-        return true;
-    } catch {
-        return false;
-    }
-}
+// Global reference to Unity project manager
+let globalUnityProjectManager: UnityProjectManager | null = null;
 
 /**
  * Handle renaming of a single file and its corresponding meta file
@@ -58,14 +34,13 @@ async function handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise
         return;
     }
     
-    // Check if this workspace is a Unity project
-    const isUnity = await isUnityProject(oldWorkspaceFolder);
-    if (!isUnity) {
+    // Check if we have a Unity project and both paths are within it
+    if (!globalUnityProjectManager || !globalUnityProjectManager.isWorkingWithUnityProject()) {
         return;
     }
     
-    // Check if both old and new paths are in the Assets folder of this workspace
-    const workspacePath = oldWorkspaceFolder.uri.fsPath;
+    // Check if both old and new paths are in the Assets folder of the Unity project
+    const workspacePath = globalUnityProjectManager!.getUnityProjectPath()!;
     const isOldInAssets = isInAssetsFolder(oldUri.fsPath, workspacePath);
     const isNewInAssets = isInAssetsFolder(newUri.fsPath, workspacePath);
     
@@ -130,14 +105,13 @@ async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
         return;
     }
 
-    // Check if the file is in a Unity project
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-    if (!workspaceFolder) {
+    // Check if we have a Unity project and the file is within it
+    if (!globalUnityProjectManager || !globalUnityProjectManager.isWorkingWithUnityProject()) {
         return;
     }
-
-    const isUnity = await isUnityProject(workspaceFolder);
-    if (!isUnity) {
+    
+    // Check if the saved file is within the Unity project path
+    if (!globalUnityProjectManager.isFileInUnityProject(document.uri.fsPath)) {
         return;
     }
 
@@ -255,62 +229,51 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
 /**
  * @param {vscode.ExtensionContext} context
  */
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     console.log('UnityCode extension is now active!');
+    
+    // Initialize Unity project manager with current workspace folders
+    globalUnityProjectManager = new UnityProjectManager();
+    await globalUnityProjectManager.init(vscode.workspace.workspaceFolders);
+    
     registerEventListeners(context);
     
     // Initialize Unity test provider only for Unity projects
-    initializeUnityTestProvider(context);
+    await initializeUnityServices(context);
 }
 
 /**
  * Initialize Unity test provider and package helper for Unity projects
  * @param context The extension context
  */
-async function initializeUnityTestProvider(context: vscode.ExtensionContext): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-        // No workspace folders, register hover provider without package helper
+async function initializeUnityServices(context: vscode.ExtensionContext): Promise<void> {
+    const unityProjectPath = globalUnityProjectManager!.getUnityProjectPath();
+    if (!unityProjectPath) {
+        // No Unity project found, register hover provider without package helper
         registerHoverProvider(context, undefined);
         return;
     }
     
-    let unityProjectFound = false;
+    // Initialize test provider for Unity projects
+    const testProvider = new UnityTestProvider(context, unityProjectPath);
+    globalTestProvider = testProvider; // Store reference for auto-refresh
     
-    // Check if any workspace folder is a Unity project
-    for (const folder of workspaceFolders) {
-        const isUnity = await isUnityProject(folder);
-        if (isUnity) {
-            unityProjectFound = true;
-            
-            // Initialize test provider for Unity projects
-            const testProvider = new UnityTestProvider(context);
-            globalTestProvider = testProvider; // Store reference for auto-refresh
-            
-            // Initialize package helper for Unity projects
-            const packageHelper = new UnityPackageHelper(folder.uri.fsPath);
-            globalPackageHelper = packageHelper;
-            
-            console.log('UnityCode: Package helper initialized (packages will be loaded lazily when needed)');
-            
-            // Register C# documentation hover provider with the initialized package helper
-            registerHoverProvider(context, packageHelper);
-            
-            context.subscriptions.push({
-                dispose: () => {
-                    testProvider.dispose();
-                    globalTestProvider = null;
-                    globalPackageHelper = null;
-                }
-            });
-            break; // Only need one test provider instance
+    // Initialize package helper for Unity projects
+    const packageHelper = new UnityPackageHelper(unityProjectPath);
+    globalPackageHelper = packageHelper;
+    
+    console.log('UnityCode: Package helper initialized (packages will be loaded lazily when needed)');
+    
+    // Register C# documentation hover provider with the initialized package helper
+    registerHoverProvider(context, packageHelper);
+    
+    context.subscriptions.push({
+        dispose: () => {
+            testProvider.dispose();
+            globalTestProvider = null;
+            globalPackageHelper = null;
         }
-    }
-    
-    // If no Unity project found, still register hover provider without package helper
-    if (!unityProjectFound) {
-        registerHoverProvider(context, undefined);
-    }
+    });
 }
 
 /**
