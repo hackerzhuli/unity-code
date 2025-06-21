@@ -5,9 +5,12 @@ import { promisify } from 'util';
 import { isInAssetsFolder } from './utils.js';
 import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
 import { UnityTestProvider } from './unityTestProvider.js';
+import { UnityPackageHelper } from './unityPackageHelper.js';
 
 // Global reference to test provider for auto-refresh functionality
 let globalTestProvider: UnityTestProvider | null = null;
+// Global reference to package helper for package information
+let globalPackageHelper: UnityPackageHelper | null = null;
 
 /**
  * Check if the workspace is a Unity project by looking for ProjectSettings/ProjectVersion.txt
@@ -214,6 +217,22 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         }
     });
 
+    // Register the command to manually refresh packages
+    const refreshPackagesDisposable = vscode.commands.registerCommand('unitycode.refreshPackages', async function () {
+        if (globalPackageHelper) {
+            vscode.window.showInformationMessage('Unity Code: Refreshing packages...');
+            try {
+                await globalPackageHelper.updatePackages();
+                const packageCount = globalPackageHelper.getAllPackages().length;
+                vscode.window.showInformationMessage(`Unity Code: Packages refreshed successfully (${packageCount} packages found)`);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Unity Code: Failed to refresh packages: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        } else {
+            vscode.window.showWarningMessage('Unity Code: Package helper not available');
+        }
+    });
+
     // Listen for file rename events using workspace API
     const renameDisposable = vscode.workspace.onDidRenameFiles(onDidRenameFiles);
 
@@ -233,6 +252,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         disposable, 
         refreshTestsDisposable,
+        refreshPackagesDisposable,
         renameDisposable, 
         saveDisposable,
         windowStateDisposable,
@@ -252,7 +272,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 /**
- * Initialize Unity test provider for Unity projects
+ * Initialize Unity test provider and package helper for Unity projects
  * @param context The extension context
  */
 async function initializeUnityTestProvider(context: vscode.ExtensionContext): Promise<void> {
@@ -268,15 +288,37 @@ async function initializeUnityTestProvider(context: vscode.ExtensionContext): Pr
             // Initialize test provider for Unity projects
             const testProvider = new UnityTestProvider(context);
             globalTestProvider = testProvider; // Store reference for auto-refresh
+            
+            // Initialize package helper for Unity projects
+            const packageHelper = new UnityPackageHelper(folder.uri.fsPath);
+            globalPackageHelper = packageHelper;
+            
+            // Perform initial package scan
+            try {
+                await packageHelper.updatePackages();
+                console.log('UnityCode: Package helper initialized and packages scanned');
+            } catch (error) {
+                console.error('UnityCode: Error during initial package scan:', error);
+            }
+            
             context.subscriptions.push({
                 dispose: () => {
                     testProvider.dispose();
                     globalTestProvider = null;
+                    globalPackageHelper = null;
                 }
             });
             break; // Only need one test provider instance
         }
     }
+}
+
+/**
+ * Get the global package helper instance
+ * @returns UnityPackageHelper instance or null if not initialized
+ */
+export function getPackageHelper(): UnityPackageHelper | null {
+    return globalPackageHelper;
 }
 
 export function deactivate() {}

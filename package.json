@@ -24,6 +24,10 @@
       {
         "command": "unitycode.refreshTests",
         "title": "Unity Code: Refresh Tests"
+      },
+      {
+        "command": "unitycode.refreshPackages",
+        "title": "Unity Code: Refresh Packages"
       }
     ],
     "configuration": {
