@@ -12,6 +12,8 @@ let globalTestProvider: UnityTestProvider | null = null;
 let globalPackageHelper: UnityPackageHelper | null = null;
 // Global reference to Unity project manager
 let globalUnityProjectManager: UnityProjectManager | null = null;
+// Global reference to Unity status bar item
+let globalUnityStatusBarItem: vscode.StatusBarItem | null = null;
 
 /**
  * Handle renaming of a single file and its corresponding meta file
@@ -157,6 +159,70 @@ async function onDidChangeWindowState(windowState: vscode.WindowState): Promise<
 }
 
 /**
+ * Create and initialize the Unity status bar item
+ */
+function createUnityStatusBarItem(): vscode.StatusBarItem {
+    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    statusBarItem.command = 'unitycode.showConnectionStatus';
+    updateUnityStatusBarItem(statusBarItem, false, false);
+    statusBarItem.show();
+    return statusBarItem;
+}
+
+/**
+ * Update the Unity status bar item based on connection status
+ * @param statusBarItem The status bar item to update
+ * @param connected Whether Unity process is detected and connected
+ * @param online Whether Unity is online and responding to messages
+ */
+function updateUnityStatusBarItem(statusBarItem: vscode.StatusBarItem, connected: boolean, online: boolean): void {
+    if (online) {
+        statusBarItem.text = '$(check) Unity Online';
+        statusBarItem.tooltip = 'Unity Editor is connected and online';
+        statusBarItem.backgroundColor = undefined;
+    } else if (connected) {
+        statusBarItem.text = '$(clock) Unity Connected';
+        statusBarItem.tooltip = 'Unity Editor is connected but not responding';
+        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    } else {
+        statusBarItem.text = '$(x) Unity Offline';
+        statusBarItem.tooltip = 'Unity Editor is not connected';
+        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    }
+}
+
+/**
+ * Start monitoring Unity connection status and update status bar
+ */
+function startUnityStatusMonitoring(): void {
+    if (!globalTestProvider || !globalUnityStatusBarItem) {
+        return;
+    }
+
+    // Update status bar immediately
+    const connected = globalTestProvider.messagingClient.connected;
+    const online = globalTestProvider.messagingClient.unityOnline;
+    updateUnityStatusBarItem(globalUnityStatusBarItem, connected, online);
+
+    // Set up periodic status checking
+    const statusCheckInterval = setInterval(() => {
+        if (!globalTestProvider || !globalUnityStatusBarItem) {
+            clearInterval(statusCheckInterval);
+            return;
+        }
+
+        const currentConnected = globalTestProvider.messagingClient.connected;
+        const currentOnline = globalTestProvider.messagingClient.unityOnline;
+        updateUnityStatusBarItem(globalUnityStatusBarItem, currentConnected, currentOnline);
+    }, 2000); // Check every 2 seconds
+
+    // Clean up interval when extension is disposed
+    if (globalTestProvider) {
+        // Store the interval for cleanup (we'll handle this in the dispose method)
+    }
+}
+
+/**
  * Register all event listeners and commands
  * @param context The extension context
  */
@@ -198,6 +264,28 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         }
     });
 
+    // Register the command to show Unity connection status
+    const showConnectionStatusDisposable = vscode.commands.registerCommand('unitycode.showConnectionStatus', function () {
+        if (globalTestProvider) {
+            const connected = globalTestProvider.messagingClient.connected;
+            const online = globalTestProvider.messagingClient.unityOnline;
+            const processId = globalTestProvider.messagingClient.connectedUnityProcessId;
+            
+            let statusMessage = '';
+            if (online) {
+                statusMessage = `Unity Editor is online and ready (Process ID: ${processId || 'Unknown'})`;
+            } else if (connected) {
+                statusMessage = `Unity Editor is connected but not responding (Process ID: ${processId || 'Unknown'})`;
+            } else {
+                statusMessage = 'Unity Editor is not connected. Make sure Unity is running with your project open.';
+            }
+            
+            vscode.window.showInformationMessage(`Unity Code Connection Status: ${statusMessage}`);
+        } else {
+            vscode.window.showWarningMessage('Unity Code: Not available (no Unity project detected)');
+        }
+    });
+
     // Listen for file rename events using workspace API
     const renameDisposable = vscode.workspace.onDidRenameFiles(onDidRenameFiles);
 
@@ -207,14 +295,25 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     // Listen for window state changes for focus-based refresh
     const windowStateDisposable = vscode.window.onDidChangeWindowState(onDidChangeWindowState);
 
+    // Create Unity status bar item for Unity projects
+    if (globalUnityProjectManager && globalUnityProjectManager.isWorkingWithUnityProject()) {
+        globalUnityStatusBarItem = createUnityStatusBarItem();
+    }
+
     context.subscriptions.push(
         disposable, 
         refreshTestsDisposable,
         refreshPackagesDisposable,
+        showConnectionStatusDisposable,
         renameDisposable, 
         saveDisposable,
         windowStateDisposable
     );
+    
+    // Add status bar item to subscriptions for proper cleanup
+    if (globalUnityStatusBarItem) {
+        context.subscriptions.push(globalUnityStatusBarItem);
+    }
 }
 
 /**
@@ -258,11 +357,17 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     // Register C# documentation hover provider with the initialized package helper
     registerHoverProvider(context, packageHelper);
     
+    // Start Unity status monitoring if status bar item exists
+    if (globalUnityStatusBarItem) {
+        startUnityStatusMonitoring();
+    }
+    
     context.subscriptions.push({
         dispose: () => {
             testProvider.dispose();
             globalTestProvider = null;
             globalPackageHelper = null;
+            globalUnityStatusBarItem = null;
         }
     });
 }
@@ -290,4 +395,10 @@ export function getPackageHelper(): UnityPackageHelper | null {
     return globalPackageHelper;
 }
 
-export function deactivate() {}
+export function deactivate() {
+    // Clean up global references
+    globalTestProvider = null;
+    globalPackageHelper = null;
+    globalUnityProjectManager = null;
+    globalUnityStatusBarItem = null;
+}
