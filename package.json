@@ -5,6 +5,10 @@
   "version": "0.1.0",
   "type": "module",
   "publisher": "hackerzhuli",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hackerzhuli/unity-code.git"
+  },
   "engines": {
     "vscode": "^1.100.0"
   },
