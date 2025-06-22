@@ -152,12 +152,12 @@ function processXmlElement(tagName: string, node: unknown): string {
             
         case 'value':
             return `**Value:** ${processContent(content)}\n\n`;
-            
-        case 'example':
-            return `**Example:**\n${processContent(content)}\n\n`;
-            
-        case 'code':
-            return `\n\`\`\`\n${processContent(content)}\n\`\`\`\n\n`;
+              case 'example':
+            return `## Example\n\n${processContent(content)}\n\n`;        case 'code': {
+            const codeContent = processContent(content);
+            const normalizedCode = normalizeCodeIndentation(codeContent);
+            return `\`\`\`\n${normalizedCode}\n\`\`\``;
+        }
             
         case 'c':
             return `\`${processContent(content)}\``;
@@ -442,4 +442,129 @@ function _cleanupMarkdown(markdown: string): string {
     markdown = markdown.trim();
     
     return markdown;
+}
+
+/**
+ * Normalize indentation in code blocks by removing common leading whitespace
+ */
+function normalizeCodeIndentation(code: string): string {
+    if (!code || typeof code !== 'string') {
+        return '';
+    }
+    
+    console.log('DEBUG normalizeCodeIndentation: input =', JSON.stringify(code));
+    
+    const lines = code.split('\n');
+    
+    // Filter out empty lines for indentation calculation
+    const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    
+    if (nonEmptyLines.length === 0) {
+        return code;
+    }
+    
+    // Find the minimum indentation (common leading whitespace)
+    const minIndent = Math.min(...nonEmptyLines.map(line => {
+        const match = line.match(/^(\s*)/);
+        return match ? match[1].length : 0;
+    }));
+    
+    console.log('DEBUG normalizeCodeIndentation: minIndent =', minIndent);
+    
+    let result = code;
+    
+    // Remove the common leading whitespace from all lines
+    if (minIndent > 0) {
+        const normalizedLines = lines.map(line => {
+            if (line.trim().length === 0) {
+                return line; // Keep empty lines as-is
+            }
+            return line.substring(minIndent);
+        });
+        
+        result = normalizedLines.join('\n');
+        console.log('DEBUG normalizeCodeIndentation: after removing common indent =', JSON.stringify(result));
+    }
+    
+    // Always try to normalize top-level braces, regardless of indentation
+    result = normalizeTopLevelBraces(result);
+    console.log('DEBUG normalizeCodeIndentation: final result =', JSON.stringify(result));
+    return result;
+}
+
+/**
+ * Further normalize code to ensure top-level braces are flush left
+ */
+function normalizeTopLevelBraces(code: string): string {
+    console.log('DEBUG normalizeTopLevelBraces: input =', JSON.stringify(code));
+    
+    const lines = code.split('\n');
+    const normalizedLines = [];
+    const braceStack: number[] = []; // Track indentation levels of opening braces
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        
+        // Check if this line is just an opening brace
+        if (trimmed === '{') {
+            console.log(`DEBUG: Found opening brace line ${i}: "${line}"`);
+            
+            // Look at the previous non-empty line to determine if this should be flush left
+            let prevNonEmptyIndex = i - 1;
+            while (prevNonEmptyIndex >= 0 && lines[prevNonEmptyIndex].trim() === '') {
+                prevNonEmptyIndex--;
+            }
+            
+            if (prevNonEmptyIndex >= 0) {
+                const prevLine = lines[prevNonEmptyIndex];
+                const prevTrimmed = prevLine.trim();
+                
+                console.log(`DEBUG: Previous line ${prevNonEmptyIndex}: "${prevTrimmed}"`);
+                
+                // If previous line is a class/interface/namespace/method declaration, make brace flush left
+                if (prevTrimmed.includes('class ') || 
+                    prevTrimmed.includes('interface ') || 
+                    prevTrimmed.includes('namespace ') ||
+                    prevTrimmed.includes('struct ') ||
+                    prevTrimmed.includes('enum ') ||
+                    prevTrimmed.endsWith(')') || // method declaration
+                    prevTrimmed.startsWith('public ') ||
+                    prevTrimmed.startsWith('private ') ||
+                    prevTrimmed.startsWith('protected ') ||
+                    prevTrimmed.startsWith('internal ')) {
+                    console.log(`DEBUG: Making opening brace flush left`);
+                    braceStack.push(0); // Track that this brace is at level 0
+                    normalizedLines.push('{');
+                    continue;
+                }
+            }
+            
+            // Default: preserve the original indentation for the opening brace
+            const indent = line.length - line.trimStart().length;
+            braceStack.push(indent);
+            normalizedLines.push(line);
+        } 
+        // Check if this line is just a closing brace
+        else if (trimmed === '}') {
+            console.log(`DEBUG: Found closing brace line ${i}: "${line}"`);
+            
+            // Match the indentation of the corresponding opening brace
+            if (braceStack.length > 0) {
+                const openingBraceIndent = braceStack.pop()!;
+                const closingBraceIndent = ' '.repeat(openingBraceIndent) + '}';
+                console.log(`DEBUG: Making closing brace match opening indent: "${closingBraceIndent}"`);
+                normalizedLines.push(closingBraceIndent);
+            } else {
+                // No matching opening brace found, keep original
+                normalizedLines.push(line);
+            }
+        } else {
+            normalizedLines.push(line);
+        }
+    }
+    
+    const result = normalizedLines.join('\n');
+    console.log('DEBUG normalizeTopLevelBraces: result =', JSON.stringify(result));
+    return result;
 }
