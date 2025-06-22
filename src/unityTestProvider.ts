@@ -19,6 +19,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private allTests: TestAdaptor[] = [];
     private testResults = new Map<string, TestStatusAdaptor>();
     private codeLensProvider: vscode.Disposable | undefined;
+    private symbolsInitialized: boolean = false;
     private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
     public readonly onDidChangeCodeLenses = this.onDidChangeCodeLensesEmitter.event;
 
@@ -302,6 +303,25 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             (request, token) => this.runTests(request, token),
             !running // Disable when running
         );
+        
+        // Force immediate code lens refresh for running state changes
+        this.forceCodeLensRefresh();
+    }
+
+    /**
+     * Force immediate code lens refresh without delays
+     */
+    private forceCodeLensRefresh(): void {
+        // Temporarily mark symbols as initialized to skip delay
+        const wasInitialized = this.symbolsInitialized;
+        this.symbolsInitialized = true;
+        
+        this.onDidChangeCodeLensesEmitter.fire();
+        
+        // Restore original state after a short delay
+        setTimeout(() => {
+            this.symbolsInitialized = wasInitialized;
+        }, 100);
     }
 
     /**
@@ -442,8 +462,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         // Store test result for code lens
         this.testResults.set(result.FullName, result.TestStatus);
         
-        // Refresh code lenses to show updated status
-        this.onDidChangeCodeLensesEmitter.fire();
+        // Force immediate code lens refresh to show updated status
+        this.forceCodeLensRefresh();
         
         if (!this.currentTestRun) {
             return;
@@ -520,9 +540,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         }
 
         try {
-            // Add delay to allow C# language server to initialize
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
             if (token.isCancellationRequested) {
                 return [];
             }
@@ -561,33 +578,63 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     }
 
     /**
-     * Find code lenses by iterating through tests and finding matching symbols
+     * Find code lenses by grouping tests and finding matching symbols
      */
     private async findTestCodeLenses(
         symbols: vscode.DocumentSymbol[],
         document: vscode.TextDocument,
         codeLenses: vscode.CodeLens[]
     ): Promise<void> {
-        // Iterate through all tests and try to find matching symbols
+        // Group tests by class and method
+        const testsByClass = new Map<string, TestAdaptor[]>();
+        const processedSymbols = new Set<string>();
+        
+        // First, group all tests by their containing class
+        for (const test of this.allTests) {
+            const classPath = this.getClassPath(test.FullName);
+            if (!testsByClass.has(classPath)) {
+                testsByClass.set(classPath, []);
+            }
+            testsByClass.get(classPath)!.push(test);
+        }
+        
+        // Create code lenses for each test method
         for (const test of this.allTests) {
             const symbol = this.findSymbolByPath(symbols, test.FullName);
-            if (symbol) {
-                console.log(`Found symbol for test: ${test.FullName}, kind: ${symbol.kind}`);
-                
-                // Don't create code lenses for namespace-level symbols
-                if (symbol.kind === vscode.SymbolKind.Namespace) {
-                    console.log(`Skipping namespace-level symbol: ${test.FullName}`);
-                    continue;
-                }
+            if (symbol && symbol.kind === vscode.SymbolKind.Method) {
+                console.log(`Found method symbol for test: ${test.FullName}`);
                 
                 const codeLens = this.createCodeLens(symbol, [test], document);
                 if (codeLens) {
                     codeLenses.push(codeLens);
                 }
-            } else {
-                console.log(`No symbol found for test: ${test.FullName}`);
+                processedSymbols.add(test.FullName);
             }
         }
+        
+        // Create code lenses for test classes (containing multiple tests)
+        for (const [classPath, testsInClass] of testsByClass) {
+            if (testsInClass.length > 1) { // Only create class-level code lens if there are multiple tests
+                const classSymbol = this.findSymbolByPath(symbols, classPath);
+                if (classSymbol && (classSymbol.kind === vscode.SymbolKind.Class || classSymbol.kind === vscode.SymbolKind.Struct)) {
+                    console.log(`Found class symbol for ${testsInClass.length} tests: ${classPath}`);
+                    
+                    const codeLens = this.createCodeLens(classSymbol, testsInClass, document);
+                    if (codeLens) {
+                        codeLenses.push(codeLens);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Extract the class path from a full test name (removes the method name)
+     */
+    private getClassPath(fullName: string): string {
+        const parts = fullName.split('.');
+        // Remove the last part (method name) to get the class path
+        return parts.slice(0, -1).join('.');
     }
 
     /**
@@ -642,8 +689,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         
         return null;
     }
-
-
 
     /**
      * Create a code lens for the given symbol and tests
@@ -710,6 +755,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
 
         const statusText = statusParts.length > 0 ? ` (${statusParts.join(' ')})` : '';
         const testText = testCount === 1 ? 'test' : 'tests';
+        
+        // Show running indicator when tests are executing
+        if (this.isRunning) {
+            return `⏳ Running ${testCount} ${testText}${statusText}`;
+        }
         
         return `▶️ Run ${testCount} ${testText}${statusText}`;
     }
