@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { DecompiledFileHelper, DecompiledFileInfo } from './decompiledFileHelper.js';
 import { UnityPackageHelper, PackageInfo } from './unityPackageHelper.js';
-import { getQualifiedTypeName, detectLanguageServer, LanguageServerInfo, isTypeSymbol } from './languageServerUtils.js';
+import { getQualifiedTypeName, detectLanguageServer, LanguageServerInfo, isTypeSymbol, extractXmlDocumentation } from './languageServerUtils.js';
+import { xmlToMarkdown } from './xmlToMarkdown.js';
 
 /**
  * Hover provider that adds documentation links to C# symbols
@@ -79,15 +80,11 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             const symbolInfo = await this.getSymbolInfo(document, position);
             if (!symbolInfo) {
                 return undefined;
-            }
-
-            // Generate documentation link based on symbol origin
+            }            // Generate documentation link based on symbol origin (optional)
             const docLinkInfo = await this.generateDocumentationLink(symbolInfo);
-            if (!docLinkInfo) {
-                return undefined; // No documentation link available
-            }
-
-            // Create hover content with symbol info and documentation link
+            
+            // Create hover content with symbol info and optional documentation link
+            // Even if no documentation link is available, we still want to show XML docs
             return this.createHoverWithDocLink(symbolInfo, docLinkInfo);
 
         } catch (error) {
@@ -199,9 +196,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             console.error('Error analyzing definition:', error);
             return undefined;
         }
-    }
-
-    /**
+    }    /**
      * Find the single top-level type in the symbol hierarchy.
      * 
      * Returns SymbolInfo for the top-level type if there is exactly one,
@@ -209,9 +204,10 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
      * 
      * @param symbols The document symbols to search through
      * @param languageServerInfo Information about the detected language server
+     * @param document The text document to extract XML documentation from
      * @returns SymbolInfo for the single top-level type, or undefined
      */
-    private findTopLevelType(symbols: vscode.DocumentSymbol[], languageServerInfo: LanguageServerInfo): SymbolInfo | undefined {
+    private findTopLevelType(symbols: vscode.DocumentSymbol[], languageServerInfo: LanguageServerInfo, document: vscode.TextDocument): SymbolInfo | undefined {
         const topLevelTypes: vscode.DocumentSymbol[] = [];
         let topLevelTypePath = "";
 
@@ -244,17 +240,20 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         // Return SymbolInfo only if there's exactly one top-level type
         if (topLevelTypes.length === 1) {
             const typeSymbol = topLevelTypes[0];
-            
-            // Determine the fully qualified type name
+              // Determine the fully qualified type name
             // Prefer detail field if it contains a qualified name (C# Dev Kit)
             // Otherwise use the constructed path (Dot Rush)
             const qualifiedTypeName = getQualifiedTypeName(typeSymbol, topLevelTypePath);
+              // Extract XML documentation for the symbol
+            const xmlDocs = extractXmlDocumentation(document, typeSymbol);
+            console.log(`abc [findTopLevelType] Extracted XML docs for ${typeSymbol.name}: "${xmlDocs}"`);
             
             return {
                 name: typeSymbol.name,
                 type: qualifiedTypeName,
                 kind: typeSymbol.kind,
-                detail: typeSymbol.detail
+                detail: typeSymbol.detail,
+                xmlDocs: xmlDocs
             };
         }
         
@@ -275,9 +274,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             if (!symbols || symbols.length === 0) {
                 return undefined;
             }
-            
-            // Find the single top-level type, returns undefined if multiple or none found
-            const topLevelType = this.findTopLevelType(symbols, languageServerInfo);
+              // Find the single top-level type, returns undefined if multiple or none found
+            const topLevelType = this.findTopLevelType(symbols, languageServerInfo, document);
             
             if (!topLevelType) {
                 console.log('Cannot determine symbol for empty range - multiple or no top-level types found.');
@@ -306,14 +304,12 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 return undefined;
             }
 
-            return this.findSymbolAtPosition(symbols, position, "", false, languageServerInfo);
+            return this.findSymbolAtPosition(symbols, position, "", false, languageServerInfo, document);
         } catch (error) {
             console.error('Error getting detailed symbol info:', error);
             return undefined;
         }
-    }
-
-    /**
+    }    /**
      * Find symbol at position and return SymbolInfo directly
      */
     private findSymbolAtPosition(
@@ -322,7 +318,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         /* the fully qualified name of the top level type that contains the symbols if exists, otherwise that path we accumulate as we go down the hierarchy */
         topLevelTypePath: string,
         isTopLevelTypeFound:boolean,
-        languageServerInfo: LanguageServerInfo
+        languageServerInfo: LanguageServerInfo,
+        document: vscode.TextDocument
     ): SymbolInfo | undefined {
         for (const symbol of symbols) {
             // Check if position is within this symbol's range
@@ -343,25 +340,28 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                         }
                     }
                     
-                    const childResult = this.findSymbolAtPosition(symbol.children, position, updatedTopLevelTypePath, updatedIsTopLevelTypeFound, languageServerInfo);
+                    const childResult = this.findSymbolAtPosition(symbol.children, position, updatedTopLevelTypePath, updatedIsTopLevelTypeFound, languageServerInfo, document);
                     if (childResult) {
                         // Found a more specific symbol within this one
                         return childResult;
                     }
                 }
-                
-                // For the target symbol, determine the best qualified type name
+                  // For the target symbol, determine the best qualified type name
                 // If this is a type symbol, use its own qualification
                 // Otherwise, use the top-level type path we've been building
                 const qualifiedTypeName = isTypeSymbol(symbol) 
                     ? getQualifiedTypeName(symbol, updatedTopLevelTypePath)
                     : updatedTopLevelTypePath;
+                  // Extract XML documentation for the symbol
+                const xmlDocs = extractXmlDocumentation(document, symbol);
+                console.log(`abc [findSymbolAtPosition] Extracted XML docs for ${symbol.name}: "${xmlDocs}"`);
                 
                 return {
                     name: symbol.name,
                     type: qualifiedTypeName,
                     kind: symbol.kind,
-                    detail: symbol.detail
+                    detail: symbol.detail,
+                    xmlDocs: xmlDocs
                 };
             }
         }
@@ -538,28 +538,48 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         // Replace placeholder in URL template
         return config.urlTemplate.replace('{typeName}', transformedTypeName);
     }
-
-    /**
+      /**
      * Create hover content with documentation link using type name
      */
-    private createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo: DocumentationLinkInfo): vscode.Hover {
-        const hoverContent = new vscode.MarkdownString();
-        
-        // Use the type name for the documentation link text
-        const typeName = symbolInfo.type;
-        
-        // Add package information if available
-        if (docLinkInfo.packageInfo) {
-            hoverContent.appendMarkdown(`From package \`${docLinkInfo.packageInfo.displayName}\`(${docLinkInfo.packageInfo.name}), version \`${docLinkInfo.packageInfo.version}\`\n\n`);
+    private createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo?: DocumentationLinkInfo): vscode.Hover {
+        const hoverContent = new vscode.MarkdownString();        // Show XML documentation if available (at the top)
+        if (symbolInfo.xmlDocs && symbolInfo.xmlDocs.trim().length > 0) {
+            console.log(`abc Adding XML docs for symbol: ${symbolInfo.name}, docs is: ${symbolInfo.xmlDocs}`);
+            console.log(`abc XML docs length: ${symbolInfo.xmlDocs.length}, trimmed length: ${symbolInfo.xmlDocs.trim().length}`);
+            
+            // Convert XML docs to Markdown format
+            const markdownDocs = xmlToMarkdown(symbolInfo.xmlDocs);
+            console.log(`abc Converted to markdown: ${markdownDocs}`);
+            
+            hoverContent.appendMarkdown(markdownDocs);
+            hoverContent.appendMarkdown('\n\n---\n\n'); // Add a separator
+        } else {
+            console.log(`abc No XML docs found for symbol: ${symbolInfo.name}, xmlDocs value:`, symbolInfo.xmlDocs);
         }
         
-        // Show documentation link using type name as link text
-        hoverContent.appendMarkdown(`View docs for [${typeName}](${docLinkInfo.url})`);
+        // Only show documentation link information if available
+        if (docLinkInfo) {
+            // Use the type name for the documentation link text
+            const typeName = symbolInfo.type;
+            
+            // Add package information if available
+            if (docLinkInfo.packageInfo) {
+                hoverContent.appendMarkdown(`From package \`${docLinkInfo.packageInfo.displayName}\`(${docLinkInfo.packageInfo.name}), version \`${docLinkInfo.packageInfo.version}\`\n\n`);
+            }
+            
+            // Show documentation link using type name as link text
+            hoverContent.appendMarkdown(`View docs for [${typeName}](${docLinkInfo.url})`);
+            
+            // Add package documentation link for Unity packages using consolidated packageLinks
+            if (docLinkInfo.packageLinks) {
+                const packageDisplayName = docLinkInfo.packageLinks.packageInfo.displayName || docLinkInfo.packageLinks.packageInfo.name;
+                hoverContent.appendMarkdown(`\n\nView docs for package [${packageDisplayName}](${docLinkInfo.packageLinks.manualUrl})`);
+            }
+        }
         
-        // Add package documentation link for Unity packages using consolidated packageLinks
-        if (docLinkInfo.packageLinks) {
-            const packageDisplayName = docLinkInfo.packageLinks.packageInfo.displayName || docLinkInfo.packageLinks.packageInfo.name;
-            hoverContent.appendMarkdown(`\n\nView docs for package [${packageDisplayName}](${docLinkInfo.packageLinks.manualUrl})`);
+        // If we have no content at all, return undefined to indicate no hover should be shown
+        if (hoverContent.value.trim().length === 0) {
+            return new vscode.Hover(new vscode.MarkdownString(`No documentation available for \`${symbolInfo.name}\``));
         }
         
         // Make the markdown trusted to allow links
@@ -593,13 +613,19 @@ interface SymbolInfo {
     
     /** The location where this symbol is defined (used for Unity package detection) */
     definitionLocation?: vscode.Location;
-    
-    /** 
+      /** 
      * The detail field from the document symbol (language server specific)
      * For C# Dev Kit: Contains fully qualified type name
      * For Dot Rush: Content unknown/not documented
      */
     detail?: string;
+    
+    /** 
+     * The extracted XML documentation comments for this symbol.
+     * Contains the content of /// comments that appear before the symbol's range,
+     * with /// markers and leading whitespace removed.
+     */
+    xmlDocs?: string;
 }
 
 /**

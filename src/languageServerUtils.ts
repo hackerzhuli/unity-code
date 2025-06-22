@@ -284,3 +284,52 @@ function findSymbolRecursiveCSharpDevKit(
     
     return null;
 }
+
+/**
+ * Extracts XML documentation comments from the text document for a given symbol.
+ * XML docs appear as lines starting with /// right before the symbol's range.
+ * 
+ * @param document The text document containing the symbol
+ * @param symbol The document symbol to extract XML docs for
+ * @returns The extracted XML documentation as a string, or empty string if none found, note that /// will be removed
+ */
+export function extractXmlDocumentation(document: vscode.TextDocument, symbol: vscode.DocumentSymbol): string {
+    if (!document || !symbol || !symbol.range) {
+        return '';
+    }
+
+    const symbolStartLine = symbol.range.start.line;
+    
+    // If the symbol is at the very beginning of the document, there can't be any docs above it
+    if (symbolStartLine === 0) {
+        return '';
+    }
+
+    const xmlDocLines: string[] = [];
+    
+    // Start from the line just before the symbol and work backwards
+    for (let lineNumber = symbolStartLine - 1; lineNumber >= 0; lineNumber--) {
+        const line = document.lineAt(lineNumber);
+        const lineText = line.text;
+        
+        // Remove leading whitespace
+        const trimmedLine = lineText.trim();
+        
+        // Check if this line is an XML doc comment
+        if (trimmedLine.startsWith('///')) {
+            // Extract the content after /// (remove the /// and any space after it)
+            const docContent = trimmedLine.substring(3);
+            // Add to the beginning of the array since we're working backwards
+            xmlDocLines.unshift(docContent);
+        } else if (trimmedLine.length === 0) {
+            // Empty line - continue looking for more XML docs above
+            continue;
+        } else {
+            // Non-XML doc line encountered - stop searching
+            break;
+        }
+    }
+    
+    // Join all XML doc lines with newlines
+    return xmlDocLines.join('\n');
+}

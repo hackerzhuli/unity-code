@@ -66,6 +66,7 @@
     "watch": "tsc -watch -p ./"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.2.5",
     "systeminformation": "^5.26.2",
     "yargs-parser": "^22.0.0"
   },
