@@ -201,8 +201,6 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         }
     }
 
-
-
     /**
      * Find the single top-level type in the symbol hierarchy.
      * 
@@ -552,7 +550,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         
         // Add package information if available
         if (docLinkInfo.packageInfo) {
-            hoverContent.appendMarkdown(`From package \`${docLinkInfo.packageInfo.name}\`, version \`${docLinkInfo.packageInfo.version}\`\n\n`);
+            hoverContent.appendMarkdown(`From package \`${docLinkInfo.packageInfo.displayName}\`(${docLinkInfo.packageInfo.name}), version \`${docLinkInfo.packageInfo.version}\`\n\n`);
         }
         
         // Show documentation link using type name as link text
@@ -560,7 +558,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         
         // Add package documentation link for Unity packages using consolidated packageLinks
         if (docLinkInfo.packageLinks) {
-            hoverContent.appendMarkdown(`\n\nView docs for [${docLinkInfo.packageLinks.packageInfo.name}](${docLinkInfo.packageLinks.manualUrl})`);
+            const packageDisplayName = docLinkInfo.packageLinks.packageInfo.displayName || docLinkInfo.packageLinks.packageInfo.name;
+            hoverContent.appendMarkdown(`\n\nView docs for package [${packageDisplayName}](${docLinkInfo.packageLinks.manualUrl})`);
         }
         
         // Make the markdown trusted to allow links
