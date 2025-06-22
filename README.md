@@ -1,6 +1,6 @@
-# Unity Code
+## Unity Code
 
-A Visual Studio Code extension that enhances Unity development workflow with automated tools and documentation features.
+A Visual Studio Code extension that enhances Unity development workflow with neat automatic tools, Unity Tests, and great official doc links or xml docs when mouse hover a symbol.
 
 ## Features
 
@@ -22,7 +22,7 @@ Also, you need to install my Visual Studio Editor package in Unity in order to l
 ### Language Server Integration
 Works with both C# Dev Kit and Dot Rush. Pick what you want.
 
-## VS Code Forks
+### VS Code Forks
 Should work in any VS Code fork, however my Unity package only supports popular VS Code forks for now but you can create a pull request for your favorate VS Code fork.
 
 ### Auto-refresh on C# File Save
