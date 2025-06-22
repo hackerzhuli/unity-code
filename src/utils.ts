@@ -6,6 +6,21 @@
 import yargsParser from 'yargs-parser';
 
 /**
+ * Console log with automatic truncation for long messages
+ * Limits the entire log message to a maximum length to prevent console spam
+ * @param message The message to log (can contain template literals)
+ * @param maxLength Maximum length of the entire log message (default: 200)
+ */
+export function logWithLimit(message: string, maxLength: number = 200): void {
+    if (message.length <= maxLength) {
+        console.log(message);
+    } else {
+        const truncated = `${message.substring(0, maxLength)}... (truncated, original length: ${message.length})`;
+        console.log(truncated);
+    }
+}
+
+/**
  * Check if a file path is inside the Assets folder of a specific workspace
  * @param filePath The file path to check
  * @param workspacePath The workspace root path (optional for backward compatibility)

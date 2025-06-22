@@ -47,7 +47,7 @@ If Unity doesn't seem to be refreshing when you save C# files:
 
 1. **Check the Output Panel**: Open VS Code's Output panel and select "UnityCode" to see detailed logs
 2. **Verify Connection**: Look for messages like "Connection status - Connected: true, Port: XXXXX"
-3. **Check Message Sending**: Look for "Sending message - Type: 8 (Refresh)" and "UDP message sent successfully"
+3. **Check Message Sending**: Look for "Sending message - Type: 8 (Refresh)"
 4. **Unity Response**: Check if Unity is responding with any messages
 5. **Manual Reconnect**: Use the "Unity: Refresh Tests" command to manually trigger a refresh and reconnection
 6. **Test Refresh**: After Unity compilation completes, manually refresh tests using the command or window focus

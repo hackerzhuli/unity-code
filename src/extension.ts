@@ -120,21 +120,12 @@ async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
     try {
         // Refresh Unity's asset database only (no test refresh due to compilation time)
         if (globalTestProvider.messagingClient.connected) {
-            console.log(`UnityCode: Connection status - Connected: ${globalTestProvider.messagingClient.connected}, Port: ${globalTestProvider.messagingClient.getCurrentPort()}`);
+            console.log(`UnityCode: Connection status - Connected: ${globalTestProvider.messagingClient.connected}, Port: ${globalTestProvider.messagingClient.currentPort}`);
             
             await globalTestProvider.messagingClient.refreshAssetDatabase();
             console.log('UnityCode: Sent refresh command to Unity (tests will not be auto-refreshed due to compilation time)');
         } else {
-            console.log('UnityCode: Not connected to Unity, skipping refresh');
-            console.log('UnityCode: Attempting to reconnect to Unity...');
-            const reconnected = await globalTestProvider.messagingClient.refreshConnection();
-            if (reconnected) {
-                console.log('UnityCode: Reconnected successfully, sending refresh...');
-                await globalTestProvider.messagingClient.refreshAssetDatabase();
-                console.log('UnityCode: Sent refresh command to Unity');
-            } else {
-                console.log('UnityCode: Failed to reconnect to Unity');
-            }
+            console.log('UnityCode: Not connected to Unity, auto-connection will handle reconnection');
         }
     } catch (error) {
         console.error('UnityCode: Error during auto-refresh:', error);

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor } from './unityMessagingClient.js';
+import { logWithLimit } from './utils.js';
 
 /**
  * Unity Test Provider for VS Code Testing API
@@ -42,8 +43,11 @@ export class UnityTestProvider {
         // Setup messaging client handlers
         this.setupMessageHandlers();
         
-        // Auto-discover tests when provider is created
-        this.discoverTests();
+        // Register connection callback to discover tests when Unity connects
+        this.messagingClient.onConnection(() => {
+            console.log('UnityCode: Unity connection established, discovering tests...');
+            this.discoverTestsSilently();
+        });
     }
 
     /**
@@ -89,22 +93,33 @@ export class UnityTestProvider {
      * Discover tests from Unity
      */
     async discoverTests(): Promise<void> {
+        return this.discoverTestsInternal(true);
+    }
+
+    /**
+     * Discover tests from Unity silently (without showing warning messages)
+     */
+    async discoverTestsSilently(): Promise<void> {
+        return this.discoverTestsInternal(false);
+    }
+
+    /**
+     * Internal method to discover tests with optional warning messages
+     */
+    private async discoverTestsInternal(showWarnings: boolean): Promise<void> {
         try {
             console.log('UnityCode: Starting test discovery...');
             
-            // Connect to Unity if not already connected
+            // Check if connected to Unity (auto-connection handles connection attempts)
             if (!this.messagingClient.connected) {
-                console.log('UnityCode: Not connected, attempting to connect to Unity...');
-                const connected = await this.messagingClient.connect();
-                if (!connected) {
-                    console.error('UnityCode: Failed to connect to Unity Editor');
-                    vscode.window.showWarningMessage('UnityCode: Could not connect to Unity Editor. Make sure Unity is running.');
-                    return;
+                console.log('UnityCode: Not connected to Unity. Auto-connection will handle reconnection.');
+                if (showWarnings) {
+                    vscode.window.showWarningMessage('UnityCode: Not connected to Unity Editor. Make sure Unity is running and wait for auto-connection.');
                 }
-                console.log('UnityCode: Successfully connected to Unity');
-            } else {
-                console.log('UnityCode: Already connected to Unity');
+                return;
             }
+            
+            console.log('UnityCode: Connected to Unity, proceeding with test discovery...');
 
             // Request test lists for both modes
             console.log('UnityCode: Requesting EditMode test list...');
@@ -115,7 +130,9 @@ export class UnityTestProvider {
             
         } catch (error) {
             console.error('UnityCode: Error discovering tests:', error);
-            vscode.window.showErrorMessage(`UnityCode: Failed to discover tests: ${error instanceof Error ? error.message : String(error)}`);
+            if (showWarnings) {
+                vscode.window.showErrorMessage(`UnityCode: Failed to discover tests: ${error instanceof Error ? error.message : String(error)}`);
+            }
         }
     }
 
@@ -124,7 +141,7 @@ export class UnityTestProvider {
      */
     private handleTestListRetrieved(value: string): void {
         try {
-            console.log(`UnityCode: Received test list data: ${value}`);
+            logWithLimit(`UnityCode: Received test list data: ${value}`);
             
             const colonIndex = value.indexOf(':');
             if (colonIndex === -1) {
@@ -137,7 +154,7 @@ export class UnityTestProvider {
             const jsonData = value.substring(colonIndex + 1);
             
             console.log(`UnityCode: Test mode: ${testMode}`);
-            console.log(`UnityCode: JSON data: ${jsonData}`);
+            logWithLimit(`UnityCode: JSON data: ${jsonData}`);
             
             if (!jsonData) {
                 console.log(`UnityCode: No tests found for ${testMode}`);
@@ -236,11 +253,8 @@ export class UnityTestProvider {
         token: vscode.CancellationToken
     ): Promise<void> {
         if (!this.messagingClient.connected) {
-            const connected = await this.messagingClient.connect();
-            if (!connected) {
-                vscode.window.showErrorMessage('UnityCode: Could not connect to Unity Editor');
-                return;
-            }
+            vscode.window.showErrorMessage('UnityCode: Not connected to Unity Editor. Auto-connection will handle reconnection.');
+            return;
         }
 
         this.currentTestRun = this.testController.createTestRun(request);
@@ -414,7 +428,7 @@ export class UnityTestProvider {
      * Dispose the test provider
      */
     dispose(): void {
-        this.messagingClient.disconnect();
+        this.messagingClient.dispose();
         this.testController.dispose();
     }
 }

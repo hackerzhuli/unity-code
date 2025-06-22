@@ -131,15 +131,6 @@ export class UnityProcessDetector {
                         parentName === validName || parentName.toLowerCase() === validName.toLowerCase()
                     );
                     
-                    if (isUnityParent) {
-                        console.log(`UnityCode: Filtering out child Unity process:`, {
-                            childPid: proc.pid,
-                            childName: proc.name,
-                            parentPid: proc.parentPid,
-                            parentName: parentProc.name
-                        });
-                    }
-                    
                     return isUnityParent;
                 }
                 return false;

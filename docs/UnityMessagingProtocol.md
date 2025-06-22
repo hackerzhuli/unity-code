@@ -2,6 +2,8 @@
 
 This document describes the UDP-based messaging protocol used by Unity's Visual Studio Editor package for communication between Unity Editor and Visual Studio(or other IDEs).
 
+The name of this package is `com.hackerzhuli.ide.visualstudio`. The name of the official package this is fork from is `com.unity.ide.visualstudio`. Difference between this package and the official package will be speicified below.
+
 ## Overview
 
 The protocol uses UDP as the primary transport with automatic fallback to TCP for large messages. The communication is bidirectional, allowing both Unity and Visual Studio to send messages to each other.
@@ -12,6 +14,11 @@ The protocol uses UDP as the primary transport with automatic fallback to TCP fo
 - **Messaging Port**: `56002 + (ProcessId % 1000)`
 - **Protocol**: UDP (primary), TCP (fallback for large messages)
 - **Address**: Binds to `IPAddress.Any` (0.0.0.0)
+
+### Client Timeout Configuration
+- **This Package**: Clients are removed after **60 seconds** of inactivity
+- **Official Unity Package**: Clients are removed after **4 seconds** of inactivity
+- **Heartbeat Requirement**: Clients must send messages at least once within the timeout period to stay registered
 
 ## Message Format
 
@@ -47,15 +54,15 @@ All available message types in the Unity Visual Studio integration:
 | `Stop` | 4 | Stop play mode | - |
 | `Pause` | 5 | Pause play mode | - |
 | `Unpause` | 6 | Unpause play mode | - |
-| `Build` | 7 | Build project | - |
+| ~~`Build`~~ | 7 | ~~Build project~~ (Obsolete) | - |
 | `Refresh` | 8 | Refresh asset database | - |
 | `Info` | 9 | Information message | - |
 | `Error` | 10 | Error message | - |
 | `Warning` | 11 | Warning message | - |
-| `Open` | 12 | Open file/asset | - |
-| `Opened` | 13 | File/asset opened confirmation | - |
+| ~~`Open`~~ | 12 | ~~Open file/asset~~ (Obsolete) | - |
+| ~~`Opened`~~ | 13 | ~~File/asset opened confirmation~~ (Obsolete) | - |
 | `Version` | 14 | Request/response for package version | Empty string (request) / Version string (response) |
-| `UpdatePackage` | 15 | Update package | - |
+| ~~`UpdatePackage`~~ | 15 | ~~Update package~~ (Obsolete) | - |
 | `ProjectPath` | 16 | Request/response for Unity project path | Empty string (request) / Full project path (response) |
 | `Tcp` | 17 | Internal message for TCP fallback coordination | `"<port>:<length>"` format |
 | `RunStarted` | 18 | Test run started | - |
@@ -66,11 +73,17 @@ All available message types in the Unity Visual Studio integration:
 | `RetrieveTestList` | 23 | Request to retrieve list of available tests | Check specific section below for details |
 | `ExecuteTests` | 24 | Request to execute specific tests | Check specific section below for details |
 | `ShowUsage` | 25 | Show usage information | - |
-| `CompilationFinished` | 26 | Notification that compilation has finished | Empty string |
+| `CompilationFinished` | 100 | Notification that compilation has finished | Empty string |
+| `PackageName` | 101 | Request/response for package name | Empty string (request) / Package name string (response) |
+| `OnLine` | 102 | Notifies clients that Unity is online and ready to receive messages | Empty string |
+| `OffLine` | 103 | Notifies clients that Unity is offline and can not receive messages | Empty string |
+
+Note:
+- Message value greater than or equal to 100 means it does not exist in the official package but was added in `com.hackerzhuli.ide.visualstudio`
 
 ### Value Format Details
 
-Detailed value formats are provided only for message types relevant to this implementation:
+Detailed value formats for some of the types:
 
 - **Empty Requests**: `Ping`, `Pong`, `None` always use empty string values
 - **Version**: 
@@ -79,6 +92,11 @@ Detailed value formats are provided only for message types relevant to this impl
 - **ProjectPath**: 
   - Request: Empty string  
   - Response: Full path to Unity project directory
+- **PackageName**: 
+  - Request: Empty string
+  - Response: Package name string (e.g., "com.hackerzhuli.ide.visualstudio")
+- **OnLine**: Empty string - sent when Unity comes online after domain reload or editor startup
+- **OffLine**: Empty string - sent when Unity goes offline before domain reload or editor shutdown
 - **Tcp**: Internal format `"<port>:<length>"` where port is the TCP listener port and length is the expected message size
 - **Test Messages**: Value format depends on Unity's test runner implementation and may contain JSON or structured data
 
@@ -165,12 +183,12 @@ Detailed value formats are provided only for message types relevant to this impl
 1. Client sends any message to Unity's messaging port
 2. Unity registers the client's endpoint and timestamp
 3. Unity responds appropriately based on message type
-4. Client must send messages at least every 4 seconds to stay registered
+4. Client must send messages within the configured timeout period to stay registered (see Client Timeout Configuration)
 
 ### Heartbeat Mechanism
 - Send `Ping` message to Unity
 - Unity responds with `Pong` message
-- Clients are automatically removed after 4 seconds of inactivity
+- Clients are automatically removed after the configured timeout period of inactivity (see Client Timeout Configuration)
 
 ### Large Message Handling (TCP Fallback)
 
@@ -223,7 +241,7 @@ When a message exceeds the 8KB UDP buffer limit, the protocol automatically swit
 - **Firewall Issues**: Check Windows Firewall settings for UDP port access
 - **Port Conflicts**: Unity uses `ReuseAddress` but conflicts may still occur
 - **Message Size**: Messages larger than 8KB automatically use TCP fallback
-- **Client Timeout**: Clients are removed after 4 seconds of inactivity
+- **Client Timeout**: Clients are removed after the configured timeout period of inactivity (see Client Timeout Configuration)
 
 ## Security Considerations
 
@@ -238,7 +256,7 @@ When a message exceeds the 8KB UDP buffer limit, the protocol automatically swit
 - **Message Ordering**: No guaranteed order (inherent UDP limitation)
 - **Buffer Size**: 8KB limit for UDP messages (larger messages use TCP)
 - **Platform Support**: Some features are Windows-specific
-- **Client Management**: Automatic cleanup after 4 seconds of inactivity
+- **Client Management**: Automatic cleanup after the configured timeout period of inactivity (see Client Timeout Configuration)
 
 ## Troubleshooting
 
@@ -246,4 +264,4 @@ When a message exceeds the 8KB UDP buffer limit, the protocol automatically swit
 2. **Firewall Blocks**: Check Windows Firewall settings
 3. **Port Conflicts**: Another application might be using the calculated port
 4. **Message Format**: Ensure proper binary serialization format
-5. **Client Timeout**: Send heartbeat messages every 3 seconds or less
+5. **Client Timeout**: Send heartbeat messages regularly within the configured timeout period (see Client Timeout Configuration)
