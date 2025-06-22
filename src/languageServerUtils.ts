@@ -23,8 +23,7 @@ export function isTypeSymbol(symbol: vscode.DocumentSymbol): boolean {
  */
 export enum LanguageServerType {
     DotRush = 'DotRush',
-    CSharpDevKit = 'CSharpDevKit',
-    Unknown = 'Unknown'
+    CSharpDevKit = 'CSharpDevKit'
 }
 
 /**
@@ -47,7 +46,7 @@ export interface LanguageServerInfo {
 export function detectLanguageServer(symbols: vscode.DocumentSymbol[]): LanguageServerInfo {
     if (symbols.length === 0) {
         return {
-            type: LanguageServerType.Unknown,
+            type: LanguageServerType.CSharpDevKit,
             hasNamespaceSymbols: false,
             hasDetailFields: false,
             sampleDetails: []
@@ -67,10 +66,9 @@ export function detectLanguageServer(symbols: vscode.DocumentSymbol[]): Language
     let detectedType: LanguageServerType;
     if (hasNamespaceSymbols) {
         detectedType = LanguageServerType.DotRush;
-    } else if (hasDetailFields) {
-        detectedType = LanguageServerType.CSharpDevKit;
     } else {
-        detectedType = LanguageServerType.Unknown;
+        // Default to C# Dev Kit when we can't definitively detect DotRush
+        detectedType = LanguageServerType.CSharpDevKit;
     }
     
     return {
@@ -126,30 +124,163 @@ export function getQualifiedTypeName(symbol: vscode.DocumentSymbol, constructedP
 }
 
 /**
- * Determines if a symbol is definitely a type based on language server information.
- * This provides more reliable type detection than the basic isTypeSymbol function.
+ * Find a symbol by traversing the symbol tree using the given full path.
+ * This function uses the provided language server information to optimize the search strategy.
  * 
- * @param symbol The document symbol to check
+ * @param symbols The root document symbols to search in
+ * @param fullPath The full dotted path to the symbol (e.g., "Namespace.Class.Method")
  * @param languageServerInfo Information about the detected language server
- * @returns True if the symbol is definitely a type, false otherwise
+ * @returns The found symbol or null if not found
  */
-export function isDefinitiveTypeSymbol(symbol: vscode.DocumentSymbol, languageServerInfo: LanguageServerInfo): boolean {
-    // For unknown language servers, fall back to basic detection
-    if (languageServerInfo.type === LanguageServerType.Unknown) {
-        // Default to C# Dev Kit behavior as specified
-        return isTypeSymbol(symbol);
+export function findSymbolByPath(symbols: vscode.DocumentSymbol[], fullPath: string, languageServerInfo: LanguageServerInfo): vscode.DocumentSymbol | null {
+    if (!symbols || symbols.length === 0 || !fullPath) {
+        return null;
     }
     
-    // For C# Dev Kit, we can be more confident in symbol kinds
-    if (languageServerInfo.type === LanguageServerType.CSharpDevKit) {
-        return isTypeSymbol(symbol);
+    const pathParts = fullPath.split('.');
+    
+    // Delegate to language server-specific implementation
+    switch (languageServerInfo.type) {
+        case LanguageServerType.DotRush:
+            return findSymbolRecursiveDotRush(symbols, pathParts, 0, languageServerInfo);
+        case LanguageServerType.CSharpDevKit:
+            return findSymbolRecursiveCSharpDevKit(symbols, pathParts, 0, languageServerInfo, fullPath);
+        default:
+            return null;
+    }
+}
+
+/**
+ * DotRush-specific symbol search implementation.
+ * DotRush creates namespace symbols that can contain dots in their names.
+ */
+function findSymbolRecursiveDotRush(
+    symbols: vscode.DocumentSymbol[], 
+    pathParts: string[], 
+    currentIndex: number,
+    languageServerInfo: LanguageServerInfo
+): vscode.DocumentSymbol | null {
+    const targetName = pathParts[currentIndex];
+    console.log(`[DotRush] Looking for symbol: ${targetName} at index ${currentIndex}, available symbols: ${symbols.map(s => `${s.name}(${s.kind})`).join(', ')}`);
+    
+    for (const symbol of symbols) {
+        let symbolNameToMatch = symbol.name;
+        
+        // For method symbols, extract just the method name before the opening parenthesis
+        if (symbol.kind === vscode.SymbolKind.Method) {
+            const parenIndex = symbol.name.indexOf('(');
+            symbolNameToMatch = parenIndex !== -1 ? symbol.name.substring(0, parenIndex) : symbol.name;
+        }
+        
+        // Check for exact match first
+        if (symbolNameToMatch === targetName) {
+            console.log(`[DotRush] Found matching symbol: ${symbol.name} (matched as ${symbolNameToMatch}), kind: ${symbol.kind}, has children: ${symbol.children?.length || 0}`);
+            
+            // If this is the last part of the path, we found our target
+            if (currentIndex === pathParts.length - 1) {
+                return symbol;
+            }
+            
+            // Otherwise, continue searching in children
+            if (symbol.children && symbol.children.length > 0) {
+                const result = findSymbolRecursiveDotRush(symbol.children, pathParts, currentIndex + 1, languageServerInfo);
+                if (result) {
+                    return result;
+                }
+            }
+        }
+        
+        // DotRush-specific: Handle namespace symbols that contain dots in their names
+        // This handles cases like "Name.Space.You.Are" where the namespace contains dots
+        if (symbol.kind === vscode.SymbolKind.Namespace && symbolNameToMatch.includes('.') && symbolNameToMatch.startsWith(targetName)) {
+            const remainingPath = pathParts.slice(currentIndex).join('.');
+            if (remainingPath.startsWith(symbolNameToMatch)) {
+                console.log(`[DotRush] Found namespace symbol with dots: ${symbol.name}, matching start of path: ${remainingPath}`);
+                
+                // Calculate how many path parts this namespace symbol consumes
+                const namespaceParts = symbolNameToMatch.split('.');
+                const newIndex = currentIndex + namespaceParts.length;
+                
+                // If this namespace consumes all remaining path parts, we found our target
+                if (newIndex === pathParts.length) {
+                    return symbol;
+                }
+                
+                // Otherwise, continue searching in children with the updated index
+                if (symbol.children && symbol.children.length > 0 && newIndex < pathParts.length) {
+                    const result = findSymbolRecursiveDotRush(symbol.children, pathParts, newIndex, languageServerInfo);
+                    if (result) {
+                        return result;
+                    }
+                }
+            }
+        }
     }
     
-    // For DotRush, we need to be more careful as it might have different symbol reporting
-    if (languageServerInfo.type === LanguageServerType.DotRush) {
-        return isTypeSymbol(symbol);
+    return null;
+}
+
+/**
+ * C# Dev Kit-specific symbol search implementation.
+ * C# Dev Kit doesn't create namespace symbols - types appear at top level with fully qualified names in detail field.
+ */
+function findSymbolRecursiveCSharpDevKit(
+    symbols: vscode.DocumentSymbol[], 
+    pathParts: string[], 
+    currentIndex: number,
+    languageServerInfo: LanguageServerInfo,
+    fullTargetPath: string
+): vscode.DocumentSymbol | null {
+    if (currentIndex >= pathParts.length) {
+        return null;
     }
     
-    // Fallback to basic detection
-    return isTypeSymbol(symbol);
+    console.log(`[CSharpDevKit] Looking for path: ${fullTargetPath} (from index ${currentIndex}), available symbols: ${symbols.map(s => `${s.name}(${s.kind})`).join(', ')}`);
+    
+    for (const symbol of symbols) {
+        // For type symbols, check if the detail field matches our full target path
+        if (isTypeSymbol(symbol)) {
+            if(!symbol.detail){
+                // this is unexpected, C# dev kit type must have detail field, if not, ignore
+                continue;
+            }
+
+            console.log(`[CSharpDevKit] Checking type symbol: ${symbol.name}, detail: ${symbol.detail}`);
+            
+            // C# Dev Kit puts the fully qualified name in the detail field
+            if (symbol.detail === fullTargetPath) {
+                console.log(`[CSharpDevKit] Found exact match via detail field: ${symbol.name}`);
+                return symbol;
+            }
+            
+            // Check if this type is part of our target path (for nested symbols)
+            if (fullTargetPath.startsWith(symbol.detail + '.')) {
+                console.log(`[CSharpDevKit] Type ${symbol.name} is part of target path, searching children`);
+                // Calculate how many path parts this type symbol consumes
+                const typePathPartsCount = (symbol.detail.match(/\./g) || []).length + 1;
+                const newIndex = currentIndex + typePathPartsCount;
+                
+                if (symbol.children && symbol.children.length > 0 && newIndex < pathParts.length) {
+                    const result = findSymbolRecursiveCSharpDevKit(symbol.children, pathParts, newIndex, languageServerInfo, fullTargetPath);
+                    if (result) {
+                        return result;
+                    }
+                }
+            }
+        }
+        
+        // For non-type symbols (methods, properties, etc.), match by name
+        // Non-type symbols cannot have children, so they're always leaf nodes
+        const currentTarget = pathParts[currentIndex];
+        if (symbol.name === currentTarget) {
+            console.log(`[CSharpDevKit] Found matching symbol: ${symbol.name}, kind: ${symbol.kind}`);
+            
+            // If this is the last part of the path, we found our target
+            if (currentIndex === pathParts.length - 1) {
+                return symbol;
+            }
+        }
+    }
+    
+    return null;
 }

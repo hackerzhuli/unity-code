@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor } from './unityMessagingClient.js';
 import { logWithLimit } from './utils.js';
+import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
 
 /**
  * Unity Test Provider for VS Code Testing API
@@ -565,8 +566,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 });
             }
 
+            // Detect language server once at entry point for optimization
+            const languageServerInfo = detectLanguageServer(symbols);
+            
             const codeLenses: vscode.CodeLens[] = [];
-            await this.findTestCodeLenses(symbols, document, codeLenses);
+            await this.findTestCodeLenses(symbols, document, codeLenses, languageServerInfo);
             
             console.log(`Generated code lenses count: ${codeLenses.length}`);
             return codeLenses;
@@ -583,7 +587,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private async findTestCodeLenses(
         symbols: vscode.DocumentSymbol[],
         document: vscode.TextDocument,
-        codeLenses: vscode.CodeLens[]
+        codeLenses: vscode.CodeLens[],
+        languageServerInfo: LanguageServerInfo
     ): Promise<void> {
         // Group tests by class and method
         const testsByClass = new Map<string, TestAdaptor[]>();
@@ -600,7 +605,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         
         // Create code lenses for each test method
         for (const test of this.allTests) {
-            const symbol = this.findSymbolByPath(symbols, test.FullName);
+            const symbol = findSymbolByPath(symbols, test.FullName, languageServerInfo);
             if (symbol && symbol.kind === vscode.SymbolKind.Method) {
                 console.log(`Found method symbol for test: ${test.FullName}`);
                 
@@ -615,7 +620,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         // Create code lenses for test classes (containing multiple tests)
         for (const [classPath, testsInClass] of testsByClass) {
             if (testsInClass.length > 1) { // Only create class-level code lens if there are multiple tests
-                const classSymbol = this.findSymbolByPath(symbols, classPath);
+                const classSymbol = findSymbolByPath(symbols, classPath, languageServerInfo);
                 if (classSymbol && (classSymbol.kind === vscode.SymbolKind.Class || classSymbol.kind === vscode.SymbolKind.Struct)) {
                     console.log(`Found class symbol for ${testsInClass.length} tests: ${classPath}`);
                     
@@ -635,86 +640,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         const parts = fullName.split('.');
         // Remove the last part (method name) to get the class path
         return parts.slice(0, -1).join('.');
-    }
-
-    /**
-     * Find a symbol by traversing the symbol tree using the given path
-     */
-    private findSymbolByPath(symbols: vscode.DocumentSymbol[], fullPath: string): vscode.DocumentSymbol | null {
-        const pathParts = fullPath.split('.');
-        return this.findSymbolRecursive(symbols, pathParts, 0);
-    }
-
-    /**
-     * Recursively search for a symbol matching the path parts
-     */
-    private findSymbolRecursive(
-        symbols: vscode.DocumentSymbol[], 
-        pathParts: string[], 
-        currentIndex: number
-    ): vscode.DocumentSymbol | null {
-        if (currentIndex >= pathParts.length) {
-            return null;
-        }
-
-        const targetName = pathParts[currentIndex];
-        console.log(`Looking for symbol: ${targetName} at index ${currentIndex}, available symbols: ${symbols.map(s => `${s.name}(${s.kind})`).join(', ')}`);
-        
-        for (const symbol of symbols) {
-            let symbolNameToMatch = symbol.name;
-            
-            // For method symbols, extract just the method name before the opening parenthesis
-            if (symbol.kind === vscode.SymbolKind.Method) {
-                const parenIndex = symbol.name.indexOf('(');
-                symbolNameToMatch = parenIndex !== -1 ? symbol.name.substring(0, parenIndex) : symbol.name;
-            }
-            
-            // Check for exact match first
-            if (symbolNameToMatch === targetName) {
-                console.log(`Found matching symbol: ${symbol.name} (matched as ${symbolNameToMatch}), kind: ${symbol.kind}, has children: ${symbol.children?.length || 0}`);
-                
-                // If this is the last part of the path, we found our target
-                if (currentIndex === pathParts.length - 1) {
-                    return symbol;
-                }
-                
-                // Otherwise, continue searching in children
-                if (symbol.children && symbol.children.length > 0) {
-                    const result = this.findSymbolRecursive(symbol.children, pathParts, currentIndex + 1);
-                    if (result) {
-                        return result;
-                    }
-                }
-            }
-            
-            // For namespace symbols, check if the symbol name matches multiple path parts
-            // This handles cases like "Name.Space.You.Are" where the namespace contains dots
-            if (symbol.kind === vscode.SymbolKind.Namespace && symbolNameToMatch.includes('.') && symbolNameToMatch.startsWith(targetName)) {
-                const remainingPath = pathParts.slice(currentIndex).join('.');
-                if (remainingPath.startsWith(symbolNameToMatch)) {
-                    console.log(`Found namespace symbol with dots: ${symbol.name}, matching start of path: ${remainingPath}`);
-                    
-                    // Calculate how many path parts this namespace symbol consumes
-                    const namespaceParts = symbolNameToMatch.split('.');
-                    const newIndex = currentIndex + namespaceParts.length;
-                    
-                    // If this namespace consumes all remaining path parts, we found our target
-                    if (newIndex === pathParts.length) {
-                        return symbol;
-                    }
-                    
-                    // Otherwise, continue searching in children with the updated index
-                    if (symbol.children && symbol.children.length > 0 && newIndex < pathParts.length) {
-                        const result = this.findSymbolRecursive(symbol.children, pathParts, newIndex);
-                        if (result) {
-                            return result;
-                        }
-                    }
-                }
-            }
-        }
-        
-        return null;
     }
 
     /**
@@ -798,15 +723,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         return basePath ? `${basePath}.${name}` : name;
     }
 
-    /**
-     * Check if a symbol represents a type (class, interface, struct, or enum)
-     */
-    private isTypeSymbol(symbol: vscode.DocumentSymbol): boolean {
-        return symbol.kind === vscode.SymbolKind.Class ||
-               symbol.kind === vscode.SymbolKind.Interface ||
-               symbol.kind === vscode.SymbolKind.Struct ||
-               symbol.kind === vscode.SymbolKind.Enum;
-    }
+
 
     /**
      * Dispose the test provider

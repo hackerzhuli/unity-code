@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { DecompiledFileHelper, DecompiledFileInfo } from './decompiledFileHelper.js';
 import { UnityPackageHelper, PackageInfo } from './unityPackageHelper.js';
-import { getQualifiedTypeName, detectLanguageServer, LanguageServerInfo, isDefinitiveTypeSymbol } from './languageServerUtils.js';
+import { getQualifiedTypeName, detectLanguageServer, LanguageServerInfo, isTypeSymbol } from './languageServerUtils.js';
 
 /**
  * Hover provider that adds documentation links to C# symbols
@@ -220,7 +220,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         const searchSymbols = (symbolList: vscode.DocumentSymbol[], path: string, isInsideType: boolean = false) => {
             for (const symbol of symbolList) {
                 // Use definitive type detection based on language server
-                const isType = isDefinitiveTypeSymbol(symbol, languageServerInfo);
+                const isType = isTypeSymbol(symbol);
                 
                 if (isType && !isInsideType) {
                     // This is a top-level type (not nested inside another type)
@@ -335,7 +335,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 // If this symbol has children, search recursively for a more specific match
                 if (symbol.children && symbol.children.length > 0) {
                     if (!isTopLevelTypeFound){
-                        if(isDefinitiveTypeSymbol(symbol, languageServerInfo)){
+                        if(isTypeSymbol(symbol)){
                             // For C# Dev Kit, use the detail field if available, otherwise combine path
                             updatedTopLevelTypePath = getQualifiedTypeName(symbol, combinePath(topLevelTypePath, symbol.name));
                             updatedIsTopLevelTypeFound = true;
@@ -355,7 +355,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 // For the target symbol, determine the best qualified type name
                 // If this is a type symbol, use its own qualification
                 // Otherwise, use the top-level type path we've been building
-                const qualifiedTypeName = isDefinitiveTypeSymbol(symbol, languageServerInfo) 
+                const qualifiedTypeName = isTypeSymbol(symbol) 
                     ? getQualifiedTypeName(symbol, updatedTopLevelTypePath)
                     : updatedTopLevelTypePath;
                 
@@ -370,12 +370,6 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         
         return undefined;
     }
-
-
-
-
-
-
 
     /**
      * Generate documentation link based on symbol type using configuration
