@@ -90,17 +90,21 @@ function processXmlNode(node: unknown): string {
             }
             const result = processXmlNode(item);
             return result;
-        }).filter((result: string) => result.length > 0);
-        
-        // Join with spaces, but don't add spaces around newlines from br elements
+        }).filter((result: string) => result.length > 0);        // Join with appropriate spacing - handle code blocks specially
         let combined = '';
         for (let i = 0; i < results.length; i++) {
             if (i > 0) {
-                // Don't add space if previous result ends with newline or current starts with newline
                 const prev = results[i - 1];
                 const curr = results[i];
+                
+                // Don't add space if previous result ends with newline or current starts with newline
                 if (!prev.endsWith('\n') && !curr.startsWith('\n')) {
-                    combined += ' ';
+                    // Special case: if current item is a code block, add double newline for proper spacing
+                    if (curr.includes('```')) {
+                        combined += '\n\n';
+                    } else {
+                        combined += ' ';
+                    }
                 }
             }
             combined += results[i];
@@ -208,14 +212,34 @@ function processContent(content: unknown): string {
     
     if (typeof content === 'string') {
         return content.trim();
-    }
-      if (Array.isArray(content)) {
-        return content.map(item => {
+    }      if (Array.isArray(content)) {
+        const results = content.map(item => {
             if (typeof item === 'string') {
                 return item;
             }
             return processXmlNode(item);
-        }).join(' ').trim();
+        });
+        
+        // Join with appropriate spacing - handle code blocks specially
+        let combined = '';
+        for (let i = 0; i < results.length; i++) {
+            if (i > 0) {
+                const prev = results[i - 1];
+                const curr = results[i];
+                
+                // Don't add space if previous result ends with newline or current starts with newline
+                if (!prev.endsWith('\n') && !curr.startsWith('\n')) {
+                    // Special case: if current item is a code block, add double newline for proper spacing
+                    if (curr.includes('```')) {
+                        combined += '\n\n';
+                    } else {
+                        combined += ' ';
+                    }
+                }
+            }
+            combined += results[i];
+        }
+        return combined.trim();
     }
     
     if (typeof content === 'object' && content !== null) {
@@ -244,9 +268,8 @@ function processContent(content: unknown): string {
             }
             return result.trim();
         }
-        
-        // Mixed content - we need to be more careful about ordering
-        // For now, let's concatenate text and elements with spaces
+          // Mixed content - we need to be more careful about ordering
+        // For now, let's concatenate text and elements with appropriate spacing
         const parts: string[] = [];
         
         if (node['#text']) {
@@ -262,7 +285,18 @@ function processContent(content: unknown): string {
             }
         }
         
-        return parts.join(' ').replace(/\s+/g, ' ').trim();
+        // Join parts with appropriate spacing - if any part contains code blocks, use newlines
+        const hasCodeBlocks = parts.some(part => part.includes('```'));
+        if (hasCodeBlocks) {
+            // For content with code blocks, join with newlines and clean up spacing
+            let result = parts.join('\n').trim();
+            // Clean up multiple consecutive newlines but preserve intentional breaks
+            result = result.replace(/\n\s*\n/g, '\n\n');
+            return result;
+        } else {
+            // For regular content, join with spaces
+            return parts.join(' ').replace(/\s+/g, ' ').trim();
+        }
     }
     
     return String(content).trim();
@@ -490,7 +524,7 @@ function normalizeCodeIndentation(code: string): string {
 }
 
 /**
- * Further normalize code to ensure top-level braces are flush left
+ * Further normalize code to ensure braces are properly aligned
  */
 function normalizeTopLevelBraces(code: string): string {
     const lines = code.split('\n');
@@ -503,7 +537,7 @@ function normalizeTopLevelBraces(code: string): string {
         
         // Check if this line is just an opening brace
         if (trimmed === '{') {
-            // Look at the previous non-empty line to determine if this should be flush left
+            // Look at the previous non-empty line to determine the correct indentation
             let prevNonEmptyIndex = i - 1;
             while (prevNonEmptyIndex >= 0 && lines[prevNonEmptyIndex].trim() === '') {
                 prevNonEmptyIndex--;
@@ -512,20 +546,29 @@ function normalizeTopLevelBraces(code: string): string {
             if (prevNonEmptyIndex >= 0) {
                 const prevLine = lines[prevNonEmptyIndex];
                 const prevTrimmed = prevLine.trim();
+                const prevIndent = prevLine.length - prevLine.trimStart().length;
                 
-                // If previous line is a class/interface/namespace/method declaration, make brace flush left
+                // For top-level declarations (class, interface, namespace), brace should be flush left
                 if (prevTrimmed.includes('class ') || 
                     prevTrimmed.includes('interface ') || 
                     prevTrimmed.includes('namespace ') ||
                     prevTrimmed.includes('struct ') ||
-                    prevTrimmed.includes('enum ') ||
-                    prevTrimmed.endsWith(')') || // method declaration
+                    prevTrimmed.includes('enum ')) {
+                    braceStack.push(0); // Track that this brace is at level 0
+                    normalizedLines.push('{');
+                    continue;
+                }
+                
+                // For method declarations or other declarations with access modifiers, 
+                // align brace with the declaration (same indentation level)
+                if (prevTrimmed.endsWith(')') || // method declaration
                     prevTrimmed.startsWith('public ') ||
                     prevTrimmed.startsWith('private ') ||
                     prevTrimmed.startsWith('protected ') ||
                     prevTrimmed.startsWith('internal ')) {
-                    braceStack.push(0); // Track that this brace is at level 0
-                    normalizedLines.push('{');
+                    const alignedBrace = ' '.repeat(prevIndent) + '{';
+                    braceStack.push(prevIndent);
+                    normalizedLines.push(alignedBrace);
                     continue;
                 }
             }

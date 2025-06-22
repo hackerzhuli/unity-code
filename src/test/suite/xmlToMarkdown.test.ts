@@ -303,7 +303,71 @@ This tag will apply to the primary constructor parameter.
             assert.ok(result.includes('The result'));
             assert.ok(result.includes('## Exceptions'));
             assert.ok(result.includes('- **`Exception1`**: First exception'));
-            assert.ok(result.includes('- **`Exception2`**: Second exception'));
+            assert.ok(result.includes('- **`Exception2`**: Second exception'));        });        it('should format code blocks with class and method properly', () => {
+            const input = `<example>
+This example shows a simple class with a method:
+<code>
+    public class Calculator
+    {
+        public int Add(int a, int b)
+        {
+            return a + b;
+        }
+    }
+</code>
+</example>`;
+            
+            const result = xmlToMarkdown(input);
+            
+            // Verify the example section is created
+            assert.ok(result.includes('## Example'));
+            assert.ok(result.includes('This example shows a simple class'));
+            
+            // Verify code block is properly formatted
+            assert.ok(result.includes('```'));
+            assert.ok(result.includes('public class Calculator'));
+            assert.ok(result.includes('public int Add(int a, int b)'));
+            
+            // Verify proper brace alignment
+            const lines = result.split('\n');
+            const codeBlockStart = lines.findIndex(line => line.trim() === '```');
+            const codeBlockEnd = lines.findIndex((line, index) => index > codeBlockStart && line.trim() === '```');
+            
+            if (codeBlockStart !== -1 && codeBlockEnd !== -1) {
+                const codeLines = lines.slice(codeBlockStart + 1, codeBlockEnd);
+                
+                // Find the class opening brace - should be flush left
+                const classLine = codeLines.find(line => line.includes('public class Calculator'));
+                const classOpenBraceLine = codeLines.find((line, index) => {
+                    return line.trim() === '{' && index > 0 && 
+                           codeLines[index - 1].includes('public class Calculator');
+                });
+                
+                if (classLine && classOpenBraceLine) {
+                    assert.strictEqual(classOpenBraceLine, '{', 'Class opening brace should be flush left');
+                }
+                
+                // Find the method opening brace - should be indented to match method declaration
+                const methodLine = codeLines.find(line => line.includes('public int Add'));
+                const methodOpenBraceLine = codeLines.find((line, index) => {
+                    return line.trim() === '{' && index > 0 && 
+                           codeLines[index - 1].includes('public int Add');
+                });
+                
+                if (methodLine && methodOpenBraceLine) {
+                    const methodIndent = methodLine.length - methodLine.trimStart().length;
+                    const expectedMethodBrace = ' '.repeat(methodIndent) + '{';
+                    assert.strictEqual(methodOpenBraceLine, expectedMethodBrace, 
+                        'Method opening brace should align with method declaration');
+                }
+                
+                // Verify return statement indentation
+                const returnLine = codeLines.find(line => line.includes('return a + b'));
+                if (returnLine) {
+                    assert.ok(returnLine.startsWith('        '), 
+                        'Return statement should be properly indented within method');
+                }
+            }
         });
     });
 });
