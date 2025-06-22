@@ -157,7 +157,10 @@ export class UnityMessagingClient {
     private messageQueue: Array<{ type: MessageType; value: string; resolve: () => void; reject: (error: Error) => void }> = [];
     private readonly OFFICIAL_PACKAGE_HEARTBEAT = 3000; // 3 seconds for official package (4s timeout)
     private readonly CUSTOM_PACKAGE_HEARTBEAT = 30000; // 30 seconds for custom package (60s timeout)
-    private currentHeartbeatInterval: number = this.OFFICIAL_PACKAGE_HEARTBEAT;
+    private readonly INITIAL_AGGRESSIVE_HEARTBEAT = 500; // 500ms for initial connection detection
+    private currentHeartbeatInterval: number = this.INITIAL_AGGRESSIVE_HEARTBEAT;
+    private initialHeartbeatTimeout: NodeJS.Timeout | null = null;
+    private hasReceivedFirstResponse: boolean = false;
     
     // Auto-connection management
     private autoConnectEnabled: boolean = true;
@@ -314,6 +317,8 @@ export class UnityMessagingClient {
         this.isConnected = false;
         this.isUnityOnline = false;
         this.connectedProcessId = null;
+        this.hasReceivedFirstResponse = false;
+        this.currentHeartbeatInterval = this.INITIAL_AGGRESSIVE_HEARTBEAT; // Reset to aggressive heartbeat for next connection
         this.stopHeartbeat();
         this.stopProcessMonitoring();
         
@@ -359,11 +364,9 @@ export class UnityMessagingClient {
             // Send initial ping to establish connection
             await this.sendMessageInternal(MessageType.Ping, '');
             
-            // Request package name to determine heartbeat interval
-            await this.sendMessageInternal(MessageType.PackageName, '');
-            
             // Unity online status will be determined by first pong or OnLine message
             this.isUnityOnline = false;
+            this.hasReceivedFirstResponse = false;
             
             // Start monitoring the connected Unity process for shutdowns
             this.startProcessMonitoring();
@@ -392,6 +395,7 @@ export class UnityMessagingClient {
         const wasOnline = this.isUnityOnline;
         this.isConnected = false;
         this.isUnityOnline = false;
+        this.hasReceivedFirstResponse = false;
         
         // Emit status change events
         if (wasConnected) {
@@ -430,11 +434,62 @@ export class UnityMessagingClient {
             }
         }, this.currentHeartbeatInterval);
     }
+    
+    /**
+     * Handle first response from Unity - request package name and switch to normal heartbeat
+     */
+    private handleFirstResponse(): void {
+        if (!this.hasReceivedFirstResponse) {
+            this.hasReceivedFirstResponse = true;
+            console.log('UnityCode: First response received, requesting package name and switching to normal heartbeat');
+            
+            // Request package name now that Unity is responding
+            this.sendMessageInternal(MessageType.PackageName, '').catch(error => {
+                console.warn('UnityCode: Failed to request package name:', error);
+            });
+            
+            // Switch to normal heartbeat after a delay
+            this.scheduleNormalHeartbeat();
+        }
+    }
+    
+    /**
+     * Schedule transition to normal heartbeat interval after initial aggressive period
+     */
+    private scheduleNormalHeartbeat(): void {
+        if (this.initialHeartbeatTimeout) {
+            clearTimeout(this.initialHeartbeatTimeout);
+        }
+        
+        this.initialHeartbeatTimeout = setTimeout(() => {
+            if (!this.isDisposed && this.hasReceivedFirstResponse) {
+                console.log('UnityCode: Switching from aggressive to normal heartbeat interval');
+                
+                // Determine the correct heartbeat interval based on package (if known)
+                const isCustomPackage = this.packageName === 'com.hackerzhuli.ide.visualstudio';
+                const normalInterval = isCustomPackage ? this.CUSTOM_PACKAGE_HEARTBEAT : this.OFFICIAL_PACKAGE_HEARTBEAT;
+                
+                this.currentHeartbeatInterval = normalInterval;
+                console.log(`UnityCode: Set heartbeat interval to ${normalInterval}ms for package '${this.packageName || 'unknown'}'`);
+                
+                // Restart heartbeat with normal interval
+                if (this.heartbeatInterval) {
+                    this.startHeartbeat();
+                }
+            }
+        }, 2000); // Wait 2 seconds after first response before switching
+    }
 
     /**
      * Update heartbeat interval based on detected package
      */
     private updateHeartbeatInterval(): void {
+        // Only update heartbeat interval if we've already switched from aggressive mode
+        if (!this.hasReceivedFirstResponse) {
+            console.log(`UnityCode: Package detected (${this.packageName}) but still in aggressive heartbeat mode, will update later`);
+            return;
+        }
+        
         const isCustomPackage = this.packageName === 'com.hackerzhuli.ide.visualstudio';
         const newInterval = isCustomPackage ? this.CUSTOM_PACKAGE_HEARTBEAT : this.OFFICIAL_PACKAGE_HEARTBEAT;
         
@@ -478,6 +533,11 @@ export class UnityMessagingClient {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
+        }
+        
+        if (this.initialHeartbeatTimeout) {
+            clearTimeout(this.initialHeartbeatTimeout);
+            this.initialHeartbeatTimeout = null;
         }
     }
 
@@ -561,6 +621,7 @@ export class UnityMessagingClient {
             this.isUnityOnline = true;
             this.onOnlineStatus.emit(true);
             this.processMessageQueue();
+            this.handleFirstResponse();
             messageHandledInternally = true;
         } else if (message.type === MessageType.OffLine) {
             console.log('UnityCode: Unity went offline');
@@ -575,6 +636,7 @@ export class UnityMessagingClient {
                 this.onOnlineStatus.emit(true);
                 this.processMessageQueue();
             }
+            this.handleFirstResponse();
             messageHandledInternally = true;
         } else if (message.type === MessageType.PackageName && message.value) {
             this.packageName = message.value;
