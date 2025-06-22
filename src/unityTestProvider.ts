@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
-import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor } from './unityMessagingClient.js';
+import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor } from './unityMessagingClient.js';
 import { logWithLimit } from './utils.js';
 
 /**
  * Unity Test Provider for VS Code Testing API
  * Manages test discovery, execution, and result reporting
  */
-export class UnityTestProvider {
+export class UnityTestProvider implements vscode.CodeLensProvider {
     private testController: vscode.TestController;
     public messagingClient: UnityMessagingClient; // Made public for auto-refresh access
     private testData = new WeakMap<vscode.TestItem, { id: string; fullName: string; testMode: 'EditMode' | 'PlayMode' }>();
@@ -14,6 +14,13 @@ export class UnityTestProvider {
     private debugProfile: vscode.TestRunProfile;
     private currentTestRun: vscode.TestRun | null = null;
     private isRunning: boolean = false;
+    
+    // Code lens related properties
+    private allTests: TestAdaptor[] = [];
+    private testResults = new Map<string, TestStatusAdaptor>();
+    private codeLensProvider: vscode.Disposable | undefined;
+    private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
+    public readonly onDidChangeCodeLenses = this.onDidChangeCodeLensesEmitter.event;
 
     constructor(context: vscode.ExtensionContext, unityProjectPath?: string) {
         this.testController = vscode.tests.createTestController('unityTests', 'Unity Tests');
@@ -22,6 +29,14 @@ export class UnityTestProvider {
         
         // Register test controller
         context.subscriptions.push(this.testController);
+        
+        // Register code lens provider for C# files
+        this.codeLensProvider = vscode.languages.registerCodeLensProvider(
+            { scheme: 'file', language: 'csharp' },
+            this
+        );
+        context.subscriptions.push(this.codeLensProvider);
+        context.subscriptions.push(this.onDidChangeCodeLensesEmitter);
         
         // Create run profiles
         this.runProfile = this.testController.createRunProfile(
@@ -190,6 +205,17 @@ export class UnityTestProvider {
         if (!testContainer.TestAdaptors || testContainer.TestAdaptors.length === 0) {
             return;
         }
+        
+        // Store tests for code lens functionality
+        // Remove existing tests for this mode and add new ones
+        this.allTests = this.allTests.filter(test => {
+            // Keep tests that don't match the current test mode by checking if any test in current container has same FullName
+            return !testContainer.TestAdaptors.some(newTest => newTest.FullName === test.FullName);
+        });
+        this.allTests.push(...testContainer.TestAdaptors);
+        
+        // Refresh code lenses
+        this.onDidChangeCodeLensesEmitter.fire();
 
         // Create a map to store test items by their index
         const testItems = new Map<number, vscode.TestItem>();
@@ -281,7 +307,7 @@ export class UnityTestProvider {
     /**
      * Run tests
      */
-    private async runTests(
+    public async runTests(
         request: vscode.TestRunRequest,
         token: vscode.CancellationToken
     ): Promise<void> {
@@ -413,6 +439,12 @@ export class UnityTestProvider {
      * Update test result in VS Code
      */
     private updateTestResult(result: TestResultAdaptor): void {
+        // Store test result for code lens
+        this.testResults.set(result.FullName, result.TestStatus);
+        
+        // Refresh code lenses to show updated status
+        this.onDidChangeCodeLensesEmitter.fire();
+        
         if (!this.currentTestRun) {
             return;
         }
@@ -451,7 +483,7 @@ export class UnityTestProvider {
     /**
      * Find test item by full name
      */
-    private findTestByFullName(fullName: string): vscode.TestItem | null {
+    public findTestByFullName(fullName: string): vscode.TestItem | null {
         const findInCollection = (collection: vscode.TestItemCollection): vscode.TestItem | null => {
             for (const [, item] of collection) {
                 const testData = this.testData.get(item);
@@ -480,9 +512,230 @@ export class UnityTestProvider {
     }
 
     /**
+     * Provide code lenses for C# test methods and classes
+     */
+    async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<vscode.CodeLens[]> {
+        if (token.isCancellationRequested || this.allTests.length === 0) {
+            return [];
+        }
+
+        try {
+            // Add delay to allow C# language server to initialize
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            if (token.isCancellationRequested) {
+                return [];
+            }
+
+            // Get document symbols
+            const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+                'vscode.executeDocumentSymbolProvider',
+                document.uri
+            );
+
+            console.log('Document symbols result:', symbols ? symbols.length : 'undefined');
+
+            if (!symbols || symbols.length === 0) {
+                return [];
+            }
+
+            // Debug: Log available tests
+            console.log(`Available tests count: ${this.allTests.length}`);
+            if (this.allTests.length > 0) {
+                console.log(`Sample test data:`);
+                this.allTests.slice(0, 5).forEach((test, i) => {
+                    console.log(`  Test ${i}: Name="${test.Name}", FullName="${test.FullName}", Type="${test.Type}", Method="${test.Method}", Parent=${test.Parent}`);
+                });
+            }
+
+            const codeLenses: vscode.CodeLens[] = [];
+            await this.findTestCodeLenses(symbols, document, codeLenses);
+            
+            console.log(`Generated code lenses count: ${codeLenses.length}`);
+            return codeLenses;
+
+        } catch (error) {
+            console.error('Error providing code lenses:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Find code lenses by iterating through tests and finding matching symbols
+     */
+    private async findTestCodeLenses(
+        symbols: vscode.DocumentSymbol[],
+        document: vscode.TextDocument,
+        codeLenses: vscode.CodeLens[]
+    ): Promise<void> {
+        // Iterate through all tests and try to find matching symbols
+        for (const test of this.allTests) {
+            const symbol = this.findSymbolByPath(symbols, test.FullName);
+            if (symbol) {
+                console.log(`Found symbol for test: ${test.FullName}, kind: ${symbol.kind}`);
+                
+                // Don't create code lenses for namespace-level symbols
+                if (symbol.kind === vscode.SymbolKind.Namespace) {
+                    console.log(`Skipping namespace-level symbol: ${test.FullName}`);
+                    continue;
+                }
+                
+                const codeLens = this.createCodeLens(symbol, [test], document);
+                if (codeLens) {
+                    codeLenses.push(codeLens);
+                }
+            } else {
+                console.log(`No symbol found for test: ${test.FullName}`);
+            }
+        }
+    }
+
+    /**
+     * Find a symbol by traversing the symbol tree using the given path
+     */
+    private findSymbolByPath(symbols: vscode.DocumentSymbol[], fullPath: string): vscode.DocumentSymbol | null {
+        const pathParts = fullPath.split('.');
+        return this.findSymbolRecursive(symbols, pathParts, 0);
+    }
+
+    /**
+     * Recursively search for a symbol matching the path parts
+     */
+    private findSymbolRecursive(
+        symbols: vscode.DocumentSymbol[], 
+        pathParts: string[], 
+        currentIndex: number
+    ): vscode.DocumentSymbol | null {
+        if (currentIndex >= pathParts.length) {
+            return null;
+        }
+
+        const targetName = pathParts[currentIndex];
+        console.log(`Looking for symbol: ${targetName} at index ${currentIndex}, available symbols: ${symbols.map(s => `${s.name}(${s.kind})`).join(', ')}`);
+        
+        for (const symbol of symbols) {
+            let symbolNameToMatch = symbol.name;
+            
+            // For method symbols, extract just the method name before the opening parenthesis
+            if (symbol.kind === vscode.SymbolKind.Method) {
+                const parenIndex = symbol.name.indexOf('(');
+                symbolNameToMatch = parenIndex !== -1 ? symbol.name.substring(0, parenIndex) : symbol.name;
+            }
+            
+            if (symbolNameToMatch === targetName) {
+                console.log(`Found matching symbol: ${symbol.name} (matched as ${symbolNameToMatch}), kind: ${symbol.kind}, has children: ${symbol.children?.length || 0}`);
+                
+                // If this is the last part of the path, we found our target
+                if (currentIndex === pathParts.length - 1) {
+                    return symbol;
+                }
+                
+                // Otherwise, continue searching in children
+                if (symbol.children && symbol.children.length > 0) {
+                    const result = this.findSymbolRecursive(symbol.children, pathParts, currentIndex + 1);
+                    if (result) {
+                        return result;
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+
+
+
+    /**
+     * Create a code lens for the given symbol and tests
+     */
+    private createCodeLens(symbol: vscode.DocumentSymbol, tests: TestAdaptor[], _document: vscode.TextDocument): vscode.CodeLens | null {
+        // Use the symbol's selection range for better positioning
+        const range = symbol.selectionRange;
+        
+        // Create code lens with test information
+        const codeLens = new vscode.CodeLens(range);
+        codeLens.command = {
+            title: this.getCodeLensTitle(tests),
+            command: 'unitycode.runTests',
+            arguments: [tests.map(t => t.FullName)]
+        };
+        
+        return codeLens;
+    }
+
+    /**
+     * Get the title for the code lens based on test results
+     */
+    private getCodeLensTitle(tests: TestAdaptor[]): string {
+        if (tests.length === 0) {
+            return '';
+        }
+
+        const testCount = tests.length;
+        let passedCount = 0;
+        let failedCount = 0;
+        let skippedCount = 0;
+        let inconclusiveCount = 0;
+        let noResultCount = 0;
+
+        for (const test of tests) {
+            const result = this.testResults.get(test.FullName);
+            if (result === undefined) {
+                noResultCount++;
+            } else {
+                switch (result) {
+                    case TestStatusAdaptor.Passed:
+                        passedCount++;
+                        break;
+                    case TestStatusAdaptor.Failed:
+                        failedCount++;
+                        break;
+                    case TestStatusAdaptor.Skipped:
+                        skippedCount++;
+                        break;
+                    case TestStatusAdaptor.Inconclusive:
+                        inconclusiveCount++;
+                        break;
+                }
+            }
+        }
+
+        // Build status string
+        const statusParts: string[] = [];
+        if (passedCount > 0) statusParts.push(`✅ ${passedCount}`);
+        if (failedCount > 0) statusParts.push(`❌ ${failedCount}`);
+        if (skippedCount > 0) statusParts.push(`⏭️ ${skippedCount}`);
+        if (inconclusiveCount > 0) statusParts.push(`❓ ${inconclusiveCount}`);
+        if (noResultCount > 0) statusParts.push(`⚪ ${noResultCount}`);
+
+        const statusText = statusParts.length > 0 ? ` (${statusParts.join(' ')})` : '';
+        const testText = testCount === 1 ? 'test' : 'tests';
+        
+        return `▶️ Run ${testCount} ${testText}${statusText}`;
+    }
+
+    /**
+     * Helper method to combine path components
+     */
+    private combinePath(basePath: string, name: string): string {
+        return basePath ? `${basePath}.${name}` : name;
+    }
+
+    /**
+     * Check if a symbol represents a type (class, interface, struct, or enum)
+     */
+    private isTypeSymbol(symbol: vscode.DocumentSymbol): boolean {
+        return symbol.kind === vscode.SymbolKind.Class ||
+               symbol.kind === vscode.SymbolKind.Interface ||
+               symbol.kind === vscode.SymbolKind.Struct ||
+               symbol.kind === vscode.SymbolKind.Enum;
+    }
+
+    /**
      * Dispose the test provider
      */
     dispose(): void {
+        this.onDidChangeCodeLensesEmitter.dispose();
         this.messagingClient.dispose();
         this.testController.dispose();
     }

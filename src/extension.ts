@@ -285,6 +285,49 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         }
     });
 
+    // Register the command to run tests from code lens
+    const runTestsDisposable = vscode.commands.registerCommand('unitycode.runTests', async function (testFullNames: string[]) {
+        if (!globalTestProvider) {
+            vscode.window.showWarningMessage('Unity Code: Test provider not available');
+            return;
+        }
+
+        if (!globalTestProvider.messagingClient.connected) {
+            vscode.window.showErrorMessage('Unity Code: Not connected to Unity Editor. Make sure Unity is running.');
+            return;
+        }
+
+        if (!testFullNames || testFullNames.length === 0) {
+            vscode.window.showWarningMessage('Unity Code: No tests specified to run');
+            return;
+        }
+
+        try {
+            // Create a test run request for the specific tests
+            const testItems: vscode.TestItem[] = [];
+            
+            // Find test items by their full names
+            for (const fullName of testFullNames) {
+                const testItem = globalTestProvider.findTestByFullName(fullName);
+                if (testItem) {
+                    testItems.push(testItem);
+                }
+            }
+
+            if (testItems.length === 0) {
+                vscode.window.showWarningMessage('Unity Code: Could not find test items to run');
+                return;
+            }
+
+            // Create and execute test run request
+            const request = new vscode.TestRunRequest(testItems);
+            await globalTestProvider.runTests(request, new vscode.CancellationTokenSource().token);
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`Unity Code: Failed to run tests: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    });
+
     // Listen for file rename events using workspace API
     const renameDisposable = vscode.workspace.onDidRenameFiles(onDidRenameFiles);
 
@@ -304,6 +347,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         refreshTestsDisposable,
         refreshPackagesDisposable,
         showConnectionStatusDisposable,
+        runTestsDisposable,
         renameDisposable, 
         saveDisposable,
         windowStateDisposable
