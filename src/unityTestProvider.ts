@@ -669,6 +669,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 symbolNameToMatch = parenIndex !== -1 ? symbol.name.substring(0, parenIndex) : symbol.name;
             }
             
+            // Check for exact match first
             if (symbolNameToMatch === targetName) {
                 console.log(`Found matching symbol: ${symbol.name} (matched as ${symbolNameToMatch}), kind: ${symbol.kind}, has children: ${symbol.children?.length || 0}`);
                 
@@ -682,6 +683,32 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                     const result = this.findSymbolRecursive(symbol.children, pathParts, currentIndex + 1);
                     if (result) {
                         return result;
+                    }
+                }
+            }
+            
+            // For namespace symbols, check if the symbol name matches multiple path parts
+            // This handles cases like "Name.Space.You.Are" where the namespace contains dots
+            if (symbol.kind === vscode.SymbolKind.Namespace && symbolNameToMatch.includes('.') && symbolNameToMatch.startsWith(targetName)) {
+                const remainingPath = pathParts.slice(currentIndex).join('.');
+                if (remainingPath.startsWith(symbolNameToMatch)) {
+                    console.log(`Found namespace symbol with dots: ${symbol.name}, matching start of path: ${remainingPath}`);
+                    
+                    // Calculate how many path parts this namespace symbol consumes
+                    const namespaceParts = symbolNameToMatch.split('.');
+                    const newIndex = currentIndex + namespaceParts.length;
+                    
+                    // If this namespace consumes all remaining path parts, we found our target
+                    if (newIndex === pathParts.length) {
+                        return symbol;
+                    }
+                    
+                    // Otherwise, continue searching in children with the updated index
+                    if (symbol.children && symbol.children.length > 0 && newIndex < pathParts.length) {
+                        const result = this.findSymbolRecursive(symbol.children, pathParts, newIndex);
+                        if (result) {
+                            return result;
+                        }
                     }
                 }
             }
