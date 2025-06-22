@@ -13,6 +13,7 @@ export class UnityTestProvider {
     private runProfile: vscode.TestRunProfile;
     private debugProfile: vscode.TestRunProfile;
     private currentTestRun: vscode.TestRun | null = null;
+    private isRunning: boolean = false;
 
     constructor(context: vscode.ExtensionContext, unityProjectPath?: string) {
         this.testController = vscode.tests.createTestController('unityTests', 'Unity Tests');
@@ -68,6 +69,7 @@ export class UnityTestProvider {
 
         this.messagingClient.onMessage(MessageType.RunStarted, () => {
             // Test run started in Unity
+            this.setRunningState(true);
         });
 
         this.messagingClient.onMessage(MessageType.RunFinished, () => {
@@ -76,6 +78,7 @@ export class UnityTestProvider {
                 this.currentTestRun.end();
                 this.currentTestRun = null;
             }
+            this.setRunningState(false);
         });
 
         this.messagingClient.onMessage(MessageType.Pong, () => {
@@ -246,6 +249,32 @@ export class UnityTestProvider {
     }
 
     /**
+     * Set the running state and update run profile availability
+     */
+    private setRunningState(running: boolean): void {
+        this.isRunning = running;
+        
+        // Dispose existing profiles
+        this.runProfile.dispose();
+        this.debugProfile.dispose();
+        
+        // Recreate profiles with updated availability
+        this.runProfile = this.testController.createRunProfile(
+            'Run Unity Tests',
+            vscode.TestRunProfileKind.Run,
+            (request, token) => this.runTests(request, token),
+            !running // Disable when running
+        );
+        
+        this.debugProfile = this.testController.createRunProfile(
+            'Debug Unity Tests',
+            vscode.TestRunProfileKind.Debug,
+            (request, token) => this.runTests(request, token),
+            !running // Disable when running
+        );
+    }
+
+    /**
      * Run tests
      */
     private async runTests(
@@ -257,6 +286,12 @@ export class UnityTestProvider {
             return;
         }
 
+        if (this.isRunning) {
+            vscode.window.showWarningMessage('UnityCode: Tests are already running. Please wait for the current test run to complete.');
+            return;
+        }
+
+        this.setRunningState(true);
         this.currentTestRun = this.testController.createTestRun(request);
         
         try {
@@ -274,6 +309,22 @@ export class UnityTestProvider {
         } catch (error) {
             console.error('UnityCode: Error running tests:', error);
             vscode.window.showErrorMessage(`UnityCode: Failed to run tests: ${error instanceof Error ? error.message : String(error)}`);
+            
+            // Reset running state on error
+            this.setRunningState(false);
+            if (this.currentTestRun) {
+                this.currentTestRun.end();
+                this.currentTestRun = null;
+            }
+        } finally {
+            // Ensure running state is reset if cancellation occurred
+            if (token.isCancellationRequested) {
+                this.setRunningState(false);
+                if (this.currentTestRun) {
+                    this.currentTestRun.end();
+                    this.currentTestRun = null;
+                }
+            }
         }
     }
 
