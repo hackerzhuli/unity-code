@@ -5,52 +5,32 @@ A Visual Studio Code extension that enhances Unity development workflow with aut
 ## Features
 
 ### Automatic Meta File Renaming
-Automatically renames Unity `.meta` files when you rename assets in VS Code, preventing broken asset references.
+Automatically renames Unity `.meta` files when you rename assets in VS Code, making refactoring class names more easy.
 
 ### C# Documentation Hover
-Provides quick access to Unity and .NET documentation by hovering over C# types and showing clickable documentation links.
+Shows beautiful markdown from xml docs for in project classes and members.
+
+Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET and also some popular .NET libraries. 
 
 ### Unity Test Explorer
-Detects and displays Unity tests in VS Code's Test Explorer. Communicates directly with Unity Editor via UDP/TCP protocol to discover tests, execute them, and display results in a hierarchical tree structure organized by assembly, namespace, class, and method.
+Detects and displays Unity tests in VS Code's Test Explorer. Run tests directly inside VS Code!
 
-## Automatic Test Refresh
+Also there is code lens above test methods and classes, run tests right after you wrote your code, just click on the run test button above the test method you changed(you must save the file to trigger Unity's refresh, see settings below).
 
-The extension provides automatic test discovery refresh in two scenarios:
+Also, you need to install my Visual Studio Editor package in Unity in order to leverage the full power of this extension. You can click run tests right when Unity Editor is compiling, and the tests will run right after the compile finished(Even Rider can't do this reliablely)! Thanks to my Unity package and this extension understanding Unity perfectly!
+
+### Language Server Integration
+Works with both C# Dev Kit and Dot Rush. Pick what you want.
+
+## VS Code Forks
+Should work in any VS Code fork, however my Unity package only supports popular VS Code forks for now but you can create a pull request for your favorate VS Code fork.
 
 ### Auto-refresh on C# File Save
-When you save a C# file in a Unity project, the extension will:
+When you save a C# file in a Unity project, the extension will trigger Unity's asset database refresh.
 
-1. Trigger Unity's asset database refresh
+This ensures Unity detects your code changes and triggers recompilation.
 
-This ensures Unity detects your code changes and triggers recompilation. Tests are not automatically refreshed due to compilation time - use manual refresh or window focus refresh instead.
-
-### Auto-refresh on Window Focus
-When you return to VS Code (window regains focus), the extension will automatically refresh test discovery. This is useful when:
-- You've been working in Unity Editor and made changes
-- You've switched between different applications
-- You want to ensure you have the latest test state
-
-### Manual Refresh
-You can also manually refresh tests using:
-- Command Palette: `Unity: Refresh Tests`
-- This is useful when you want to force a refresh at any time
-
-### Configuration
-You can control the auto-refresh behavior with these settings:
+### Settings
+You can control the auto-refresh behavior with this setting:
 
 - `unitycode.autoRefreshUnity` (default: `true`): Enable/disable automatic Unity asset database refresh when C# files are saved
-- `unitycode.refreshOnWindowFocus` (default: `true`): Enable/disable automatic refresh when VS Code window regains focus
-
-### Troubleshooting Auto-Refresh
-
-If Unity doesn't seem to be refreshing when you save C# files:
-
-1. **Check the Output Panel**: Open VS Code's Output panel and select "UnityCode" to see detailed logs
-2. **Verify Connection**: Look for messages like "Connection status - Connected: true, Port: XXXXX"
-3. **Check Message Sending**: Look for "Sending message - Type: 8 (Refresh)"
-4. **Unity Response**: Check if Unity is responding with any messages
-5. **Manual Reconnect**: Use the "Unity: Refresh Tests" command to manually trigger a refresh and reconnection
-6. **Test Refresh**: After Unity compilation completes, manually refresh tests using the command or window focus
-
-You can modify these settings in VS Code's settings (File > Preferences > Settings) by searching for "Unity Code".
-
