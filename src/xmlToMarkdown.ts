@@ -41,9 +41,7 @@ export function xmlToMarkdown(xmlDocs: string): string {
             cdataPropName: "__cdata",
             alwaysCreateTextNode: false,
             preserveOrder: true,
-        });        const result = parser.parse(wrappedXml);
-        
-        // When preserveOrder is true, the result is an array
+        });        const result = parser.parse(wrappedXml);        // When preserveOrder is true, the result is an array
         let rootContent;
         if (Array.isArray(result)) {
             // Find the root element in the array
@@ -51,6 +49,12 @@ export function xmlToMarkdown(xmlDocs: string): string {
             rootContent = rootElement ? rootElement.root : result;
         } else {
             rootContent = result.root;
+        }
+        
+        // If rootContent is an array, apply grouping logic at the top level
+        if (Array.isArray(rootContent)) {
+            const groupedContent = groupConsecutiveElements(rootContent);
+            rootContent = groupedContent;
         }
           // Process the parsed XML and convert to Markdown
         const markdown = processXmlNode(rootContent);
@@ -78,12 +82,15 @@ function processXmlNode(node: unknown): string {
     if (typeof node === 'string') {
         return node.trim();
     }    if (Array.isArray(node)) {
-        // For mixed content (text + inline elements), concatenate with spaces
-        // But handle br elements specially to preserve newlines
-        const results = node.map(item => {
+        // Group consecutive parameters and exceptions before processing
+        const groupedItems = groupConsecutiveElements(node);        const results = groupedItems.map((item: unknown) => {
+            // Handle special group objects
+            if (typeof item === 'object' && item !== null && '_specialGroup' in item) {
+                return processSpecialGroup(item);
+            }
             const result = processXmlNode(item);
             return result;
-        }).filter(result => result.length > 0);
+        }).filter((result: string) => result.length > 0);
         
         // Join with spaces, but don't add spaces around newlines from br elements
         let combined = '';
@@ -99,16 +106,19 @@ function processXmlNode(node: unknown): string {
             combined += results[i];
         }
         return combined;
-    }
-
-    // Process object nodes
+    }    // Process object nodes
     for (const [key, _value] of Object.entries(node as Record<string, unknown>)) {
         // Skip attributes key
         if (key === ':@') {
             continue;
         }
-        // For see elements and others with attributes, pass the entire node
-        markdown += processXmlElement(key, node);
+        // Handle special grouped elements
+        if (typeof _value === 'object' && _value !== null && '_specialGroup' in _value) {
+            markdown += processSpecialGroup(_value);
+        } else {
+            // For see elements and others with attributes, pass the entire node
+            markdown += processXmlElement(key, node);
+        }
     }
     
     return markdown;
@@ -122,36 +132,29 @@ function processXmlElement(tagName: string, node: unknown): string {
     const content = typeof node === 'object' && node !== null 
         ? (node as Record<string, unknown>)[tagName] 
         : node;
-    
-    switch (tagName.toLowerCase()) {        case 'summary':
-            return `**Summary:**\n${processContent(content)}\n\n`;
+      switch (tagName.toLowerCase()) {        case 'summary':
+            return `## Summary\n\n${processContent(content)}\n\n`;
             
         case 'remarks':
-            return `**Remarks:**\n${processContent(content)}\n\n`;        case 'param': {
-            if (Array.isArray(content)) {
-                // Handle param content array - attributes are on the parent node
-                const paramName = extractAttribute(node, 'name');
-                const paramText = processContent(content);
-                return `**Parameter \`${paramName}\`:** ${paramText}\n\n`;
-            } else {
-                // Single param element - extract name from the parent node, content from the param content
-                const paramName = extractAttribute(node, 'name');
-                const paramText = processContent(content);
-                return `**Parameter \`${paramName}\`:** ${paramText}\n\n`;
-            }
+            return `## Remarks\n\n${processContent(content)}\n\n`;        case 'param': {
+            // Individual param (not grouped) - use old format for multi-line content
+            const paramName = extractAttribute(node, 'name');
+            const paramText = processContent(content);
+            return `**Parameter \`${paramName}\`:** ${paramText}\n\n`;
         }
             
         case 'returns':
-            return `**Returns:** ${processContent(content)}\n\n`;
+            return `## Return Value\n\n${processContent(content)}\n\n`;
             
         case 'exception': {
+            // Individual exception (not grouped) - use old format for multi-line content
             const exceptionType = extractAttribute(node, 'cref');
             const exceptionText = processContent(content);
             return `**Exception \`${exceptionType}\`:** ${exceptionText}\n\n`;
         }
             
         case 'value':
-            return `**Value:** ${processContent(content)}\n\n`;
+            return `## Value\n\n${processContent(content)}\n\n`;
               case 'example':
             return `## Example\n\n${processContent(content)}\n\n`;        case 'code': {
             const codeContent = processContent(content);
@@ -452,8 +455,6 @@ function normalizeCodeIndentation(code: string): string {
         return '';
     }
     
-    console.log('DEBUG normalizeCodeIndentation: input =', JSON.stringify(code));
-    
     const lines = code.split('\n');
     
     // Filter out empty lines for indentation calculation
@@ -469,8 +470,6 @@ function normalizeCodeIndentation(code: string): string {
         return match ? match[1].length : 0;
     }));
     
-    console.log('DEBUG normalizeCodeIndentation: minIndent =', minIndent);
-    
     let result = code;
     
     // Remove the common leading whitespace from all lines
@@ -483,12 +482,10 @@ function normalizeCodeIndentation(code: string): string {
         });
         
         result = normalizedLines.join('\n');
-        console.log('DEBUG normalizeCodeIndentation: after removing common indent =', JSON.stringify(result));
     }
     
     // Always try to normalize top-level braces, regardless of indentation
     result = normalizeTopLevelBraces(result);
-    console.log('DEBUG normalizeCodeIndentation: final result =', JSON.stringify(result));
     return result;
 }
 
@@ -496,8 +493,6 @@ function normalizeCodeIndentation(code: string): string {
  * Further normalize code to ensure top-level braces are flush left
  */
 function normalizeTopLevelBraces(code: string): string {
-    console.log('DEBUG normalizeTopLevelBraces: input =', JSON.stringify(code));
-    
     const lines = code.split('\n');
     const normalizedLines = [];
     const braceStack: number[] = []; // Track indentation levels of opening braces
@@ -508,8 +503,6 @@ function normalizeTopLevelBraces(code: string): string {
         
         // Check if this line is just an opening brace
         if (trimmed === '{') {
-            console.log(`DEBUG: Found opening brace line ${i}: "${line}"`);
-            
             // Look at the previous non-empty line to determine if this should be flush left
             let prevNonEmptyIndex = i - 1;
             while (prevNonEmptyIndex >= 0 && lines[prevNonEmptyIndex].trim() === '') {
@@ -519,8 +512,6 @@ function normalizeTopLevelBraces(code: string): string {
             if (prevNonEmptyIndex >= 0) {
                 const prevLine = lines[prevNonEmptyIndex];
                 const prevTrimmed = prevLine.trim();
-                
-                console.log(`DEBUG: Previous line ${prevNonEmptyIndex}: "${prevTrimmed}"`);
                 
                 // If previous line is a class/interface/namespace/method declaration, make brace flush left
                 if (prevTrimmed.includes('class ') || 
@@ -533,7 +524,6 @@ function normalizeTopLevelBraces(code: string): string {
                     prevTrimmed.startsWith('private ') ||
                     prevTrimmed.startsWith('protected ') ||
                     prevTrimmed.startsWith('internal ')) {
-                    console.log(`DEBUG: Making opening brace flush left`);
                     braceStack.push(0); // Track that this brace is at level 0
                     normalizedLines.push('{');
                     continue;
@@ -547,13 +537,10 @@ function normalizeTopLevelBraces(code: string): string {
         } 
         // Check if this line is just a closing brace
         else if (trimmed === '}') {
-            console.log(`DEBUG: Found closing brace line ${i}: "${line}"`);
-            
             // Match the indentation of the corresponding opening brace
             if (braceStack.length > 0) {
                 const openingBraceIndent = braceStack.pop()!;
                 const closingBraceIndent = ' '.repeat(openingBraceIndent) + '}';
-                console.log(`DEBUG: Making closing brace match opening indent: "${closingBraceIndent}"`);
                 normalizedLines.push(closingBraceIndent);
             } else {
                 // No matching opening brace found, keep original
@@ -565,6 +552,151 @@ function normalizeTopLevelBraces(code: string): string {
     }
     
     const result = normalizedLines.join('\n');
-    console.log('DEBUG normalizeTopLevelBraces: result =', JSON.stringify(result));
     return result;
+}
+
+/**
+ * Groups consecutive elements of the same type (param, exception) for better formatting
+ * Only groups elements that have single-line content (no line breaks)
+ */
+function groupConsecutiveElements(elements: unknown[]): unknown[] {
+    if (!Array.isArray(elements)) {
+        return elements;
+    }
+    
+    const result: unknown[] = [];
+    let i = 0;
+    
+    while (i < elements.length) {
+        const element = elements[i];
+        
+        // Check if this is a groupable element (param or exception)
+        if (typeof element === 'object' && element !== null) {
+            const keys = Object.keys(element as Record<string, unknown>);
+            const elementType = keys.find(key => key === 'param' || key === 'exception');
+              if (elementType) {
+                // Check if this element has single-line content (no multi-line elements like para, br, code, etc.)
+                const elementContent = typeof element === 'object' && element !== null 
+                    ? (element as Record<string, unknown>)[elementType] 
+                    : element;
+                const isSingleLine = !containsMultiLineElements(elementContent);
+                
+                if (isSingleLine) {
+                    // Found a groupable single-line element, look for consecutive single-line elements of the same type
+                    const group: unknown[] = [element];
+                    let j = i + 1;
+                    
+                    while (j < elements.length) {
+                        const nextElement = elements[j];
+                        if (typeof nextElement === 'object' && nextElement !== null) {
+                            const nextKeys = Object.keys(nextElement as Record<string, unknown>);                            if (nextKeys.includes(elementType)) {
+                                // Check if this next element is also single-line
+                                const nextElementContent = (nextElement as Record<string, unknown>)[elementType];
+                                const nextIsSingleLine = !containsMultiLineElements(nextElementContent);
+                                
+                                if (nextIsSingleLine) {
+                                    group.push(nextElement);
+                                    j++;
+                                } else {
+                                    break; // Multi-line element breaks the grouping
+                                }
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // Create a special group (even for single elements, as per requirement)
+                    result.push({
+                        _specialGroup: elementType,
+                        elements: group
+                    });
+                    i = j;
+                } else {
+                    // Multi-line element, don't group - process individually
+                    result.push(element);
+                    i++;
+                }
+            } else {
+                // Not a groupable element, add as-is
+                result.push(element);
+                i++;
+            }
+        } else {
+            // Not an object, add as-is
+            result.push(element);
+            i++;
+        }
+    }
+    
+    return result;
+}
+
+/**
+ * Process a special group of consecutive elements (parameters or exceptions)
+ */
+function processSpecialGroup(group: Record<string, unknown>): string {
+    const groupType = group._specialGroup as string;
+    const elements = group.elements as unknown[];
+    
+    if (groupType === 'param') {
+        const items = elements.map(element => {
+            const paramName = extractAttribute(element, 'name');
+            const paramContent = typeof element === 'object' && element !== null 
+                ? (element as Record<string, unknown>).param 
+                : element;
+            const paramText = processContent(paramContent);
+            return `- **\`${paramName}\`**: ${paramText}`;
+        });
+        
+        return `## Parameters\n\n${items.join('\n')}\n\n`;
+    } else if (groupType === 'exception') {
+        const items = elements.map(element => {
+            const exceptionType = extractAttribute(element, 'cref');
+            const exceptionContent = typeof element === 'object' && element !== null 
+                ? (element as Record<string, unknown>).exception 
+                : element;
+            const exceptionText = processContent(exceptionContent);
+            return `- **\`${exceptionType}\`**: ${exceptionText}`;
+        });
+        
+        return `## Exceptions\n\n${items.join('\n')}\n\n`;
+    }
+    
+    return '';
+}
+
+/**
+ * Check if content contains multi-line elements like para, br, code blocks, etc.
+ */
+function containsMultiLineElements(content: unknown): boolean {
+    if (!content) {
+        return false;
+    }
+    
+    if (Array.isArray(content)) {
+        // Check if any item in the array is a multi-line element
+        return content.some(item => containsMultiLineElements(item));
+    }
+    
+    if (typeof content === 'object' && content !== null) {
+        const obj = content as Record<string, unknown>;
+        
+        // Check for known multi-line elements
+        for (const key of Object.keys(obj)) {
+            if (key === 'para' || key === 'br' || key === 'code' || key === 'example' || key === 'list') {
+                return true;
+            }
+            // Recursively check nested content
+            if (key !== ':@' && !key.startsWith('@_')) {
+                if (containsMultiLineElements(obj[key])) {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    return false;
 }
