@@ -44,8 +44,8 @@ export class UnityTestProvider {
         // Setup messaging client handlers
         this.setupMessageHandlers();
         
-        // Register connection callback to discover tests when Unity connects
-        this.messagingClient.onConnection(() => {
+        // Subscribe to connection event to discover tests when Unity connects
+        this.messagingClient.onConnection.subscribe(() => {
             console.log('UnityCode: Unity connection established, discovering tests...');
             this.discoverTestsSilently();
         });

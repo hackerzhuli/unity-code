@@ -3,6 +3,7 @@ import * as net from 'net';
 import * as si from 'systeminformation';
 import { UnityProcessDetector, UnityProcess } from './unityProcessDetector.js';
 import { logWithLimit } from './utils.js';
+import { VoidEventEmitter } from './eventEmitter.js';
 
 /**
  * Unity Visual Studio Editor Messaging Protocol Client
@@ -169,8 +170,8 @@ export class UnityMessagingClient {
     // Process monitoring for smart disconnection detection
     private connectedProcessId: number | null = null;
     
-    // Connection callback
-    private connectionCallback: (() => void) | null = null;
+    // Connection event - public field for external subscription
+    public readonly onConnection = new VoidEventEmitter();
     private processMonitorInterval: NodeJS.Timeout | null = null;
     private readonly PROCESS_CHECK_DELAY = 10000; // 10 seconds between process checks
 
@@ -265,7 +266,7 @@ export class UnityMessagingClient {
                 this.currentRetryAttempt = 0;
                 this.stopConnectionRetry(); // Stop retrying once connected
             }
-        } catch (error) {
+        } catch (_error) {
             // Silent failure for auto-connection attempts
             // Only log if it's been many attempts
             if (this.currentRetryAttempt % 12 === 0) { // Log every minute (12 * 5 seconds)
@@ -358,14 +359,12 @@ export class UnityMessagingClient {
             
             this.startHeartbeat();
             
-            // Trigger connection callback if registered
-            if (this.connectionCallback) {
-                console.log('UnityCode: Triggering connection callback for new Unity connection');
-                this.connectionCallback();
-            }
+            // Trigger connection event
+            console.log('UnityCode: Emitting connection event for new Unity connection');
+            this.onConnection.emit();
             
             return true;
-        } catch (error) {
+        } catch (_error) {
             this.isConnected = false; // Reset connection state on failure
             this.connectedProcessId = null;
             return false;
@@ -522,13 +521,6 @@ export class UnityMessagingClient {
      */
     onMessage(type: MessageType, handler: (message: UnityMessage) => void): void {
         this.messageHandlers.set(type, handler);
-    }
-
-    /**
-     * Register callback for when connection to Unity is established
-     */
-    onConnection(callback: () => void): void {
-        this.connectionCallback = callback;
     }
 
     /**
