@@ -99,24 +99,56 @@ describe('EventEmitter', () => {
         
         it('should handle errors in listeners gracefully', () => {
             const emitter = new EventEmitter<string>();
-            let goodListenerCalled = false;
+            let successfulCallCount = 0;
             
-            // Add a listener that throws
+            // Add a listener that throws an error
             emitter.subscribe(() => {
                 throw new Error('Test error');
             });
             
-            // Add a good listener
+            // Add a listener that should still execute
             emitter.subscribe(() => {
-                goodListenerCalled = true;
+                successfulCallCount++;
             });
             
-            // Should not throw and should call the good listener
+            // Emit should not throw, and the second listener should still execute
             assert.doesNotThrow(() => {
                 emitter.emit('test');
             });
             
-            assert.strictEqual(goodListenerCalled, true);
+            assert.strictEqual(successfulCallCount, 1);
+        });
+        
+        it('should work with boolean events for connection status', () => {
+            const connectionEmitter = new EventEmitter<boolean>();
+            const statusHistory: boolean[] = [];
+            
+            connectionEmitter.subscribe((isConnected) => {
+                statusHistory.push(isConnected);
+            });
+            
+            // Simulate connection events
+            connectionEmitter.emit(true);  // Connected
+            connectionEmitter.emit(false); // Disconnected
+            connectionEmitter.emit(true);  // Reconnected
+            
+            assert.deepStrictEqual(statusHistory, [true, false, true]);
+        });
+        
+        it('should work with boolean events for online status', () => {
+            const onlineEmitter = new EventEmitter<boolean>();
+            let currentStatus = false;
+            
+            onlineEmitter.subscribe((isOnline) => {
+                currentStatus = isOnline;
+            });
+            
+            // Simulate online/offline events
+            onlineEmitter.emit(true);
+            assert.strictEqual(currentStatus, true);
+            
+            onlineEmitter.emit(false);
+            assert.strictEqual(currentStatus, false);
         });
     });
     

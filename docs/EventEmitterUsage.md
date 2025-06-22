@@ -80,22 +80,36 @@ client.onConnection(() => {
 });
 ```
 
-### After (New Event Pattern)
+### After (New Event Pattern with Boolean Status)
 
 ```typescript
 // New event-based approach
 class UnityMessagingClient {
-    public readonly onConnection = new VoidEventEmitter();
+    public readonly onConnectionStatus = new EventEmitter<boolean>();
+    public readonly onOnlineStatus = new EventEmitter<boolean>();
     
     private triggerConnection(): void {
-        this.onConnection.emit();
+        this.onConnectionStatus.emit(true);
     }
 }
 
 // Usage
 const client = new UnityMessagingClient();
-const unsubscribe = client.onConnection.subscribe(() => {
-    console.log('Connected!');
+const unsubscribe = client.onConnectionStatus.subscribe((isConnected) => {
+    if (isConnected) {
+        console.log('Unity connected!');
+    } else {
+        console.log('Unity disconnected!');
+    }
+});
+
+// Subscribe to online status changes
+client.onOnlineStatus.subscribe((isOnline) => {
+    if (isOnline) {
+        console.log('Unity is online and ready!');
+    } else {
+        console.log('Unity went offline!');
+    }
 });
 
 // Can unsubscribe later
@@ -103,6 +117,34 @@ unsubscribe();
 ```
 
 ## Advanced Usage
+
+### Multiple Event Types
+
+```typescript
+// Create different event emitters for different purposes
+const connectionEvents = new EventEmitter<boolean>();
+const messageEvents = new EventEmitter<string>();
+const statusEvents = new EventEmitter<{status: string, timestamp: number}>();
+
+// Subscribe to different events
+connectionEvents.subscribe((isConnected) => {
+    console.log(isConnected ? 'Connected!' : 'Disconnected!');
+});
+
+messageEvents.subscribe((message) => {
+    console.log('Received:', message);
+});
+
+statusEvents.subscribe((data) => {
+    console.log(`Status: ${data.status} at ${data.timestamp}`);
+});
+
+// Emit events
+connectionEvents.emit(true);  // Connected
+connectionEvents.emit(false); // Disconnected
+messageEvents.emit('Hello Unity!');
+statusEvents.emit({status: 'ready', timestamp: Date.now()});
+```
 
 ### Multiple Subscribers
 
@@ -169,8 +211,8 @@ console.log(event.listenerCount); // 1
 ```typescript
 // In UnityMessagingClient
 export class UnityMessagingClient {
-    public readonly onConnection = new VoidEventEmitter();
-    public readonly onDisconnection = new VoidEventEmitter();
+    public readonly onConnectionStatus = new EventEmitter<boolean>();
+    public readonly onOnlineStatus = new EventEmitter<boolean>();
     public readonly onMessage = new EventEmitter<UnityMessage>();
     
     // ... implementation
@@ -179,9 +221,20 @@ export class UnityMessagingClient {
 // In UnityTestProvider
 export class UnityTestProvider {
     constructor(private messagingClient: UnityMessagingClient) {
-        // Subscribe to connection events
-        this.messagingClient.onConnection.subscribe(() => {
-            this.discoverTestsSilently();
+        // Subscribe to connection status events
+        this.messagingClient.onConnectionStatus.subscribe((isConnected) => {
+            if (isConnected) {
+                this.discoverTestsSilently();
+            }
+        });
+        
+        // Subscribe to online status events
+        this.messagingClient.onOnlineStatus.subscribe((isOnline) => {
+            if (isOnline) {
+                this.updateOnlineStatus(true);
+            } else {
+                this.updateOnlineStatus(false);
+            }
         });
         
         // Subscribe to specific messages

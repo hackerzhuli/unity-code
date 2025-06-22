@@ -3,7 +3,7 @@ import * as net from 'net';
 import * as si from 'systeminformation';
 import { UnityProcessDetector, UnityProcess } from './unityProcessDetector.js';
 import { logWithLimit } from './utils.js';
-import { VoidEventEmitter } from './eventEmitter.js';
+import { EventEmitter } from './eventEmitter.js';
 
 /**
  * Unity Visual Studio Editor Messaging Protocol Client
@@ -170,8 +170,10 @@ export class UnityMessagingClient {
     // Process monitoring for smart disconnection detection
     private connectedProcessId: number | null = null;
     
-    // Connection event - public field for external subscription
-    public readonly onConnection = new VoidEventEmitter();
+    // Connection status event - emits true for connected, false for disconnected
+    public readonly onConnectionStatus = new EventEmitter<boolean>();
+    // Online status event - emits true for online, false for offline
+    public readonly onOnlineStatus = new EventEmitter<boolean>();
     private processMonitorInterval: NodeJS.Timeout | null = null;
     private readonly PROCESS_CHECK_DELAY = 10000; // 10 seconds between process checks
 
@@ -308,11 +310,20 @@ export class UnityMessagingClient {
      */
     private handleConnectionLoss(): void {
         const wasConnected = this.isConnected;
+        const wasOnline = this.isUnityOnline;
         this.isConnected = false;
         this.isUnityOnline = false;
         this.connectedProcessId = null;
         this.stopHeartbeat();
         this.stopProcessMonitoring();
+        
+        // Emit status change events
+        if (wasConnected) {
+            this.onConnectionStatus.emit(false);
+        }
+        if (wasOnline) {
+            this.onOnlineStatus.emit(false);
+        }
         
         if (wasConnected && this.autoConnectEnabled && !this.isDisposed) {
             console.log('UnityCode: Connection lost, restarting auto-connection...');
@@ -361,7 +372,7 @@ export class UnityMessagingClient {
             
             // Trigger connection event
             console.log('UnityCode: Emitting connection event for new Unity connection');
-            this.onConnection.emit();
+            this.onConnectionStatus.emit(true);
             
             return true;
         } catch (_error) {
@@ -377,8 +388,18 @@ export class UnityMessagingClient {
     dispose(): void {
         this.isDisposed = true;
         this.autoConnectEnabled = false;
+        const wasConnected = this.isConnected;
+        const wasOnline = this.isUnityOnline;
         this.isConnected = false;
         this.isUnityOnline = false;
+        
+        // Emit status change events
+        if (wasConnected) {
+            this.onConnectionStatus.emit(false);
+        }
+        if (wasOnline) {
+            this.onOnlineStatus.emit(false);
+        }
         
         this.stopHeartbeat();
         this.stopConnectionRetry();
@@ -538,17 +559,20 @@ export class UnityMessagingClient {
         if (message.type === MessageType.OnLine) {
             console.log('UnityCode: Unity online');
             this.isUnityOnline = true;
+            this.onOnlineStatus.emit(true);
             this.processMessageQueue();
             messageHandledInternally = true;
         } else if (message.type === MessageType.OffLine) {
             console.log('UnityCode: Unity went offline');
             this.isUnityOnline = false;
+            this.onOnlineStatus.emit(false);
             messageHandledInternally = true;
         } else if (message.type === MessageType.Pong) {
             // Pong response indicates Unity is online and responding
             if (!this.isUnityOnline) {
                 console.log('UnityCode: Unity online (pong received)');
                 this.isUnityOnline = true;
+                this.onOnlineStatus.emit(true);
                 this.processMessageQueue();
             }
             messageHandledInternally = true;

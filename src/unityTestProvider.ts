@@ -44,10 +44,14 @@ export class UnityTestProvider {
         // Setup messaging client handlers
         this.setupMessageHandlers();
         
-        // Subscribe to connection event to discover tests when Unity connects
-        this.messagingClient.onConnection.subscribe(() => {
-            console.log('UnityCode: Unity connection established, discovering tests...');
-            this.discoverTestsSilently();
+        // Subscribe to connection status event to discover tests when Unity connects
+        this.messagingClient.onConnectionStatus.subscribe((isConnected) => {
+            if (isConnected) {
+                console.log('UnityCode: Unity connection established, discovering tests...');
+                this.discoverTestsSilently();
+            } else {
+                console.log('UnityCode: Unity disconnected');
+            }
         });
     }
 

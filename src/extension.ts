@@ -177,49 +177,48 @@ function createUnityStatusBarItem(): vscode.StatusBarItem {
  */
 function updateUnityStatusBarItem(statusBarItem: vscode.StatusBarItem, connected: boolean, online: boolean): void {
     if (online) {
-        statusBarItem.text = '$(check) Unity Online';
-        statusBarItem.tooltip = 'Unity Editor is connected and online';
-        statusBarItem.backgroundColor = undefined;
+        statusBarItem.text = '$(check)Unity';
+        statusBarItem.tooltip = 'Unity Editor is connected';
+        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
     } else if (connected) {
-        statusBarItem.text = '$(clock) Unity Connected';
-        statusBarItem.tooltip = 'Unity Editor is connected but not responding';
+        statusBarItem.text = '$(clock)Unity';
+        statusBarItem.tooltip = 'Unity Editor is detected but not connected';
         statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     } else {
-        statusBarItem.text = '$(x) Unity Offline';
-        statusBarItem.tooltip = 'Unity Editor is not connected';
-        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+        statusBarItem.text = '$(x)Unity';
+        statusBarItem.tooltip = 'Unity Editor is not detected';
+        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.offlineBackground');
     }
 }
 
 /**
- * Start monitoring Unity connection status and update status bar
+ * Start monitoring Unity connection status and update status bar using events
  */
 function startUnityStatusMonitoring(): void {
     if (!globalTestProvider || !globalUnityStatusBarItem) {
         return;
     }
 
-    // Update status bar immediately
+    // Update status bar immediately with current state
     const connected = globalTestProvider.messagingClient.connected;
     const online = globalTestProvider.messagingClient.unityOnline;
     updateUnityStatusBarItem(globalUnityStatusBarItem, connected, online);
 
-    // Set up periodic status checking
-    const statusCheckInterval = setInterval(() => {
-        if (!globalTestProvider || !globalUnityStatusBarItem) {
-            clearInterval(statusCheckInterval);
-            return;
+    // Subscribe to connection status changes for immediate updates
+    globalTestProvider.messagingClient.onConnectionStatus.subscribe((isConnected) => {
+        if (globalUnityStatusBarItem) {
+            const currentOnline = globalTestProvider?.messagingClient.unityOnline || false;
+            updateUnityStatusBarItem(globalUnityStatusBarItem, isConnected, currentOnline);
         }
+    });
 
-        const currentConnected = globalTestProvider.messagingClient.connected;
-        const currentOnline = globalTestProvider.messagingClient.unityOnline;
-        updateUnityStatusBarItem(globalUnityStatusBarItem, currentConnected, currentOnline);
-    }, 2000); // Check every 2 seconds
-
-    // Clean up interval when extension is disposed
-    if (globalTestProvider) {
-        // Store the interval for cleanup (we'll handle this in the dispose method)
-    }
+    // Subscribe to online status changes for immediate updates
+    globalTestProvider.messagingClient.onOnlineStatus.subscribe((isOnline) => {
+        if (globalUnityStatusBarItem) {
+            const currentConnected = globalTestProvider?.messagingClient.connected || false;
+            updateUnityStatusBarItem(globalUnityStatusBarItem, currentConnected, isOnline);
+        }
+    });
 }
 
 /**
