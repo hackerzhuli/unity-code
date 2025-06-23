@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 
 // Import the utility functions for testing
-import { isInAssetsFolder, extractProjectPath, extractHotReloadProjectPath } from '../../utils.js';
+import { isInAssetsFolder, extractUnityProjectPath, extractHotReloadProjectPath } from '../../utils.js';
 
 describe('Utils Unit Tests', () => {
 	describe('isInAssetsFolder', () => {
@@ -64,7 +64,7 @@ describe('Utils Unit Tests', () => {
 				];
 
 				testCases.forEach(({ description, command, expected }, index) => {
-					const result = extractProjectPath(command);
+					const result = extractUnityProjectPath(command);
 					assert.strictEqual(result, expected, `Test case ${index + 1} failed: ${description}`);
 				});
 			});
@@ -89,7 +89,7 @@ describe('Utils Unit Tests', () => {
 				];
 
 				testCases.forEach(({ description, command, expected }, index) => {
-					const result = extractProjectPath(command);
+					const result = extractUnityProjectPath(command);
 					assert.strictEqual(result, expected, `Special character test ${index + 1} failed: ${description}`);
 				});
 			});
@@ -126,7 +126,7 @@ describe('Utils Unit Tests', () => {
 				];
 
 				testCases.forEach(({ description, command, expected }, index) => {
-					const result = extractProjectPath(command);
+					const result = extractUnityProjectPath(command);
 					assert.strictEqual(result, expected, `Case/Priority test ${index + 1} failed: ${description}`);
 				});
 			});
@@ -158,15 +158,15 @@ describe('Utils Unit Tests', () => {
 				];
 
 				testCases.forEach(({ description, command, expected }, index) => {
-					const result = extractProjectPath(command);
+					const result = extractUnityProjectPath(command);
 					assert.strictEqual(result, expected, `Edge case test ${index + 1} failed: ${description}`);
 				});
 			});
 
 			it('should handle null/undefined commands', () => {
 				// TypeScript prevents passing null/undefined, but we test the runtime behavior
-				const result1 = extractProjectPath(null!);
-				const result2 = extractProjectPath(undefined!);
+				const result1 = extractUnityProjectPath(null!);
+				const result2 = extractUnityProjectPath(undefined!);
 				assert.strictEqual(result1, undefined);
 				assert.strictEqual(result2, undefined);
 			});
@@ -228,7 +228,7 @@ describe('Utils Unit Tests', () => {
 			];
 
 			testCases.forEach(({ description, command, expected }, index) => {
-				const result = extractProjectPath(command);
+				const result = extractUnityProjectPath(command);
 				assert.strictEqual(result, expected, `Integration test ${index + 1} failed: ${description}`);
 			});
 		});

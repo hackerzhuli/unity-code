@@ -4,6 +4,8 @@
  */
 
 import yargsParser from 'yargs-parser';
+import * as fs from 'fs';
+import { promisify } from 'util';
 
 /**
  * Console log with automatic truncation for long messages
@@ -42,11 +44,17 @@ export function isInAssetsFolder(filePath: string, workspacePath?: string): bool
 }
 
 /**
- * Extracts the project path from Unity command line arguments
+ * Generic function to extract project path from command line arguments
  * @param command The full command line string
+ * @param optionKeys Array of option keys to search for, in priority order
+ * @param contextName Name for logging context (e.g., 'Unity', 'Hot Reload')
  * @returns The project path if found, undefined otherwise
  */
-export function extractProjectPath(command: string): string | undefined {
+function extractProjectPathFromCommand(
+    command: string,
+    optionKeys: string[],
+    contextName: string
+): string | undefined {
     if (!command) {
         return undefined;
     }
@@ -55,76 +63,14 @@ export function extractProjectPath(command: string): string | undefined {
         // Parse command line arguments using yargs-parser
         const argv = yargsParser(command, {
             configuration: {
-                'short-option-groups': false,  // Prevent -projectPath from being split into individual chars
+                'short-option-groups': false,  // Prevent options from being split into individual chars
                 'camel-case-expansion': false,
                 'strip-aliased': false,
                 'strip-dashed': false
             }
         });
         
-        // Look for project path in various Unity option formats
-        // Unity command line options are completely case insensitive
-        // We need to check all possible case variations dynamically
-        
         // Helper function to find case-insensitive key in argv
-        const findCaseInsensitiveKey = (targetKey: string): string | undefined => {
-            const lowerTargetKey = targetKey.toLowerCase();
-            for (const key of Object.keys(argv)) {
-                if (key.toLowerCase() === lowerTargetKey) {
-                    return key;
-                }
-            }
-            return undefined;
-        };
-        
-        // Priority 1: projectPath variants (highest priority)
-        const projectPathKey = findCaseInsensitiveKey('projectPath');
-        if (projectPathKey && argv[projectPathKey]) {
-            const projectPath = String(argv[projectPathKey]);
-            console.log(`UnityCode: Extracted project path from '${projectPathKey}': ${projectPath}`);
-            return projectPath;
-        }
-        
-        // Priority 2: createProject variants (lower priority)
-        const createProjectKey = findCaseInsensitiveKey('createProject');
-        if (createProjectKey && argv[createProjectKey]) {
-            const projectPath = String(argv[createProjectKey]);
-            console.log(`UnityCode: Extracted project path from '${createProjectKey}': ${projectPath}`);
-            return projectPath;
-        }
-        
-        console.log(`UnityCode: No project path found in command: ${command}`);
-        return undefined;
-        
-    } catch (error) {
-        console.error(`UnityCode: Error parsing command line arguments: ${error instanceof Error ? error.message : String(error)}`);
-        return undefined;
-    }
-}
-
-/**
- * Extracts the project path from Hot Reload for Unity (CodePatcherCLI) command line arguments
- * @param command The full command line string from CodePatcherCLI process
- * @returns The project path if found, undefined otherwise
- */
-export function extractHotReloadProjectPath(command: string): string | undefined {
-    if (!command) {
-        return undefined;
-    }
-    
-    try {
-        // Parse command line arguments using yargs-parser
-        const argv = yargsParser(command, {
-            configuration: {
-                'short-option-groups': false,  // Prevent -u from being split
-                'camel-case-expansion': false,
-                'strip-aliased': false,
-                'strip-dashed': false,
-            }
-        });
-        
-        // Helper function to find case-insensitive key in argv
-        // Windows command line options can be case insensitive, but prioritize exact match
         const findCaseInsensitiveKey = (targetKey: string): string | undefined => {
             // First try exact match
             if (argv[targetKey]) {
@@ -141,23 +87,77 @@ export function extractHotReloadProjectPath(command: string): string | undefined
             return undefined;
         };
         
-        // Look for -u option (project path for Hot Reload for Unity)
-        const uKey = findCaseInsensitiveKey('u');
-        if (uKey && argv[uKey]) {
-            const value = argv[uKey];
-            // Check if the value is a meaningful string (not just a boolean flag)
-            if (typeof value === 'string' && value.trim() !== '') {
-                const projectPath = String(value);
-                console.log(`UnityCode: Extracted Hot Reload project path from '${uKey}': ${projectPath}`);
-                return projectPath;
+        // Search for project path in order of priority
+        for (const optionKey of optionKeys) {
+            const foundKey = findCaseInsensitiveKey(optionKey);
+            if (foundKey && argv[foundKey]) {
+                const value = argv[foundKey];
+                // Ensure value is a non-empty string (not just a boolean flag)
+                if (typeof value === 'string' && value.trim() !== '') {
+                    const projectPath = String(value);
+                    console.log(`UnityCode: Extracted ${contextName} project path from '${foundKey}': ${projectPath}`);
+                    return projectPath;
+                }
             }
         }
         
-        console.log(`UnityCode: No Hot Reload project path found in command: ${command}`);
+        console.log(`UnityCode: No ${contextName} project path found in command: ${command}`);
         return undefined;
         
     } catch (error) {
-        console.error(`UnityCode: Error parsing Hot Reload command line arguments: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`UnityCode: Error parsing ${contextName} command line arguments: ${error instanceof Error ? error.message : String(error)}`);
         return undefined;
+    }
+}
+
+/**
+ * Extracts the project path from Unity command line arguments
+ * @param command The full command line string
+ * @returns The project path if found, undefined otherwise
+ */
+export function extractUnityProjectPath(command: string): string | undefined {
+    return extractProjectPathFromCommand(
+        command,
+        ['projectPath', 'createProject'],
+        'Unity'
+    );
+}
+
+/**
+ * Extracts the project path from Hot Reload for Unity (CodePatcherCLI) command line arguments
+ * @param command The full command line string from CodePatcherCLI process
+ * @returns The project path if found, undefined otherwise
+ */
+export function extractHotReloadProjectPath(command: string): string | undefined {
+    return extractProjectPathFromCommand(
+        command,
+        ['u'],
+        'Hot Reload'
+    );
+}
+
+/**
+ * Checks if two project paths match using file system resolution
+ * Handles path normalization, case sensitivity, and symbolic links
+ * @param path1 First project path to compare
+ * @param path2 Second project path to compare
+ * @returns True if paths match, false otherwise
+ */
+export async function projectPathsMatch(path1: string, path2: string): Promise<boolean> {
+    try {
+        // Get canonical paths for comparison
+        const realpath = promisify(fs.realpath);
+        const canonicalPath1 = await realpath(path1);
+        const canonicalPath2 = await realpath(path2);
+        
+        // Normalize paths to lowercase for case-insensitive comparison on Windows
+        const normalizedPath1 = canonicalPath1.toLowerCase();
+        const normalizedPath2 = canonicalPath2.toLowerCase();
+        
+        return normalizedPath1 === normalizedPath2;
+        
+    } catch (_error) {
+        // If we can't resolve paths, they don't match
+        return false;
     }
 }
