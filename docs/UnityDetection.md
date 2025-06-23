@@ -1,23 +1,15 @@
 # Unity Detection
+We have a native binary that lives in bin directory that we run as child process to detect Unity.
 
-Find a process with name Unity(add platform specific extension), extract it's command line, find -projectPath option and that is the project path of the Unity project.
-
-example(on Windows)(unrelated part ommited)
-``` sh
-C:\Unity\6000.0.51f1\Editor\Unity.exe -projectpath F:\projects\unity\TestUnityCode
+example path(windows)(it's platform specific):
+``` txt
+bin/win_64/unity_code_native.exe
 ```
 
-another example(on Windows)(project path quoted)(unrelated part ommited)
-``` sh
-C:\Unity\6000.0.51f1\Editor\Unity.exe -createproject "F:\projects\unity\Test Unity Code 2"
-```
+It has a messaging protocol [here]().
 
-yet another example(on Windows)(Chinese path)(unrelated part ommited)
-``` sh
-C:\Unity\6000.0.51f1\Editor\Unity.exe -createproject F\projects\unity\测试UnityCode
-```
+Use to detect whether Unity is running and whether Hot Reload For Unity is enabled.
 
+This program takes an argument that is the Unity project path, it only detects Unity Editor that is opened with that path.
 
-## Notes
-- the option can also be named -projectpath, -createProject, -createproject(so it is not case sensitive, specifically test this)
-- the path can be quoted or not quoted(if there is no space in path, it may not be quoted)
+Note that now we only support Windows, so, for other platforms, we just never detect Unity for now.

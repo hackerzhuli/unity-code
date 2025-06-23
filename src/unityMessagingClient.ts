@@ -1,9 +1,9 @@
 import * as dgram from 'dgram';
 import * as net from 'net';
-import * as si from 'systeminformation';
-import { UnityProcessDetector, UnityProcess } from './unityProcessDetector.js';
+import { UnityDetector, UnityDetectionEvent } from './unityDetector.js';
 import { logWithLimit } from './utils.js';
 import { EventEmitter } from './eventEmitter.js';
+
 
 /**
  * Unity Visual Studio Editor Messaging Protocol Client
@@ -120,23 +120,13 @@ export interface TestResultAdaptorContainer {
  * - **Non-heartbeat messages** are queued when Unity is offline for reliability
  * - **Heartbeat messages** (Ping/Pong) are not queued to avoid interference with connection detection
  * - **All queued messages** are processed when Unity comes back online
- * 
- * @example
- * ```typescript
- * const client = new UnityMessagingClient();
- * await client.connect();
- * 
- * // Check connection states
- * console.log(client.connected);     // Process detected and socket established
- * console.log(client.unityOnline);   // Unity ready to receive messages
- * console.log(client.connectedUnityProcessId); // PID being monitored
- * ```
  */
 export class UnityMessagingClient {
     private socket: dgram.Socket | null = null;
     private unityPort: number = 0;
     private unityAddress: string = '127.0.0.1';
     private messageHandlers: Map<MessageType, (message: UnityMessage) => void> = new Map();
+
     /**
      * Indicates whether we have detected a Unity process and established a UDP socket connection.
      * This does NOT guarantee Unity is ready to receive messages - use isUnityOnline for that.
@@ -152,7 +142,6 @@ export class UnityMessagingClient {
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private readonly UDP_BUFFER_SIZE = 8192;
     private readonly TCP_TIMEOUT = 5000;
-    private currentProjectPath?: string;
     private packageName: string = '';
     private messageQueue: Array<{ type: MessageType; value: string; resolve: () => void; reject: (error: Error) => void }> = [];
     private readonly OFFICIAL_PACKAGE_HEARTBEAT = 3000; // 3 seconds for official package (4s timeout)
@@ -162,45 +151,62 @@ export class UnityMessagingClient {
     private initialHeartbeatTimeout: NodeJS.Timeout | null = null;
     private hasReceivedFirstResponse: boolean = false;
     
-    // Auto-connection management
-    private autoConnectEnabled: boolean = true;
-    private connectionRetryInterval: NodeJS.Timeout | null = null;
-    private readonly CONNECTION_RETRY_DELAY = 5000; // 5 seconds between retry attempts
-    private readonly MAX_RETRY_ATTEMPTS = -1; // -1 means infinite retries
-    private currentRetryAttempt: number = 0;
     private isDisposed: boolean = false;
     
     // Process monitoring for smart disconnection detection
     private connectedProcessId: number | null = null;
     
+    // Unity detector for active monitoring
+    private unityDetector: UnityDetector | null = null;
+    
     // Connection status event - emits true for connected, false for disconnected
     public readonly onConnectionStatus = new EventEmitter<boolean>();
+    
     // Online status event - emits true for online, false for offline
     public readonly onOnlineStatus = new EventEmitter<boolean>();
-    private processMonitorInterval: NodeJS.Timeout | null = null;
-    private readonly PROCESS_CHECK_DELAY = 10000; // 10 seconds between process checks
 
-    constructor(projectPath?: string) {
-        this.currentProjectPath = projectPath;
+    constructor(unityDetector: UnityDetector) {
+        this.unityDetector = unityDetector;
         this.setupSocket();
         
-        // Start auto-connection process
-        if (this.autoConnectEnabled) {
-            this.startAutoConnection();
+        if (this.unityDetector) {
+            this.initializeUnityDetectorEvents();
         }
     }
 
-    private processDetector = new UnityProcessDetector();
-
     /**
-     * Detect Unity Editor processes and return their process IDs
+     * Initialize Unity detector events for active monitoring
      */
-    private async detectUnityProcesses(): Promise<number[]> {
-        const unityProcesses = await this.processDetector.detectUnityProcesses(this.currentProjectPath);
-        const processIds = unityProcesses.map((proc: UnityProcess) => proc.pid);
+    private async initializeUnityDetectorEvents(): Promise<void> {
+        if (!this.unityDetector) {
+            return;
+        }
         
-        console.log(`UnityCode: Detected ${processIds.length} Unity process PIDs: [${processIds.join(', ')}]`);
-        return processIds;
+        try {
+            // Subscribe to Unity state changes
+            this.unityDetector.onUnityStateChanged.subscribe((event: UnityDetectionEvent) => {
+                console.log(`UnityMessagingClient: Unity state changed - Running: ${event.isRunning}, PID: ${event.processId}, Hot Reload: ${event.isHotReloadEnabled}`);
+                
+                if (event.isRunning && event.processId) {
+                    // Unity started or changed - attempt connection once
+                    if (!this.isConnected || this.connectedProcessId !== event.processId) {
+                        console.log(`UnityMessagingClient: New Unity process detected (PID: ${event.processId}), attempting connection`);
+                        this.connectToUnity(event.processId);
+                    }
+                } else {
+                    // Unity stopped - handle disconnection
+                    if (this.isConnected) {
+                        console.log('UnityMessagingClient: Unity process stopped, handling disconnection');
+                        this.handleConnectionLoss();
+                    }
+                }
+            });
+            
+            await this.unityDetector.start();
+            console.log('UnityMessagingClient: Unity detector events initialized and started');
+        } catch (error) {
+            console.error('UnityMessagingClient: Failed to initialize Unity detector events:', error);
+        }
     }
 
     /**
@@ -213,70 +219,26 @@ export class UnityMessagingClient {
     }
 
     /**
-     * Start auto-connection process
+     * Connect to Unity with a specific process ID
      */
-    private startAutoConnection(): void {
-        if (this.isDisposed) {
-            return;
-        }
-        
-        // Try to connect immediately
-        this.attemptConnection();
-        
-        // Set up retry timer
-        this.scheduleConnectionRetry();
-    }
-    
-    /**
-     * Schedule next connection retry
-     */
-    private scheduleConnectionRetry(): void {
-        if (this.isDisposed || !this.autoConnectEnabled) {
-            return;
-        }
-        
-        this.stopConnectionRetry();
-        this.connectionRetryInterval = setInterval(() => {
-            // Only attempt connection if we're truly disconnected (not just offline)
-            if (!this.isConnected && !this.isDisposed) {
-                this.attemptConnection();
-            }
-        }, this.CONNECTION_RETRY_DELAY);
-    }
-    
-    /**
-     * Stop connection retry timer
-     */
-    private stopConnectionRetry(): void {
-        if (this.connectionRetryInterval) {
-            clearInterval(this.connectionRetryInterval);
-            this.connectionRetryInterval = null;
-        }
-    }
-    
-    /**
-     * Attempt to connect to Unity (used by auto-connection)
-     */
-    private async attemptConnection(): Promise<void> {
+    private async connectToUnity(processId: number): Promise<void> {
         if (this.isDisposed || this.isConnected) {
+            console.log(`UnityCode: Skipping connection attempt (isDisposed=${this.isDisposed}, isConnected=${this.isConnected})`);
             return;
         }
+        
+        console.log(`UnityCode: Attempting to connect to Unity process ${processId}`);
         
         try {
-            this.currentRetryAttempt++;
-            const success = await this.connectInternal();
+            const success = await this.connectInternal(processId);
             
             if (success) {
-                console.log(`UnityCode: Auto-connection successful after ${this.currentRetryAttempt} attempts`);
-                this.currentRetryAttempt = 0;
-                this.stopConnectionRetry(); // Stop retrying once connected
+                console.log(`UnityCode: Successfully connected to Unity process ${processId}`);
+            } else {
+                console.log(`UnityCode: Failed to connect to Unity process ${processId}`);
             }
-        } catch (_error) {
-            // Silent failure for auto-connection attempts
-            // Only log if it's been many attempts
-            if (this.currentRetryAttempt % 12 === 0) { // Log every minute (12 * 5 seconds)
-                console.log(`UnityCode: Auto-connection attempt ${this.currentRetryAttempt} failed, will keep trying...`);
-            }
+        } catch (error) {
+            console.log(`UnityCode: Connection to Unity process ${processId} failed with error:`, error);
         }
     }
 
@@ -309,7 +271,7 @@ export class UnityMessagingClient {
     }
     
     /**
-     * Handle connection loss and restart auto-connection if needed
+     * Handle connection loss
      */
     private handleConnectionLoss(): void {
         const wasConnected = this.isConnected;
@@ -320,8 +282,7 @@ export class UnityMessagingClient {
         this.hasReceivedFirstResponse = false;
         this.currentHeartbeatInterval = this.INITIAL_AGGRESSIVE_HEARTBEAT; // Reset to aggressive heartbeat for next connection
         this.stopHeartbeat();
-        this.stopProcessMonitoring();
-        
+
         // Emit status change events
         if (wasConnected) {
             this.onConnectionStatus.emit(false);
@@ -330,29 +291,23 @@ export class UnityMessagingClient {
             this.onOnlineStatus.emit(false);
         }
         
-        if (wasConnected && this.autoConnectEnabled && !this.isDisposed) {
-            console.log('UnityCode: Connection lost, restarting auto-connection...');
-            this.scheduleConnectionRetry();
-        }
+        console.log('UnityCode: Connection lost - waiting for Unity detection event to reconnect');
     }
 
     /**
-     * Internal connection method used by auto-connection system
+     * Internal connection method
      */
-    private async connectInternal(): Promise<boolean> {
+    private async connectInternal(processId: number): Promise<boolean> {
         if (!this.socket) {
+            console.log(`UnityCode: connectInternal: No socket available`);
             return false;
         }
 
         try {
-            // First, detect Unity processes and find the active port
-            const processIds = await this.detectUnityProcesses();
-            if (processIds.length === 0) {
-                return false; // No Unity process found, will retry later
-            }
-
+            console.log(`UnityCode: connectInternal: Connecting to Unity process ${processId}`);
+            
             // Store the connected process ID for monitoring
-            this.connectedProcessId = processIds[0];
+            this.connectedProcessId = processId;
             const activePort = this.calculatePortForProcess(this.connectedProcessId);
 
             // Update the port
@@ -360,6 +315,7 @@ export class UnityMessagingClient {
 
             // Set connected state before sending initial ping
             this.isConnected = true;
+            console.log(`UnityCode: connectInternal: Connected to Unity process ${this.connectedProcessId} on port ${activePort}`);
             
             // Send initial ping to establish connection
             await this.sendMessageInternal(MessageType.Ping, '');
@@ -368,17 +324,15 @@ export class UnityMessagingClient {
             this.isUnityOnline = false;
             this.hasReceivedFirstResponse = false;
             
-            // Start monitoring the connected Unity process for shutdowns
-            this.startProcessMonitoring();
-            
             this.startHeartbeat();
             
             // Trigger connection event
-            console.log('UnityCode: Emitting connection event for new Unity connection');
+            console.log(`UnityCode: connectInternal: Emitting connection event for new Unity connection`);
             this.onConnectionStatus.emit(true);
             
             return true;
-        } catch (_error) {
+        } catch (error) {
+            console.log(`UnityCode: connectInternal: Failed with error:`, error);
             this.isConnected = false; // Reset connection state on failure
             this.connectedProcessId = null;
             return false;
@@ -390,7 +344,6 @@ export class UnityMessagingClient {
      */
     dispose(): void {
         this.isDisposed = true;
-        this.autoConnectEnabled = false;
         const wasConnected = this.isConnected;
         const wasOnline = this.isUnityOnline;
         this.isConnected = false;
@@ -406,13 +359,12 @@ export class UnityMessagingClient {
         }
         
         this.stopHeartbeat();
-        this.stopConnectionRetry();
-        this.stopProcessMonitoring();
-        
+
         // Clear message queue and reject pending messages
         this.messageQueue.forEach(queuedMessage => {
             queuedMessage.reject(new Error('Client disposed'));
         });
+        
         this.messageQueue = [];
         
         if (this.socket) {
@@ -538,62 +490,6 @@ export class UnityMessagingClient {
         if (this.initialHeartbeatTimeout) {
             clearTimeout(this.initialHeartbeatTimeout);
             this.initialHeartbeatTimeout = null;
-        }
-    }
-
-    /**
-     * Start continuous monitoring of the connected Unity process.
-     * Detects when the Unity Editor process terminates and triggers connection cleanup.
-     * Monitoring runs regardless of Unity's online/offline state.
-     */
-    private startProcessMonitoring(): void {
-        if (!this.connectedProcessId || this.isDisposed) {
-            return;
-        }
-        
-        this.stopProcessMonitoring();
-        
-        console.log(`UnityCode: Starting process monitoring for Unity PID ${this.connectedProcessId}`);
-        
-        this.processMonitorInterval = setInterval(async () => {
-            if (this.isDisposed) {
-                this.stopProcessMonitoring();
-                return;
-            }
-            
-            await this.checkUnityProcess();
-        }, this.PROCESS_CHECK_DELAY);
-    }
-    
-    /**
-     * Stop process monitoring
-     */
-    private stopProcessMonitoring(): void {
-        if (this.processMonitorInterval) {
-            clearInterval(this.processMonitorInterval);
-            this.processMonitorInterval = null;
-        }
-    }
-    
-    /**
-     * Check if the Unity process is still running
-     */
-    private async checkUnityProcess(): Promise<void> {
-        if (!this.connectedProcessId || this.isDisposed) {
-            return;
-        }
-        
-        try {
-            const processes = await si.processes();
-            const isProcessRunning = processes.list.some(proc => proc.pid === this.connectedProcessId);
-            
-            if (!isProcessRunning) {
-                console.log(`UnityCode: Unity process ${this.connectedProcessId} not found - editor shutdown detected`);
-                this.handleConnectionLoss();
-            }
-        } catch (error) {
-            console.error('UnityCode: Error checking Unity process:', error);
-            // Don't treat process check errors as disconnection
         }
     }
 
@@ -949,40 +845,9 @@ export class UnityMessagingClient {
     }
 
     /**
-     * Check if auto-connection is enabled
-     */
-    get autoConnectionEnabled(): boolean {
-        return this.autoConnectEnabled;
-    }
-
-    /**
-     * Get current retry attempt count
-     */
-    get retryAttemptCount(): number {
-        return this.currentRetryAttempt;
-    }
-
-    /**
      * Get connected Unity process ID
      */
     get connectedUnityProcessId(): number | null {
         return this.connectedProcessId;
-    }
-
-    /**
-     * Check if process monitoring is active
-     */
-    get isProcessMonitoringActive(): boolean {
-        return this.processMonitorInterval !== null;
-    }
-
-    /**
-     * Force a connection attempt (bypasses auto-connection logic)
-     */
-    async forceConnectionAttempt(): Promise<boolean> {
-        if (this.isDisposed) {
-            return false;
-        }
-        return await this.connectInternal();
     }
 }

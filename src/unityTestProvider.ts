@@ -24,10 +24,10 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
     public readonly onDidChangeCodeLenses = this.onDidChangeCodeLensesEmitter.event;
 
-    constructor(context: vscode.ExtensionContext, unityProjectPath?: string) {
+    constructor(context: vscode.ExtensionContext, messagingClient: UnityMessagingClient) {
         this.testController = vscode.tests.createTestController('unityTests', 'Unity Tests');
         
-        this.messagingClient = new UnityMessagingClient(unityProjectPath);
+        this.messagingClient = messagingClient;
         
         // Register test controller
         context.subscriptions.push(this.testController);
@@ -723,14 +723,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         return basePath ? `${basePath}.${name}` : name;
     }
 
-
-
     /**
      * Dispose the test provider
      */
     dispose(): void {
         this.onDidChangeCodeLensesEmitter.dispose();
-        this.messagingClient.dispose();
         this.testController.dispose();
     }
 }

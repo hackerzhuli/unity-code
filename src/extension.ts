@@ -5,6 +5,8 @@ import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
 import { UnityTestProvider } from './unityTestProvider.js';
 import { UnityPackageHelper } from './unityPackageHelper.js';
 import { UnityProjectManager } from './unityProjectManager.js';
+import { UnityMessagingClient } from './unityMessagingClient.js';
+import { UnityDetector } from './unityDetector.js';
 
 // Global reference to test provider for auto-refresh functionality
 let globalTestProvider: UnityTestProvider | null = null;
@@ -14,6 +16,8 @@ let globalPackageHelper: UnityPackageHelper | null = null;
 let globalUnityProjectManager: UnityProjectManager | null = null;
 // Global reference to Unity status bar item
 let globalUnityStatusBarItem: vscode.StatusBarItem | null = null;
+let globalUnityMessagingClient: UnityMessagingClient | null = null;
+let globalUnityDetector: UnityDetector | null = null;
 
 /**
  * Handle renaming of a single file and its corresponding meta file
@@ -195,17 +199,17 @@ function updateUnityStatusBarItem(statusBarItem: vscode.StatusBarItem, connected
  * Start monitoring Unity connection status and update status bar using events
  */
 function startUnityStatusMonitoring(): void {
-    if (!globalTestProvider || !globalUnityStatusBarItem) {
+    if (!globalUnityMessagingClient || !globalUnityStatusBarItem) {
         return;
     }
 
     // Update status bar immediately with current state
-    const connected = globalTestProvider.messagingClient.connected;
-    const online = globalTestProvider.messagingClient.unityOnline;
+    const connected = globalUnityMessagingClient.connected;
+    const online = globalUnityMessagingClient.unityOnline;
     updateUnityStatusBarItem(globalUnityStatusBarItem, connected, online);
 
     // Subscribe to connection status changes for immediate updates
-    globalTestProvider.messagingClient.onConnectionStatus.subscribe((isConnected) => {
+    globalUnityMessagingClient.onConnectionStatus.subscribe((isConnected) => {
         if (globalUnityStatusBarItem) {
             const currentOnline = globalTestProvider?.messagingClient.unityOnline || false;
             updateUnityStatusBarItem(globalUnityStatusBarItem, isConnected, currentOnline);
@@ -213,7 +217,7 @@ function startUnityStatusMonitoring(): void {
     });
 
     // Subscribe to online status changes for immediate updates
-    globalTestProvider.messagingClient.onOnlineStatus.subscribe((isOnline) => {
+    globalUnityMessagingClient.onOnlineStatus.subscribe((isOnline) => {
         if (globalUnityStatusBarItem) {
             const currentConnected = globalTestProvider?.messagingClient.connected || false;
             updateUnityStatusBarItem(globalUnityStatusBarItem, currentConnected, isOnline);
@@ -386,10 +390,13 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
         registerHoverProvider(context, undefined);
         return;
     }
+
+    globalUnityDetector = new UnityDetector(unityProjectPath, context.extensionPath);
     
+    globalUnityMessagingClient = new UnityMessagingClient(globalUnityDetector);
+
     // Initialize test provider for Unity projects
-    const testProvider = new UnityTestProvider(context, unityProjectPath);
-    globalTestProvider = testProvider; // Store reference for auto-refresh
+    globalTestProvider = new UnityTestProvider(context, globalUnityMessagingClient);
     
     // Initialize package helper for Unity projects
     const packageHelper = new UnityPackageHelper(unityProjectPath);
@@ -400,6 +407,8 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     // Register C# documentation hover provider with the initialized package helper
     registerHoverProvider(context, packageHelper);
     
+    await globalUnityDetector.start();
+
     // Start Unity status monitoring if status bar item exists
     if (globalUnityStatusBarItem) {
         startUnityStatusMonitoring();
@@ -407,12 +416,20 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     
     context.subscriptions.push({
         dispose: () => {
-            testProvider.dispose();
-            globalTestProvider = null;
-            globalPackageHelper = null;
-            globalUnityStatusBarItem = null;
+            cleanup();
         }
     });
+}
+
+function cleanup() {
+    globalTestProvider?.dispose();
+    globalUnityDetector?.stop();
+    globalUnityMessagingClient?.dispose();
+    globalUnityDetector = null;
+    globalUnityMessagingClient = null;
+    globalTestProvider = null;
+    globalPackageHelper = null;
+    globalUnityStatusBarItem = null;
 }
 
 /**
@@ -439,9 +456,5 @@ export function getPackageHelper(): UnityPackageHelper | null {
 }
 
 export function deactivate() {
-    // Clean up global references
-    globalTestProvider = null;
-    globalPackageHelper = null;
-    globalUnityProjectManager = null;
-    globalUnityStatusBarItem = null;
+    cleanup();
 }

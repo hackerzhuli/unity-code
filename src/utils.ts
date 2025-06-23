@@ -50,7 +50,7 @@ export function isInAssetsFolder(filePath: string, workspacePath?: string): bool
  * @param contextName Name for logging context (e.g., 'Unity', 'Hot Reload')
  * @returns The project path if found, undefined otherwise
  */
-function extractProjectPathFromCommand(
+export function extractProjectPathFromCommand(
     command: string,
     optionKeys: string[],
     contextName: string
@@ -111,39 +111,13 @@ function extractProjectPathFromCommand(
 }
 
 /**
- * Extracts the project path from Unity command line arguments
- * @param command The full command line string
- * @returns The project path if found, undefined otherwise
- */
-export function extractUnityProjectPath(command: string): string | undefined {
-    return extractProjectPathFromCommand(
-        command,
-        ['projectPath', 'createProject'],
-        'Unity'
-    );
-}
-
-/**
- * Extracts the project path from Hot Reload for Unity (CodePatcherCLI) command line arguments
- * @param command The full command line string from CodePatcherCLI process
- * @returns The project path if found, undefined otherwise
- */
-export function extractHotReloadProjectPath(command: string): string | undefined {
-    return extractProjectPathFromCommand(
-        command,
-        ['u'],
-        'Hot Reload'
-    );
-}
-
-/**
- * Checks if two project paths match using file system resolution
+ * Checks if two paths match using file system resolution (files must exist, otherwise always don't match)
  * Handles path normalization, case sensitivity, and symbolic links
  * @param path1 First project path to compare
  * @param path2 Second project path to compare
  * @returns True if paths match, false otherwise
  */
-export async function projectPathsMatch(path1: string, path2: string): Promise<boolean> {
+export async function pathsMatch(path1: string, path2: string): Promise<boolean> {
     try {
         // Get canonical paths for comparison
         const realpath = promisify(fs.realpath);
