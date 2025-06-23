@@ -70,7 +70,7 @@ export class UnityDetector {
     constructor(projectPath: string, extensionRoot: string) {
         this.projectPath = projectPath;
         this.extensionRoot = extensionRoot;
-        this.port = 50000 + (process.pid % 1000);
+        this.port = 0;
     }
     
     /**
@@ -97,7 +97,7 @@ export class UnityDetector {
             console.log('UnityDetector: Successfully started Unity detection');
         } catch (error) {
             console.error('UnityDetector: Failed to start:', error);
-            await this.stop();
+            this.stop();
             throw error;
         }
     }
@@ -138,6 +138,8 @@ export class UnityDetector {
         this.nativeBinary = spawn(binaryPath, [this.projectPath], {
             stdio: ['pipe', 'pipe', 'pipe']
         });
+
+        this.port = 50000 + (this.nativeBinary.pid ?? 0) % 1000;
         
         this.nativeBinary.on('error', (error) => {
             console.error('UnityDetector: Native binary error:', error);
@@ -274,6 +276,8 @@ export class UnityDetector {
         
         const payload = buffer.subarray(5, 5 + payloadLength).toString('utf8');
         
+        console.log(`UnityDetector: Received message type ${messageType} with payload: ${payload}`);
+
         switch (messageType) {
             case MessageType.GetUnityState:
                 this.handleUnityStateMessage(payload);

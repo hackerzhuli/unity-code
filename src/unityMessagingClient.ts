@@ -202,7 +202,6 @@ export class UnityMessagingClient {
                 }
             });
             
-            await this.unityDetector.start();
             console.log('UnityMessagingClient: Unity detector events initialized and started');
         } catch (error) {
             console.error('UnityMessagingClient: Failed to initialize Unity detector events:', error);
@@ -364,7 +363,7 @@ export class UnityMessagingClient {
         this.messageQueue.forEach(queuedMessage => {
             queuedMessage.reject(new Error('Client disposed'));
         });
-        
+
         this.messageQueue = [];
         
         if (this.socket) {
