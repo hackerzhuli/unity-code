@@ -102,7 +102,7 @@ async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
     const config = vscode.workspace.getConfiguration('unitycode');
     const autoRefreshEnabled = config.get<boolean>('autoRefreshUnity', true);
     
-    if (!autoRefreshEnabled || !globalTestProvider) {
+    if (!autoRefreshEnabled || !globalUnityMessagingClient) {
         return;
     }
 
@@ -121,18 +121,9 @@ async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
         return;
     }
 
-    console.log(`UnityCode: C# file saved: ${document.fileName}, refreshing Unity and tests...`);
-    
     try {
-        // Refresh Unity's asset database only (no test refresh due to compilation time)
-        if (globalTestProvider.messagingClient.connected) {
-            console.log(`UnityCode: Connection status - Connected: ${globalTestProvider.messagingClient.connected}, Port: ${globalTestProvider.messagingClient.currentPort}`);
-            
-            await globalTestProvider.messagingClient.refreshAssetDatabase();
-            console.log('UnityCode: Sent refresh command to Unity (tests will not be auto-refreshed due to compilation time)');
-        } else {
-            console.log('UnityCode: Not connected to Unity, auto-connection will handle reconnection');
-        }
+        console.log(`UnityCode: C# file saved: ${document.fileName}, refreshing Unity and tests...`);
+        await globalUnityMessagingClient.refreshAssetDatabase();
     } catch (error) {
         console.error('UnityCode: Error during auto-refresh:', error);
     }

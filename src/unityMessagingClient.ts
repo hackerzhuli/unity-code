@@ -157,7 +157,7 @@ export class UnityMessagingClient {
     private connectedProcessId: number | null = null;
     
     // Unity detector for active monitoring
-    private unityDetector: UnityDetector | null = null;
+    private unityDetector: UnityDetector;
     
     // Connection status event - emits true for connected, false for disconnected
     public readonly onConnectionStatus = new EventEmitter<boolean>();
@@ -213,7 +213,7 @@ export class UnityMessagingClient {
      */
     private calculatePortForProcess(processId: number): number {
         const port = 56002 + (processId % 1000);
-        console.log(`UnityCode: Calculated port ${port} for process ID ${processId} (formula: 56001 + ${processId} % 1000 = 56001 + ${processId % 1000})`);
+        console.log(`UnityMessagingClient: Calculated port ${port} for process ID ${processId} (formula: 56001 + ${processId} % 1000 = 56001 + ${processId % 1000})`);
         return port;
     }
 
@@ -222,22 +222,22 @@ export class UnityMessagingClient {
      */
     private async connectToUnity(processId: number): Promise<void> {
         if (this.isDisposed || this.isConnected) {
-            console.log(`UnityCode: Skipping connection attempt (isDisposed=${this.isDisposed}, isConnected=${this.isConnected})`);
+            console.log(`UnityMessagingClient: Skipping connection attempt (isDisposed=${this.isDisposed}, isConnected=${this.isConnected})`);
             return;
         }
         
-        console.log(`UnityCode: Attempting to connect to Unity process ${processId}`);
+        console.log(`UnityMessagingClient: Attempting to connect to Unity process ${processId}`);
         
         try {
             const success = await this.connectInternal(processId);
             
             if (success) {
-                console.log(`UnityCode: Successfully connected to Unity process ${processId}`);
+                console.log(`UnityMessagingClient: Successfully connected to Unity process ${processId}`);
             } else {
-                console.log(`UnityCode: Failed to connect to Unity process ${processId}`);
+                console.log(`UnityMessagingClient: Failed to connect to Unity process ${processId}`);
             }
         } catch (error) {
-            console.log(`UnityCode: Connection to Unity process ${processId} failed with error:`, error);
+            console.log(`UnityMessagingClient: Connection to Unity process ${processId} failed with error:`, error);
         }
     }
 
@@ -254,17 +254,17 @@ export class UnityMessagingClient {
                 message.origin = `${rinfo.address}:${rinfo.port}`;
                 this.handleMessage(message);
             } catch (error) {
-                console.error('UnityCode: Error deserializing message:', error);
+                console.error('UnityMessagingClient: Error deserializing message:', error);
             }
         });
 
         this.socket.on('error', (error: Error) => {
-            console.error('UnityCode: Socket error:', error);
+            console.error('UnityMessagingClient: Socket error:', error);
             this.handleConnectionLoss();
         });
 
         this.socket.on('close', () => {
-            console.log('UnityCode: Socket closed');
+            console.log('UnityMessagingClient: Socket closed');
             this.handleConnectionLoss();
         });
     }
@@ -290,7 +290,7 @@ export class UnityMessagingClient {
             this.onOnlineStatus.emit(false);
         }
         
-        console.log('UnityCode: Connection lost - waiting for Unity detection event to reconnect');
+        console.log('UnityMessagingClient: Connection lost - waiting for Unity detection event to reconnect');
     }
 
     /**
@@ -298,12 +298,12 @@ export class UnityMessagingClient {
      */
     private async connectInternal(processId: number): Promise<boolean> {
         if (!this.socket) {
-            console.log(`UnityCode: connectInternal: No socket available`);
+            console.log(`UnityMessagingClient: connectInternal: No socket available`);
             return false;
         }
 
         try {
-            console.log(`UnityCode: connectInternal: Connecting to Unity process ${processId}`);
+            console.log(`UnityMessagingClient: connectInternal: Connecting to Unity process ${processId}`);
             
             // Store the connected process ID for monitoring
             this.connectedProcessId = processId;
@@ -314,7 +314,7 @@ export class UnityMessagingClient {
 
             // Set connected state before sending initial ping
             this.isConnected = true;
-            console.log(`UnityCode: connectInternal: Connected to Unity process ${this.connectedProcessId} on port ${activePort}`);
+            console.log(`UnityMessagingClient: connectInternal: Connected to Unity process ${this.connectedProcessId} on port ${activePort}`);
             
             // Send initial ping to establish connection
             await this.sendMessageInternal(MessageType.Ping, '');
@@ -326,12 +326,12 @@ export class UnityMessagingClient {
             this.startHeartbeat();
             
             // Trigger connection event
-            console.log(`UnityCode: connectInternal: Emitting connection event for new Unity connection`);
+            console.log(`UnityMessagingClient: connectInternal: Emitting connection event for new Unity connection`);
             this.onConnectionStatus.emit(true);
             
             return true;
         } catch (error) {
-            console.log(`UnityCode: connectInternal: Failed with error:`, error);
+            console.log(`UnityMessagingClient: connectInternal: Failed with error:`, error);
             this.isConnected = false; // Reset connection state on failure
             this.connectedProcessId = null;
             return false;
@@ -392,11 +392,11 @@ export class UnityMessagingClient {
     private handleFirstResponse(): void {
         if (!this.hasReceivedFirstResponse) {
             this.hasReceivedFirstResponse = true;
-            console.log('UnityCode: First response received, requesting package name and switching to normal heartbeat');
+            console.log('UnityMessagingClient: First response received, requesting package name and switching to normal heartbeat');
             
             // Request package name now that Unity is responding
             this.sendMessageInternal(MessageType.PackageName, '').catch(error => {
-                console.warn('UnityCode: Failed to request package name:', error);
+                console.warn('UnityMessagingClient: Failed to request package name:', error);
             });
             
             // Switch to normal heartbeat after a delay
@@ -414,14 +414,14 @@ export class UnityMessagingClient {
         
         this.initialHeartbeatTimeout = setTimeout(() => {
             if (!this.isDisposed && this.hasReceivedFirstResponse) {
-                console.log('UnityCode: Switching from aggressive to normal heartbeat interval');
+                console.log('UnityMessagingClient: Switching from aggressive to normal heartbeat interval');
                 
                 // Determine the correct heartbeat interval based on package (if known)
                 const isCustomPackage = this.packageName === 'com.hackerzhuli.ide.visualstudio';
                 const normalInterval = isCustomPackage ? this.CUSTOM_PACKAGE_HEARTBEAT : this.OFFICIAL_PACKAGE_HEARTBEAT;
                 
                 this.currentHeartbeatInterval = normalInterval;
-                console.log(`UnityCode: Set heartbeat interval to ${normalInterval}ms for package '${this.packageName || 'unknown'}'`);
+                console.log(`UnityMessagingClient: Set heartbeat interval to ${normalInterval}ms for package '${this.packageName || 'unknown'}'`);
                 
                 // Restart heartbeat with normal interval
                 if (this.heartbeatInterval) {
@@ -437,7 +437,7 @@ export class UnityMessagingClient {
     private updateHeartbeatInterval(): void {
         // Only update heartbeat interval if we've already switched from aggressive mode
         if (!this.hasReceivedFirstResponse) {
-            console.log(`UnityCode: Package detected (${this.packageName}) but still in aggressive heartbeat mode, will update later`);
+            console.log(`UnityMessagingClient: Package detected (${this.packageName}) but still in aggressive heartbeat mode, will update later`);
             return;
         }
         
@@ -445,7 +445,7 @@ export class UnityMessagingClient {
         const newInterval = isCustomPackage ? this.CUSTOM_PACKAGE_HEARTBEAT : this.OFFICIAL_PACKAGE_HEARTBEAT;
         
         if (newInterval !== this.currentHeartbeatInterval) {
-            console.log(`UnityCode: Updating heartbeat interval from ${this.currentHeartbeatInterval}ms to ${newInterval}ms for package ${this.packageName}`);
+            console.log(`UnityMessagingClient: Updating heartbeat interval from ${this.currentHeartbeatInterval}ms to ${newInterval}ms for package ${this.packageName}`);
             this.currentHeartbeatInterval = newInterval;
             
             // Restart heartbeat with new interval if currently running
@@ -463,7 +463,7 @@ export class UnityMessagingClient {
             return;
         }
         
-        console.log(`UnityCode: Processing ${this.messageQueue.length} queued messages`);
+        console.log(`UnityMessagingClient: Processing ${this.messageQueue.length} queued messages`);
         const queue = [...this.messageQueue];
         this.messageQueue = [];
         
@@ -505,28 +505,28 @@ export class UnityMessagingClient {
     private handleMessage(message: UnityMessage): void {
         // Skip logging for ping/pong messages to reduce console noise
         if (message.type !== MessageType.Ping && message.type !== MessageType.Pong) {
-            logWithLimit(`UnityCode: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
+            logWithLimit(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
         }
         
         // Handle Unity online/offline state changes
         let messageHandledInternally = false;
         
         if (message.type === MessageType.OnLine) {
-            console.log('UnityCode: Unity online');
+            console.log('UnityMessagingClient: Unity online');
             this.isUnityOnline = true;
             this.onOnlineStatus.emit(true);
             this.processMessageQueue();
             this.handleFirstResponse();
             messageHandledInternally = true;
         } else if (message.type === MessageType.OffLine) {
-            console.log('UnityCode: Unity went offline');
+            console.log('UnityMessagingClient: Unity went offline');
             this.isUnityOnline = false;
             this.onOnlineStatus.emit(false);
             messageHandledInternally = true;
         } else if (message.type === MessageType.Pong) {
             // Pong response indicates Unity is online and responding
             if (!this.isUnityOnline) {
-                console.log('UnityCode: Unity online (pong received)');
+                console.log('UnityMessagingClient: Unity online (pong received)');
                 this.isUnityOnline = true;
                 this.onOnlineStatus.emit(true);
                 this.processMessageQueue();
@@ -535,7 +535,7 @@ export class UnityMessagingClient {
             messageHandledInternally = true;
         } else if (message.type === MessageType.PackageName && message.value) {
             this.packageName = message.value;
-            console.log(`UnityCode: Detected Unity package: ${this.packageName}`);
+            console.log(`UnityMessagingClient: Detected Unity package: ${this.packageName}`);
             this.updateHeartbeatInterval();
             messageHandledInternally = true;
         }
@@ -546,7 +546,7 @@ export class UnityMessagingClient {
         } else if (!messageHandledInternally) {
             // Skip logging for ping/pong messages to reduce console noise
             if (message.type !== MessageType.Ping && message.type !== MessageType.Pong) {
-                console.log(`UnityCode: No handler registered for message type ${message.type} (${MessageType[message.type] || 'Unknown'})`);
+                console.log(`UnityMessagingClient: No handler registered for message type ${message.type} (${MessageType[message.type] || 'Unknown'})`);
             }
         }
 
@@ -566,7 +566,7 @@ export class UnityMessagingClient {
             const length = parseInt(lengthStr);
 
             if (isNaN(port) || isNaN(length)) {
-                console.error('UnityCode: Invalid TCP message format');
+                console.error('UnityMessagingClient: Invalid TCP message format');
                 return;
             }
 
@@ -575,7 +575,7 @@ export class UnityMessagingClient {
                 this.handleMessage(tcpMessage);
             }
         } catch (error) {
-            console.error('UnityCode: Error handling TCP message:', error);
+            console.error('UnityMessagingClient: Error handling TCP message:', error);
         }
     }
 
@@ -640,7 +640,7 @@ export class UnityMessagingClient {
         const isHeartbeatMessage = type === MessageType.Ping || type === MessageType.Pong;
         
         if (!this.isUnityOnline && !isHeartbeatMessage) {
-            console.log(`UnityCode: Unity is offline, queuing message - Type: ${type} (${MessageType[type]}), Value: "${value}"`);
+            console.log(`UnityMessagingClient: Unity is offline, queuing message - Type: ${type} (${MessageType[type]}), Value: "${value}"`);
             return new Promise((resolve, reject) => {
                 this.messageQueue.push({ type, value, resolve, reject });
             });
@@ -660,21 +660,21 @@ export class UnityMessagingClient {
         const buffer = this.serializeMessage({ type, value });
         // Skip logging for ping/pong messages to reduce console noise
         if (type !== MessageType.Ping && type !== MessageType.Pong) {
-            logWithLimit(`UnityCode: Sending message - Type: ${type} (${MessageType[type]}), Value: "${value}", Size: ${buffer.length} bytes, Target: ${this.unityAddress}:${this.unityPort}`);
+            logWithLimit(`UnityMessagingClient: Sending message - Type: ${type} (${MessageType[type]}), Value: "${value}", Size: ${buffer.length} bytes, Target: ${this.unityAddress}:${this.unityPort}`);
         }
 
         // Check if message is too large for UDP
         if (buffer.length >= this.UDP_BUFFER_SIZE) {
-            console.log(`UnityCode: Message too large for UDP (${buffer.length} >= ${this.UDP_BUFFER_SIZE}), using TCP fallback`);
+            console.log(`UnityMessagingClient: Message too large for UDP (${buffer.length} >= ${this.UDP_BUFFER_SIZE}), using TCP fallback`);
             await this.sendTcpMessage({ type, value });
         } else {
             return new Promise((resolve, reject) => {
                 this.socket!.send(buffer, this.unityPort, this.unityAddress, (error) => {
                     if (error) {
-                        console.error(`UnityCode: UDP send failed:`, error);
+                        console.error(`UnityMessagingClient: UDP send failed:`, error);
                         reject(error);
                     } else {
-                        //console.log(`UnityCode: UDP message sent successfully`);
+                        //console.log(`UnityMessagingClient: UDP message sent successfully`);
                         resolve();
                     }
                 });
@@ -788,15 +788,30 @@ export class UnityMessagingClient {
     }
 
     /**
-     * Refresh Unity's asset database to trigger recompilation
+     * Refresh Unity's asset database to trigger recompilation( automatically disable this if Hot Reload is enabled)
      */
     async refreshAssetDatabase(): Promise<void> {
-        console.log(`UnityCode: Sending Refresh message (type ${MessageType.Refresh}) to Unity on port ${this.unityPort}`);
+        if(!this.isConnected){
+            console.log('UnityMessagingClient: Not connected to Unity, cannot refresh asset database');
+            return;
+        }
+
+        console.log(`UnityMessagingClient: Sending Refresh message (type ${MessageType.Refresh}) to Unity on port ${this.unityPort}`);
         try {
-            await this.sendMessage(MessageType.Refresh, '');
-            console.log('UnityCode: Refresh message sent successfully');
+            // we need to know if Hot Reload for Unity is Enabled, if so, we dont want a Refresh
+            await this.unityDetector?.requestUnityState();
+
+            // wait for 100 ms to allow receive Unity state
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            if (!this.unityDetector.isHotReloadEnabled) {
+                await this.sendMessage(MessageType.Refresh, '');
+                console.log('UnityMessagingClient: Refresh asset database message sent successfully');
+            }else{
+                console.log('UnityMessagingClient: Refresh asset database message not sent because Hot Reload is enabled');
+            }
         } catch (error) {
-            console.error('UnityCode: Failed to send refresh message:', error);
+            console.error('UnityMessagingClient: Failed to send refresh message:', error);
             throw error;
         }
     }
