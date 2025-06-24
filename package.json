@@ -22,16 +22,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "codeunity.renameMetaFiles",
-        "title": "CodeUnity: Rename Meta Files"
-      },
-      {
         "command": "unitycode.refreshTests",
         "title": "Unity Code: Refresh Tests"
-      },
-      {
-        "command": "unitycode.refreshPackages",
-        "title": "Unity Code: Refresh Packages"
       }
     ],
     "configuration": {
@@ -40,7 +32,7 @@
         "unitycode.autoRefreshUnity": {
           "type": "boolean",
           "default": true,
-          "description": "Enable/disable automatic Unity asset database refresh when C# files are saved"
+          "description": "Enable/disable automatic Unity asset database refresh when files are saved, this will be automatically disabled if Hot Reload for Unity is running"
         },
         "unitycode.refreshOnWindowFocus": {
           "type": "boolean",

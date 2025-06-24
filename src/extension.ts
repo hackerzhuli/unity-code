@@ -217,12 +217,6 @@ function startUnityStatusMonitoring(): void {
  * @param context The extension context
  */
 function registerEventListeners(context: vscode.ExtensionContext): void {
-    // Register the command to manually rename meta files
-    const disposable = vscode.commands.registerCommand('codeunity.renameMetaFiles', function () {
-        vscode.window.showInformationMessage('CodeUnity: Manually renaming meta files');
-        // This would scan the workspace and fix any mismatched meta files
-    });
-
     // Register the command to manually refresh tests
     const refreshTestsDisposable = vscode.commands.registerCommand('unitycode.refreshTests', async function () {
         if (globalTestProvider) {
@@ -235,22 +229,6 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
             }
         } else {
             vscode.window.showWarningMessage('Unity Code: Test provider not available');
-        }
-    });
-
-    // Register the command to manually refresh packages
-    const refreshPackagesDisposable = vscode.commands.registerCommand('unitycode.refreshPackages', async function () {
-        if (globalPackageHelper) {
-            vscode.window.showInformationMessage('Unity Code: Refreshing packages...');
-            try {
-                await globalPackageHelper.updatePackages();
-                const packageCount = (await globalPackageHelper.getAllPackages()).length;
-                vscode.window.showInformationMessage(`Unity Code: Packages refreshed successfully (${packageCount} packages found)`);
-            } catch (error) {
-                vscode.window.showErrorMessage(`Unity Code: Failed to refresh packages: ${error instanceof Error ? error.message : String(error)}`);
-            }
-        } else {
-            vscode.window.showWarningMessage('Unity Code: Package helper not available');
         }
     });
 
@@ -334,9 +312,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     }
 
     context.subscriptions.push(
-        disposable, 
         refreshTestsDisposable,
-        refreshPackagesDisposable,
         showConnectionStatusDisposable,
         runTestsDisposable,
         renameDisposable, 
