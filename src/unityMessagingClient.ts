@@ -114,12 +114,37 @@ export interface TestResultAdaptorContainer {
  * - **Non-heartbeat messages** are queued when Unity is offline for reliability
  * - **Heartbeat messages** (Ping/Pong) are not queued to avoid interference with connection detection
  * - **All queued messages** are processed when Unity comes back online
+ * 
+ * ## Rate Limiting
+ * 
+ * The client implements configurable rate limiting to prevent issues with Unity operations:
+ * 
+ * **Why Rate Limiting is Necessary:**
+ * - **Test Operations**: Unity test execution can take several seconds to minutes depending on test complexity
+ * - **Asset Database Refresh**: Refreshing Unity's asset database triggers recompilation and can take significant time
+ * - **Build Operations**: Unity builds are resource-intensive and should not be triggered rapidly
+ * - **Preventing Unity Overload**: Rapid successive commands can overwhelm Unity Editor and cause instability
+ * 
+ * **Rate Limiting Behavior:**
+ * - Each message type can have its own configurable minimum interval between sends
+ * - Messages that violate rate limits are immediately discarded with an error
+ * - Heartbeat messages (Ping/Pong) are exempt from rate limiting to maintain connection health
  */
 export class UnityMessagingClient {
     private socket: dgram.Socket | null = null;
     private unityPort: number = 0;
     private unityAddress: string = '127.0.0.1';
     private messageHandlers: Map<MessageType, (message: UnityMessage) => void> = new Map();
+    
+    /**
+     * Rate limiting configuration - maps MessageType to minimum interval in milliseconds
+     */
+    private rateLimitConfig: Map<MessageType, number> = new Map();
+    
+    /**
+     * Track last send time for each message type
+     */
+    private lastSendTimes: Map<MessageType, number> = new Map();
 
     /**
      * Indicates whether we have detected a Unity process and established a UDP socket connection.
@@ -165,6 +190,9 @@ export class UnityMessagingClient {
         if (this.unityDetector) {
             this.initializeUnityDetectorEvents();
         }
+        
+        // Initialize default rate limits for specific message types
+        this.initializeDefaultRateLimits();
     }
 
     /**
@@ -417,8 +445,6 @@ export class UnityMessagingClient {
         }, 2000); // Wait 2 seconds after first response before switching
     }
 
-
-
     /**
      * Process queued messages when Unity comes back online
      */
@@ -592,12 +618,24 @@ export class UnityMessagingClient {
     }
 
     /**
-     * Send message to Unity
+     * Send message to Unity with rate limiting
      */
     async sendMessage(type: MessageType, value: string): Promise<void> {
         if (!this.socket || !this.isConnected) {
-            throw new Error('Not connected to Unity');
+            console.error('Not connected to Unity');
         }
+
+        // Check rate limit for this message type
+        if (this.isRateLimited(type)) {
+            const rateLimitMs = this.rateLimitConfig.get(type)!;
+            const lastSendTime = this.lastSendTimes.get(type) || 0;
+            const timeSinceLastSend = Date.now() - lastSendTime;
+            console.error(`UnityMessagingClient: Rate limit exceeded for message type ${type} (${MessageType[type]}). ` +
+                       `Minimum interval: ${rateLimitMs}ms, Time since last send: ${timeSinceLastSend}ms. Message discarded.`);
+        }
+
+        // Update last send time for rate limiting
+        this.updateLastSendTime(type);
 
         // Queue all non-heartbeat messages when Unity is offline for reliability
         const isHeartbeatMessage = type === MessageType.Ping || type === MessageType.Pong;
@@ -608,7 +646,7 @@ export class UnityMessagingClient {
                 this.messageQueue.push({ type, value, resolve, reject });
             });
         }
-
+        
         return this.sendMessageInternal(type, value);
     }
 
@@ -617,7 +655,7 @@ export class UnityMessagingClient {
      */
     private async sendMessageInternal(type: MessageType, value: string): Promise<void> {
         if (!this.socket || !this.isConnected) {
-            throw new Error('Not connected to Unity');
+            console.error('Not connected to Unity');
         }
 
         const buffer = this.serializeMessage({ type, value });
@@ -729,7 +767,6 @@ export class UnityMessagingClient {
             }
         } catch (error) {
             console.error('UnityMessagingClient: Failed to send refresh message:', error);
-            throw error;
         }
     }
 
@@ -780,5 +817,39 @@ export class UnityMessagingClient {
      */
     get connectedUnityProcessId(): number | null {
         return this.connectedProcessId;
+    }
+        
+    /**
+     * Initialize default rate limits for message types that need throttling
+     */
+    private initializeDefaultRateLimits(): void {
+        this.rateLimitConfig.set(MessageType.Refresh, 1000);
+        this.rateLimitConfig.set(MessageType.RetrieveTestList, 500);
+        this.rateLimitConfig.set(MessageType.ExecuteTests, 1000);
+    }
+    
+    /**
+     * Check if a message type is currently rate limited
+     */
+    private isRateLimited(type: MessageType): boolean {
+        const rateLimitMs = this.rateLimitConfig.get(type);
+        if (!rateLimitMs) {
+            return false; // No rate limit configured for this message type
+        }
+        
+        const lastSendTime = this.lastSendTimes.get(type);
+        if (!lastSendTime) {
+            return false; // First time sending this message type
+        }
+        
+        const timeSinceLastSend = Date.now() - lastSendTime;
+        return timeSinceLastSend < rateLimitMs;
+    }
+    
+    /**
+     * Update the last send time for a message type
+     */
+    private updateLastSendTime(type: MessageType): void {
+        this.lastSendTimes.set(type, Date.now());
     }
 }

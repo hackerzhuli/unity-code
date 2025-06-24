@@ -121,12 +121,8 @@ async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
         return;
     }
 
-    try {
-        console.log(`UnityCode: C# file saved: ${document.fileName}, refreshing Unity and tests...`);
-        await globalUnityMessagingClient.refreshAssetDatabase();
-    } catch (error) {
-        console.error('UnityCode: Error during auto-refresh:', error);
-    }
+    console.log(`UnityCode: C# file saved: ${document.fileName}, refreshing Unity and tests...`);
+    await globalUnityMessagingClient.refreshAssetDatabase();
 }
 
 /**
