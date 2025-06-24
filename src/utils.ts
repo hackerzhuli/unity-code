@@ -1,4 +1,3 @@
-import yargsParser from 'yargs-parser';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import * as nodePath from 'path'
@@ -15,73 +14,6 @@ export function logWithLimit(message: string, maxLength: number = 200): void {
     } else {
         const truncated = `${message.substring(0, maxLength)}... (truncated, original length: ${message.length})`;
         console.log(truncated);
-    }
-}
-
-/**
- * Generic function to extract project path from command line arguments
- * @param command The full command line string
- * @param optionKeys Array of option keys to search for, in priority order
- * @param contextName Name for logging context (e.g., 'Unity', 'Hot Reload')
- * @returns The project path if found, undefined otherwise
- */
-export function extractProjectPathFromCommand(
-    command: string,
-    optionKeys: string[],
-    contextName: string
-): string | undefined {
-    if (!command) {
-        return undefined;
-    }
-    
-    try {
-        // Parse command line arguments using yargs-parser
-        const argv = yargsParser(command, {
-            configuration: {
-                'short-option-groups': false,  // Prevent options from being split into individual chars
-                'camel-case-expansion': false,
-                'strip-aliased': false,
-                'strip-dashed': false
-            }
-        });
-        
-        // Helper function to find case-insensitive key in argv
-        const findCaseInsensitiveKey = (targetKey: string): string | undefined => {
-            // First try exact match
-            if (argv[targetKey]) {
-                return targetKey;
-            }
-            
-            // Then try case-insensitive search
-            const lowerTargetKey = targetKey.toLowerCase();
-            for (const key of Object.keys(argv)) {
-                if (key.toLowerCase() === lowerTargetKey) {
-                    return key;
-                }
-            }
-            return undefined;
-        };
-        
-        // Search for project path in order of priority
-        for (const optionKey of optionKeys) {
-            const foundKey = findCaseInsensitiveKey(optionKey);
-            if (foundKey && argv[foundKey]) {
-                const value = argv[foundKey];
-                // Ensure value is a non-empty string (not just a boolean flag)
-                if (typeof value === 'string' && value.trim() !== '') {
-                    const projectPath = String(value);
-                    console.log(`UnityCode: Extracted ${contextName} project path from '${foundKey}': ${projectPath}`);
-                    return projectPath;
-                }
-            }
-        }
-        
-        console.log(`UnityCode: No ${contextName} project path found in command: ${command}`);
-        return undefined;
-        
-    } catch (error) {
-        console.error(`UnityCode: Error parsing ${contextName} command line arguments: ${error instanceof Error ? error.message : String(error)}`);
-        return undefined;
     }
 }
 
