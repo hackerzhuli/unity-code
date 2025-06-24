@@ -387,16 +387,11 @@
                     lineElement.className = 'stack-trace-line';
                     lineElement.textContent = line;
                     lineElement.addEventListener('click', () => {
-                        const match = line.match(/(.+\.cs):(\d+)/);
-                        if (match) {
-                            const filePath = match[1];
-                            const lineNumber = parseInt(match[2]);
-                            vscode.postMessage({
-                                type: 'openFile',
-                                filePath: filePath,
-                                line: lineNumber
-                            });
-                        }
+                        // Send the entire line to the extension for parsing
+                        vscode.postMessage({
+                            type: 'openFile',
+                            stackTraceLine: line
+                        });
                     });
                 } else {
                     lineElement.textContent = line;

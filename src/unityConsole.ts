@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { UnityProjectManager } from './unityProjectManager.js';
 
 export interface UnityLogEntry {
     id: string;
@@ -17,12 +18,12 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
     private _logs: UnityLogEntry[] = [];
     private _logCounter = 0;
     private _selectedLogId: string | null = null;
-    private _unityProjectManager?: any;
+    private _unityProjectManager: UnityProjectManager | null;
     private extensionPath: string;
     
     constructor(
         private readonly _extensionUri: vscode.Uri,
-        unityProjectManager?: any,
+        unityProjectManager: UnityProjectManager | null,
     ) {
         this._unityProjectManager = unityProjectManager;
         this.extensionPath = _extensionUri.fsPath;
@@ -30,7 +31,7 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
     
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
-        context: vscode.WebviewViewResolveContext,
+        _context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken,
     ) {
         this._view = webviewView;
@@ -58,7 +59,11 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
                         this._selectedLogId = message.logId;
                         break;
                     case 'openFile':
-                        this._openFileAtLine(message.filePath, message.line);
+                        if (message.stackTraceLine) {
+                            this._openFileFromStackTrace(message.stackTraceLine);
+                        } else {
+                            this._openFileAtLine(message.filePath, message.line);
+                        }
                         break;
                     case 'webviewReady':
                         // Webview is ready to receive logs (e.g., after being hidden and shown again)
@@ -116,20 +121,66 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
         }
     }
     
+    private async _openFileFromStackTrace(stackTraceLine: string): Promise<void> {
+        try {
+            // Parse Unity stack trace line to extract file path and line number
+            // Unity stack trace formats:
+            // 1. "Script:Awake () (at Assets/Scripts/Script.cs:10)"
+            // 2. "UnityEngine.Debug:Log(Object) (at C:/buildslave/unity/build/Runtime/Export/Debug.bindings.cs:35)"
+            // 3. "Assets/Scripts/Script.cs:10"
+            
+            let filePath: string | null = null;
+            let lineNumber = 1;
+            
+            // Try to match pattern: (at path/file.cs:line)
+            let match = stackTraceLine.match(/\(at\s+(.+\.cs):(\d+)\)/);
+            if (match) {
+                filePath = match[1];
+                lineNumber = parseInt(match[2]);
+            } else {
+                // Try to match pattern: path/file.cs:line
+                match = stackTraceLine.match(/([^\s]+\.cs):(\d+)/);
+                if (match) {
+                    filePath = match[1];
+                    lineNumber = parseInt(match[2]);
+                }
+            }
+            
+            if (!filePath) {
+                console.error(`Could not parse file path from stack trace line: ${stackTraceLine}`);
+                return;
+            }
+            
+            // Remove any leading path separators or "Assets/" prefix for Unity relative paths
+            if (filePath.startsWith('Assets/') || filePath.startsWith('Assets\\')) {
+                filePath = filePath.substring(7); // Remove "Assets/" or "Assets\\"
+            }
+            
+            await this._openFileAtLine(filePath, lineNumber);
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to parse stack trace: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
     private async _openFileAtLine(filePath: string, line: number): Promise<void> {
         try {
             // Convert relative Unity path to absolute path
             let absolutePath = filePath;
-            if (this._unityProjectManager && !path.isAbsolute(filePath)) {
+            if (!path.isAbsolute(filePath)) {
+                if (!this._unityProjectManager){
+                    console.error('UnityProjectManager is not initialized');
+                    return;
+                }
                 const unityProjectPath = this._unityProjectManager.getUnityProjectPath();
                 if (unityProjectPath) {
-                    absolutePath = path.join(unityProjectPath, filePath);
+                    absolutePath = path.join(unityProjectPath, 'Assets', filePath);
                 }
             }
             
             // Check if file exists
             if (!fs.existsSync(absolutePath)) {
-                vscode.window.showWarningMessage(`File not found: ${filePath}`);
+                console.error(`File not found: ${absolutePath}`);
                 return;
             }
             
@@ -146,7 +197,7 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
         }
     }
     
-    private _getHtmlForWebview(webview: vscode.Webview): string {
+    private _getHtmlForWebview(_webview: vscode.Webview): string {
         try {
             const htmlPath = path.join(this.extensionPath, 'assets/unityConsole.html');
             return fs.readFileSync(htmlPath, 'utf8');
@@ -165,9 +216,10 @@ export class UnityConsoleManager {
     
     constructor(
         private readonly _context: vscode.ExtensionContext,
-        private readonly _unityProjectManager?: any
+        private readonly _unityProjectManager: UnityProjectManager | null
     ) {
-
+        this._context = _context;
+        this._unityProjectManager = _unityProjectManager;
     }
     
     public initialize(): void {

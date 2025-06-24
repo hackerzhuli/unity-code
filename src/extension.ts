@@ -204,7 +204,6 @@ function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
     }
 
     // Initialize Unity Console Manager
-    const unityProjectPath = globalUnityProjectManager?.getUnityProjectPath();
     globalUnityConsoleManager = new UnityConsoleManager(context, globalUnityProjectManager);
     globalUnityConsoleManager.initialize();
 
