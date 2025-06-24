@@ -47,7 +47,7 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(
             message => {
-                switch (message.command) {
+                switch (message.command || message.type) {
                     case 'clearLogs':
                         this.clearLogs();
                         break;
