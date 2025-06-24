@@ -35,14 +35,43 @@
             cursor: pointer;
             border-radius: 3px;
             font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            position: relative;
         }
         
         .filter-button.active {
             background-color: var(--vscode-button-hoverBackground);
+            border-color: var(--vscode-focusBorder);
+        }
+        
+        .filter-button:not(.active) {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            opacity: 0.6;
         }
         
         .filter-button:hover {
             background-color: var(--vscode-button-hoverBackground);
+            opacity: 1;
+        }
+        
+        .filter-count {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 10px;
+            padding: 1px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            min-width: 16px;
+            text-align: center;
+        }
+        
+        .filter-button:not(.active) .filter-count {
+            background-color: var(--vscode-descriptionForeground);
+            color: var(--vscode-editor-background);
+            opacity: 0.7;
         }
         
         .clear-button {
@@ -166,9 +195,18 @@
 <body>
     <div class="toolbar">
         <button class="filter-button active" data-filter="all">All</button>
-        <button class="filter-button active" data-filter="info">Info</button>
-        <button class="filter-button active" data-filter="warning">Warning</button>
-        <button class="filter-button active" data-filter="error">Error</button>
+        <button class="filter-button active" data-filter="info">
+            Info
+            <span class="filter-count" id="info-count">0</span>
+        </button>
+        <button class="filter-button active" data-filter="warning">
+            Warning
+            <span class="filter-count" id="warning-count">0</span>
+        </button>
+        <button class="filter-button active" data-filter="error">
+            Error
+            <span class="filter-count" id="error-count">0</span>
+        </button>
         <button class="clear-button" onclick="clearLogs()">Clear</button>
     </div>
     
@@ -273,6 +311,7 @@
             console.log("UnityConsoleWebView: logElement appended to logList");
             
             updateLogVisibility();
+            updateLogCounts();
             
             // Auto-scroll to bottom
             logList.scrollTop = logList.scrollHeight;
@@ -290,6 +329,9 @@
             logList.appendChild(noLogs);
             noLogs.style.display = 'flex';
             detailsContent.textContent = 'Select a log entry to view details';
+            
+            // Reset log counts
+            updateLogCounts();
             
             vscode.postMessage({ type: 'clearLogs' });
         }
@@ -425,6 +467,21 @@
             updateLogVisibility();
         }
         
+        function updateLogCounts() {
+            const counts = { info: 0, warning: 0, error: 0 };
+            
+            logs.forEach(log => {
+                if (counts.hasOwnProperty(log.type)) {
+                    counts[log.type]++;
+                }
+            });
+            
+            // Update count displays
+            document.getElementById('info-count').textContent = counts.info;
+            document.getElementById('warning-count').textContent = counts.warning;
+            document.getElementById('error-count').textContent = counts.error;
+        }
+        
         function updateFilterButtons() {
             const buttons = document.querySelectorAll('.filter-button');
             buttons.forEach(button => {
@@ -435,6 +492,9 @@
                     button.classList.toggle('active', activeFilters.has(filter));
                 }
             });
+            
+            // Update log counts
+            updateLogCounts();
         }
         
         // Event listeners
@@ -543,6 +603,7 @@
                 });
                 console.log("UnityConsoleWebView: all logs rendered, calling updateLogVisibility");
                 updateLogVisibility();
+                updateLogCounts();
                 
                 // Handle log selection after rendering
                 handleLogSelection(targetSelectedLogId);
