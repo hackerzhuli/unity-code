@@ -138,8 +138,7 @@ export class UnityMessagingClient {
     private readonly TCP_TIMEOUT = 5000;
     private packageName: string = '';
     private messageQueue: Array<{ type: MessageType; value: string; resolve: () => void; reject: (error: Error) => void }> = [];
-    private readonly OFFICIAL_PACKAGE_HEARTBEAT = 3000; // 3 seconds for official package (4s timeout)
-    private readonly CUSTOM_PACKAGE_HEARTBEAT = 30000; // 30 seconds for custom package (60s timeout)
+    private readonly NORMAL_HEARTBEAT = 3000; // 3 seconds for normal heartbeat
     private readonly INITIAL_AGGRESSIVE_HEARTBEAT = 500; // 500ms for initial connection detection
     private currentHeartbeatInterval: number = this.INITIAL_AGGRESSIVE_HEARTBEAT;
     private initialHeartbeatTimeout: NodeJS.Timeout | null = null;
@@ -388,10 +387,7 @@ export class UnityMessagingClient {
             this.hasReceivedFirstResponse = true;
             console.log('UnityMessagingClient: First response received, requesting package name and switching to normal heartbeat');
             
-            // Request package name now that Unity is responding
-            this.sendMessageInternal(MessageType.PackageName, '').catch(error => {
-                console.warn('UnityMessagingClient: Failed to request package name:', error);
-            });
+
             
             // Switch to normal heartbeat after a delay
             this.scheduleNormalHeartbeat();
@@ -410,12 +406,8 @@ export class UnityMessagingClient {
             if (!this.isDisposed && this.hasReceivedFirstResponse) {
                 console.log('UnityMessagingClient: Switching from aggressive to normal heartbeat interval');
                 
-                // Determine the correct heartbeat interval based on package (if known)
-                const isCustomPackage = this.packageName === 'com.hackerzhuli.ide.visualstudio';
-                const normalInterval = isCustomPackage ? this.CUSTOM_PACKAGE_HEARTBEAT : this.OFFICIAL_PACKAGE_HEARTBEAT;
-                
-                this.currentHeartbeatInterval = normalInterval;
-                console.log(`UnityMessagingClient: Set heartbeat interval to ${normalInterval}ms for package '${this.packageName || 'unknown'}'`);
+                this.currentHeartbeatInterval = this.NORMAL_HEARTBEAT;
+                console.log(`UnityMessagingClient: Set heartbeat interval to ${this.NORMAL_HEARTBEAT}ms`);
                 
                 // Restart heartbeat with normal interval
                 if (this.heartbeatInterval) {
@@ -425,29 +417,7 @@ export class UnityMessagingClient {
         }, 2000); // Wait 2 seconds after first response before switching
     }
 
-    /**
-     * Update heartbeat interval based on detected package
-     */
-    private updateHeartbeatInterval(): void {
-        // Only update heartbeat interval if we've already switched from aggressive mode
-        if (!this.hasReceivedFirstResponse) {
-            console.log(`UnityMessagingClient: Package detected (${this.packageName}) but still in aggressive heartbeat mode, will update later`);
-            return;
-        }
-        
-        const isCustomPackage = this.packageName === 'com.hackerzhuli.ide.visualstudio';
-        const newInterval = isCustomPackage ? this.CUSTOM_PACKAGE_HEARTBEAT : this.OFFICIAL_PACKAGE_HEARTBEAT;
-        
-        if (newInterval !== this.currentHeartbeatInterval) {
-            console.log(`UnityMessagingClient: Updating heartbeat interval from ${this.currentHeartbeatInterval}ms to ${newInterval}ms for package ${this.packageName}`);
-            this.currentHeartbeatInterval = newInterval;
-            
-            // Restart heartbeat with new interval if currently running
-            if (this.heartbeatInterval) {
-                this.startHeartbeat();
-            }
-        }
-    }
+
 
     /**
      * Process queued messages when Unity comes back online
@@ -530,7 +500,6 @@ export class UnityMessagingClient {
         } else if (message.type === MessageType.PackageName && message.value) {
             this.packageName = message.value;
             console.log(`UnityMessagingClient: Detected Unity package: ${this.packageName}`);
-            this.updateHeartbeatInterval();
             messageHandledInternally = true;
         }
         
