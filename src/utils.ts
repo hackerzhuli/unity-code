@@ -1,11 +1,7 @@
-/**
- * Utility functions that don't depend on VS Code API
- * These can be safely imported and tested without VS Code environment
- */
-
 import yargsParser from 'yargs-parser';
 import * as fs from 'fs';
 import { promisify } from 'util';
+import * as nodePath from 'path'
 
 /**
  * Console log with automatic truncation for long messages
@@ -20,27 +16,6 @@ export function logWithLimit(message: string, maxLength: number = 200): void {
         const truncated = `${message.substring(0, maxLength)}... (truncated, original length: ${message.length})`;
         console.log(truncated);
     }
-}
-
-/**
- * Check if a file path is inside the Assets folder of a specific workspace
- * @param filePath The file path to check
- * @param workspacePath The workspace root path (optional for backward compatibility)
- * @returns boolean True if the file is in the Assets folder
- */
-export function isInAssetsFolder(filePath: string, workspacePath?: string): boolean {
-    const normalizedFilePath = filePath.replace(/\\/g, '/');
-    
-    if (workspacePath) {
-        const normalizedWorkspacePath = workspacePath.replace(/\\/g, '/');
-        const assetsPath = normalizedWorkspacePath + '/Assets';
-        
-        // Check if the file is inside the Assets folder of the specific workspace
-        return normalizedFilePath.startsWith(assetsPath + '/') || normalizedFilePath === assetsPath;
-    }
-    
-    // Fallback to old behavior for backward compatibility
-    return normalizedFilePath.includes('/Assets/') || normalizedFilePath.endsWith('/Assets');
 }
 
 /**
@@ -111,27 +86,41 @@ export function extractProjectPathFromCommand(
 }
 
 /**
- * Checks if two paths match using file system resolution (files must exist, otherwise always don't match)
- * Handles path normalization, case sensitivity, and symbolic links
- * @param path1 First project path to compare
- * @param path2 Second project path to compare
- * @returns True if paths match, false otherwise
+ * Normalize a path, if the path doesn't exist on file system, then the original will be returned (it will not be normalized)
+ * @param path The path to normalize
+ * @returns The normalized path, if file exists, same file always return the same result
  */
-export async function pathsMatch(path1: string, path2: string): Promise<boolean> {
+export async function normalizePath(path: string): Promise<string> {
     try {
-        // Get canonical paths for comparison
-        const realpath = promisify(fs.realpath);
-        const canonicalPath1 = await realpath(path1);
-        const canonicalPath2 = await realpath(path2);
-        
-        // Normalize paths to lowercase for case-insensitive comparison on Windows
-        const normalizedPath1 = canonicalPath1.toLowerCase();
-        const normalizedPath2 = canonicalPath2.toLowerCase();
-        
-        return normalizedPath1 === normalizedPath2;
-        
+        // calls the native version to get the REAL path
+        const realpath = promisify(fs.realpath.native);
+        return await realpath(path);
     } catch (_error) {
-        // If we can't resolve paths, they don't match
+        return path;
+    }
+}
+
+/**
+ * Checks if a given file or directory path is located inside a specified parent directory.
+ * Both must exist on file system, otherwise return false.
+ * @param {string} dirPath The path to the potential parent directory.
+ * @param {string} path The path to the file or directory to check for containment.
+ * @returns {Promise<boolean>} A promise that resolves to true if the item is inside the parent directory, false otherwise.
+ */
+export async function isInsideDirectory(dirPath: string, path: string): Promise<boolean> {
+    // check both exist on file system
+    const access = promisify(fs.access);
+    try {
+        await access(dirPath, fs.constants.F_OK);
+        await access(path, fs.constants.F_OK);
+    } catch (_error) {
         return false;
     }
+
+    // Get real paths to handle symbolic links and normalize paths
+    const normalizedDirPath = await normalizePath(dirPath);
+    const normalizedPath = await normalizePath(path);
+    
+    // Check if the path starts with the directory path
+    return normalizedPath.startsWith(normalizedDirPath) && normalizedPath.length > normalizedDirPath.length && (normalizedPath[normalizedDirPath.length] === nodePath.sep) ;
 }

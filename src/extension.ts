@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { isInAssetsFolder } from './utils.js';
 import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
 import { UnityTestProvider } from './unityTestProvider.js';
 import { UnityPackageHelper } from './unityPackageHelper.js';
@@ -46,9 +45,8 @@ async function handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise
     }
     
     // Check if both old and new paths are in the Assets folder of the Unity project
-    const workspacePath = globalUnityProjectManager!.getUnityProjectPath()!;
-    const isOldInAssets = isInAssetsFolder(oldUri.fsPath, workspacePath);
-    const isNewInAssets = isInAssetsFolder(newUri.fsPath, workspacePath);
+    const isOldInAssets = await globalUnityProjectManager.isInAssetsFolder(oldUri.fsPath);
+    const isNewInAssets = await globalUnityProjectManager.isInAssetsFolder(newUri.fsPath);
     
     if (!isOldInAssets || !isNewInAssets) {
         return;
@@ -106,8 +104,8 @@ async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
         return;
     }
 
-    // Check if the saved file is a C# file
-    if (document.languageId !== 'csharp') {
+    // don't refresh if it's a .meta file
+    if (document.uri.fsPath.endsWith(".meta")){
         return;
     }
 
@@ -116,12 +114,13 @@ async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
         return;
     }
     
-    // Check if the saved file is within the Unity project path
-    if (!globalUnityProjectManager.isFileInUnityProject(document.uri.fsPath)) {
+    // Check if the saved file is in the assets folder
+    // anything in assets folder is fine, except a .meta file
+    if (!globalUnityProjectManager.isInAssetsFolder(document.uri.fsPath)) {
         return;
     }
 
-    console.log(`UnityCode: C# file saved: ${document.fileName}, refreshing Unity and tests...`);
+    console.log(`UnityCode: file saved: ${document.fileName}, refreshing Unity and tests...`);
     await globalUnityMessagingClient.refreshAssetDatabase();
 }
 

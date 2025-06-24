@@ -1,12 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { isInsideDirectory as isInDirectory, normalizePath } from './utils.js';
 
 /**
  * Unity Project Manager class for centralized Unity project detection and management
  * Detects Unity project status once during async initialization and caches the result
  */
 export class UnityProjectManager {
+    /** path of the Unity project(normalized) */
     private unityProjectPath: string | null = null;
     private isInitialized: boolean = false;
 
@@ -54,7 +56,7 @@ export class UnityProjectManager {
         // Check each workspace folder for Unity project
         for (const folder of folders) {
             if (await this.isUnityProjectByPath(folder.uri.fsPath)) {
-                return folder.uri.fsPath;
+                return await normalizePath(folder.uri.fsPath);
             }
         }
         
@@ -93,14 +95,26 @@ export class UnityProjectManager {
     }
 
     /**
-     * Check if a given file path is within the current Unity project
-     * @param filePath The file path to check
-     * @returns True if the file is within the Unity project
+     * Check if a given path is within the current Unity project
+     * @param path The path to check
+     * @returns True if the path is within the Unity project, the path must exist on file system, otherwise false
      */
-    public isFileInUnityProject(filePath: string): boolean {
+    public async isInProject(path: string): Promise<boolean> {
         if (!this.unityProjectPath) {
             return false;
         }
-        return filePath.startsWith(this.unityProjectPath);
+        return await isInDirectory(this.unityProjectPath, path);
+    }
+
+    /**
+     * Check if a given path is inside the Assets folder of this Unity project
+     * @param path The path to check
+     * @returns boolean True if the path is in the Assets folder, the path must exist on file system, otherwise false
+     */
+    public async isInAssetsFolder(path: string): Promise<boolean> {
+        if (this.unityProjectPath) {
+            return await isInDirectory(this.unityProjectPath + '/Assets', path);
+        }
+        return false;
     }
 }
