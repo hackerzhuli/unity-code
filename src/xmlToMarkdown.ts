@@ -459,29 +459,6 @@ function smartTrim(markdown: string): string {
 }
 
 /**
- * Clean up the final markdown output
- */
-function _cleanupMarkdown(markdown: string): string {
-    // Remove excessive blank lines (more than 2 consecutive)
-    markdown = markdown.replace(/\n\s*\n\s*\n+/g, '\n\n');
-    
-    // Clean up extra spaces but preserve line breaks
-    markdown = markdown.replace(/[ \t]+/g, ' ');
-    
-    // Remove trailing whitespace from lines
-    markdown = markdown.replace(/[ \t]+$/gm, '');    // Ensure proper spacing around section headers
-    // Inline headers (Returns, Parameter, etc.)
-    markdown = markdown.replace(/(\*\*(?:Returns|Parameter [^:]*|Exception [^:]*|Value):\*\*)\n+/g, '$1 ');
-    // Block headers (Summary, Remarks, Example) 
-    markdown = markdown.replace(/(\*\*(?:Summary|Remarks|Example):\*\*)\s+/g, '$1\n');
-    
-    // Trim leading and trailing whitespace
-    markdown = markdown.trim();
-    
-    return markdown;
-}
-
-/**
  * Normalize indentation in code blocks by removing common leading whitespace
  */
 function normalizeCodeIndentation(code: string): string {
