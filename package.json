@@ -90,18 +90,13 @@
     "watch": "tsc -watch -p ./"
   },
   "dependencies": {
-    "@types/find-process": "^1.1.0",
-    "csv-parse": "^5.6.0",
-    "fast-xml-parser": "^5.2.5",
-    "find-process": "^1.4.10",
-    "yargs-parser": "^22.0.0"
+    "fast-xml-parser": "^5.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
     "@types/vscode": "^1.100.0",
-    "@types/yargs-parser": "^21.0.3",
     "@typescript-eslint/eslint-plugin": "^8.34.1",
     "@typescript-eslint/parser": "^8.34.1",
     "eslint": "^9.29.0",
