@@ -24,8 +24,26 @@
       {
         "command": "unitycode.refreshTests",
         "title": "Unity Code: Refresh Tests"
+      },
+      {
+        "command": "unitycode.showUnityLogs",
+        "title": "Unity Code: Show Unity Logs"
+      },
+      {
+        "command": "unitycode.showUnityConsole",
+        "title": "Unity Code: Show Unity Console"
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "unityConsole",
+          "name": "Unity Console",
+          "when": "unitycode:hasUnityProject"
+        }
+      ]
+    },
     "configuration": {
       "title": "Unity Code",
       "properties": {
@@ -38,6 +56,11 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically refresh Unity tests when VS Code window regains focus"
+        },
+        "unitycode.showUnityLogs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable Unity log messages forwarding to VS Code Output Channel"
         }
       },
       "testing": {

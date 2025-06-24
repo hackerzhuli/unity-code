@@ -6,6 +6,7 @@ import { UnityPackageHelper } from './unityPackageHelper.js';
 import { UnityProjectManager } from './unityProjectManager.js';
 import { UnityMessagingClient } from './unityMessagingClient.js';
 import { UnityDetector } from './unityDetector.js';
+import { UnityConsoleManager } from './unityConsole.js';
 
 // Global reference to test provider for auto-refresh functionality
 let globalTestProvider: UnityTestProvider | null = null;
@@ -17,6 +18,10 @@ let globalUnityProjectManager: UnityProjectManager | null = null;
 let globalUnityStatusBarItem: vscode.StatusBarItem | null = null;
 let globalUnityMessagingClient: UnityMessagingClient | null = null;
 let globalUnityDetector: UnityDetector | null = null;
+// Global reference to Unity log output channel
+let globalUnityLogChannel: vscode.OutputChannel | null = null;
+// Global reference to Unity Console manager
+let globalUnityConsoleManager: UnityConsoleManager | null = null;
 
 /**
  * Handle renaming of a single file and its corresponding meta file
@@ -182,6 +187,58 @@ function updateUnityStatusBarItem(statusBarItem: vscode.StatusBarItem, connected
 }
 
 /**
+ * Register Unity log message handlers to display logs in Unity Console WebView
+ */
+function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
+    if (!globalUnityMessagingClient) {
+        return;
+    }
+
+    // Check if Unity log forwarding is enabled
+    const config = vscode.workspace.getConfiguration('unitycode');
+    const showUnityLogs = config.get<boolean>('showUnityLogs', true);
+    
+    if (!showUnityLogs) {
+        console.log('UnityCode: Unity log forwarding is disabled in settings');
+        return;
+    }
+
+    // Initialize Unity Console Manager
+    const unityProjectPath = globalUnityProjectManager?.getUnityProjectPath();
+    globalUnityConsoleManager = new UnityConsoleManager(context, globalUnityProjectManager);
+    globalUnityConsoleManager.initialize();
+
+    // Create Unity log output channel for backward compatibility
+    globalUnityLogChannel = vscode.window.createOutputChannel('Unity Logs');
+    console.log('UnityCode: Unity Console initialized - logs will appear in Unity Console WebView and "Unity Logs" output channel');
+
+    // Handle Info messages
+    globalUnityMessagingClient.onInfoMessage.subscribe((message) => {
+        const timestamp = new Date().toLocaleTimeString();
+        globalUnityLogChannel?.appendLine(`[${timestamp}] [Info] ${message}`);
+        globalUnityConsoleManager?.addLog('info', message);
+        // Also log to Debug Console for developers
+        console.log(`[Unity Info] ${message}`);
+    });
+
+    // Handle Warning messages
+    globalUnityMessagingClient.onWarningMessage.subscribe((message) => {
+        const timestamp = new Date().toLocaleTimeString();
+        globalUnityLogChannel?.appendLine(`[${timestamp}] [Warning] ${message}`);
+        globalUnityConsoleManager?.addLog('warning', message);
+        console.warn(`[Unity Warning] ${message}`);
+    });
+
+    // Handle Error messages
+    globalUnityMessagingClient.onErrorMessage.subscribe((message) => {
+        const timestamp = new Date().toLocaleTimeString();
+        globalUnityLogChannel?.appendLine(`[${timestamp}] [Error] ${message}`);
+        globalUnityConsoleManager?.addLog('error', message);
+        console.error(`[Unity Error] ${message}`);
+    });
+}
+
+/**
  * Start monitoring Unity connection status and update status bar using events
  */
 function startUnityStatusMonitoring(): void {
@@ -228,6 +285,15 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
             }
         } else {
             vscode.window.showWarningMessage('Unity Code: Test provider not available');
+        }
+    });
+
+    // Register the command to show Unity logs
+    const showUnityLogsDisposable = vscode.commands.registerCommand('unitycode.showUnityLogs', function () {
+        if (globalUnityLogChannel) {
+            globalUnityLogChannel.show();
+        } else {
+            vscode.window.showInformationMessage('Unity Code: Unity logs are not available (no Unity project detected or not connected)');
         }
     });
 
@@ -312,6 +378,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
 
     context.subscriptions.push(
         refreshTestsDisposable,
+        showUnityLogsDisposable,
         showConnectionStatusDisposable,
         runTestsDisposable,
         renameDisposable, 
@@ -319,9 +386,12 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         windowStateDisposable
     );
     
-    // Add status bar item to subscriptions for proper cleanup
+    // Add status bar item and log channel to subscriptions for proper cleanup
     if (globalUnityStatusBarItem) {
         context.subscriptions.push(globalUnityStatusBarItem);
+    }
+    if (globalUnityLogChannel) {
+        context.subscriptions.push(globalUnityLogChannel);
     }
 }
 
@@ -349,9 +419,13 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     const unityProjectPath = globalUnityProjectManager!.getUnityProjectPath();
     if (!unityProjectPath) {
         // No Unity project found, register hover provider without package helper
+        vscode.commands.executeCommand('setContext', 'unitycode:hasUnityProject', false);
         registerHoverProvider(context, undefined);
         return;
     }
+
+    // Set context variable to show Unity Console view
+    vscode.commands.executeCommand('setContext', 'unitycode:hasUnityProject', true);
 
     globalUnityDetector = new UnityDetector(unityProjectPath, context.extensionPath);
     
@@ -376,6 +450,9 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
         startUnityStatusMonitoring();
     }
     
+    // Register Unity log message handlers
+    registerUnityLogHandlers(context);
+    
     context.subscriptions.push({
         dispose: () => {
             cleanup();
@@ -387,11 +464,15 @@ function cleanup() {
     globalTestProvider?.dispose();
     globalUnityDetector?.stop();
     globalUnityMessagingClient?.dispose();
+    globalUnityLogChannel?.dispose();
+    globalUnityConsoleManager?.dispose();
     globalUnityDetector = null;
     globalUnityMessagingClient = null;
     globalTestProvider = null;
     globalPackageHelper = null;
     globalUnityStatusBarItem = null;
+    globalUnityLogChannel = null;
+    globalUnityConsoleManager = null;
 }
 
 /**

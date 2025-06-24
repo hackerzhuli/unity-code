@@ -30,7 +30,18 @@ When you save a C# file in a Unity project, the extension will trigger Unity's a
 
 This ensures Unity detects your code changes and triggers recompilation.
 
+### Unity Log Forwarding
+Receive Unity Editor log messages (Info, Warning, Error) directly in VS Code's Output Channel.
+
+Logs appear in the "Unity Logs" output channel with timestamps. You can access them via:
+- Command Palette: `Unity Code: Show Unity Logs`
+- View → Output → Select "Unity Logs" from dropdown
+
+Logs are also forwarded to the Debug Console for developers.
+
 ### Settings
-You can control the auto-refresh behavior with this setting:
+You can control the extension behavior with these settings:
 
 - `unitycode.autoRefreshUnity` (default: `true`): Enable/disable automatic Unity asset database refresh when C# files are saved
+- `unitycode.refreshOnWindowFocus` (default: `true`): Automatically refresh Unity tests when VS Code window regains focus
+- `unitycode.showUnityLogs` (default: `true`): Enable/disable Unity log messages forwarding to VS Code Output Channel

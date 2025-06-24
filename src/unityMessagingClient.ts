@@ -182,6 +182,11 @@ export class UnityMessagingClient {
     
     // Online status event - emits true for online, false for offline
     public readonly onOnlineStatus = new EventEmitter<boolean>();
+    
+    // Log message events - emits log messages from Unity
+    public readonly onInfoMessage = new EventEmitter<string>();
+    public readonly onWarningMessage = new EventEmitter<string>();
+    public readonly onErrorMessage = new EventEmitter<string>();
 
     constructor(unityDetector: UnityDetector) {
         this.unityDetector = unityDetector;
@@ -530,8 +535,16 @@ export class UnityMessagingClient {
                 this.packageName = message.value;
                 console.log(`UnityMessagingClient: Detected Unity package: ${this.packageName}`);
             }
-        }
-        else if (message.type === MessageType.Tcp) {
+        } else if (message.type === MessageType.Info) {
+            messageHandledInternally = true;
+            this.onInfoMessage.emit(message.value);
+        } else if (message.type === MessageType.Warning) {
+            messageHandledInternally = true;
+            this.onWarningMessage.emit(message.value);
+        } else if (message.type === MessageType.Error) {
+            messageHandledInternally = true;
+            this.onErrorMessage.emit(message.value);
+        } else if (message.type === MessageType.Tcp) {
             messageHandledInternally = true;
             this.handleTcpMessage(message);
         }

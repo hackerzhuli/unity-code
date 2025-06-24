@@ -16,8 +16,7 @@ The protocol uses UDP as the primary transport with automatic fallback to TCP fo
 - **Address**: Binds to `IPAddress.Any` (0.0.0.0)
 
 ### Client Timeout Configuration
-- **This Package**: Clients are removed after **60 seconds** of inactivity
-- **Official Unity Package**: Clients are removed after **4 seconds** of inactivity
+- **Timeout Period**: Clients are removed after **4 seconds** of inactivity
 - **Heartbeat Requirement**: Clients must send messages at least once within the timeout period to stay registered
 
 ## Message Format
@@ -56,9 +55,9 @@ All available message types in the Unity Visual Studio integration:
 | `Unpause` | 6 | Unpause play mode | - |
 | ~~`Build`~~ | 7 | ~~Build project~~ (Obsolete) | - |
 | `Refresh` | 8 | Refresh asset database | - |
-| `Info` | 9 | Information message | - |
-| `Error` | 10 | Error message | - |
-| `Warning` | 11 | Warning message | - |
+| `Info` | 9 | Information message from Unity logs | Log message content with optional stack trace |
+| `Error` | 10 | Error message from Unity logs | Error message content with stack trace |
+| `Warning` | 11 | Warning message from Unity logs | Warning message content with optional stack trace |
 | ~~`Open`~~ | 12 | ~~Open file/asset~~ (Obsolete) | - |
 | ~~`Opened`~~ | 13 | ~~File/asset opened confirmation~~ (Obsolete) | - |
 | `Version` | 14 | Request/response for package version | Empty string (request) / Version string (response) |
@@ -183,12 +182,12 @@ Detailed value formats for some of the types:
 1. Client sends any message to Unity's messaging port
 2. Unity registers the client's endpoint and timestamp
 3. Unity responds appropriately based on message type
-4. Client must send messages within the configured timeout period to stay registered (see Client Timeout Configuration)
+4. Client must send messages within 4 seconds to stay registered (see Client Timeout Configuration)
 
 ### Heartbeat Mechanism
 - Send `Ping` message to Unity
 - Unity responds with `Pong` message
-- Clients are automatically removed after the configured timeout period of inactivity (see Client Timeout Configuration)
+- Clients are automatically removed after 4 seconds of inactivity (see Client Timeout Configuration)
 
 ### Large Message Handling (TCP Fallback)
 
@@ -241,7 +240,7 @@ When a message exceeds the 8KB UDP buffer limit, the protocol automatically swit
 - **Firewall Issues**: Check Windows Firewall settings for UDP port access
 - **Port Conflicts**: Unity uses `ReuseAddress` but conflicts may still occur
 - **Message Size**: Messages larger than 8KB automatically use TCP fallback
-- **Client Timeout**: Clients are removed after the configured timeout period of inactivity (see Client Timeout Configuration)
+- **Client Timeout**: Clients are removed after 4 seconds of inactivity (see Client Timeout Configuration)
 
 ## Security Considerations
 
@@ -256,7 +255,7 @@ When a message exceeds the 8KB UDP buffer limit, the protocol automatically swit
 - **Message Ordering**: No guaranteed order (inherent UDP limitation)
 - **Buffer Size**: 8KB limit for UDP messages (larger messages use TCP)
 - **Platform Support**: Some features are Windows-specific
-- **Client Management**: Automatic cleanup after the configured timeout period of inactivity (see Client Timeout Configuration)
+- **Client Management**: Automatic cleanup after 4 seconds of inactivity (see Client Timeout Configuration)
 
 ## Troubleshooting
 
@@ -264,4 +263,4 @@ When a message exceeds the 8KB UDP buffer limit, the protocol automatically swit
 2. **Firewall Blocks**: Check Windows Firewall settings
 3. **Port Conflicts**: Another application might be using the calculated port
 4. **Message Format**: Ensure proper binary serialization format
-5. **Client Timeout**: Send heartbeat messages regularly within the configured timeout period (see Client Timeout Configuration)
+5. **Client Timeout**: Send heartbeat messages regularly within 4 seconds (see Client Timeout Configuration)
