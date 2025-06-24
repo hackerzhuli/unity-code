@@ -4,12 +4,6 @@ import { UnityDetector, UnityDetectionEvent } from './unityDetector.js';
 import { logWithLimit } from './utils.js';
 import { EventEmitter } from './eventEmitter.js';
 
-
-/**
- * Unity Visual Studio Editor Messaging Protocol Client
- * Implements UDP-based communication with TCP fallback for large messages
- */
-
 export enum MessageType {
     None = 0,
     Ping = 1,
@@ -665,70 +659,24 @@ export class UnityMessagingClient {
 
         // Check if message is too large for UDP
         if (buffer.length >= this.UDP_BUFFER_SIZE) {
-            console.log(`UnityMessagingClient: Message too large for UDP (${buffer.length} >= ${this.UDP_BUFFER_SIZE}), using TCP fallback`);
-            await this.sendTcpMessage({ type, value });
-        } else {
-            return new Promise((resolve, reject) => {
-                this.socket!.send(buffer, this.unityPort, this.unityAddress, (error) => {
-                    if (error) {
-                        console.error(`UnityMessagingClient: UDP send failed:`, error);
-                        reject(error);
-                    } else {
-                        //console.log(`UnityMessagingClient: UDP message sent successfully`);
-                        resolve();
-                    }
-                });
-            });
+            const errorMsg = `Message too large for UDP (discarded) (${buffer.length} >= ${this.UDP_BUFFER_SIZE}), discarding message - Type: ${type} (${MessageType[type]}), Value: "${value}"`;
+            console.error(`UnityMessagingClient: ${errorMsg}`);
         }
-    }
 
-    /**
-     * Send large message via TCP
-     */
-    private async sendTcpMessage(message: UnityMessage): Promise<void> {
         return new Promise((resolve, reject) => {
-            const server = net.createServer();
-            const messageBuffer = this.serializeMessage(message);
-
-            server.listen(0, () => {
-                const address = server.address() as net.AddressInfo;
-                const tcpPort = address.port;
-
-                // Send TCP coordination message via UDP
-                const tcpMessage = {
-                    type: MessageType.Tcp,
-                    value: `${tcpPort}:${messageBuffer.length}`
-                };
-
-                const tcpBuffer = this.serializeMessage(tcpMessage);
-                this.socket!.send(tcpBuffer, this.unityPort, this.unityAddress, (error) => {
-                    if (error) {
-                        server.close();
-                        reject(error);
-                        return;
-                    }
-
-                    // Wait for Unity to connect
-                    const timeout = setTimeout(() => {
-                        server.close();
-                        reject(new Error('TCP send timeout'));
-                    }, this.TCP_TIMEOUT);
-
-                    server.on('connection', (socket) => {
-                        clearTimeout(timeout);
-                        socket.write(messageBuffer);
-                        socket.end();
-                        server.close();
-                        resolve();
-                    });
-                });
-            });
-
-            server.on('error', (error) => {
-                reject(error);
+            this.socket!.send(buffer, this.unityPort, this.unityAddress, (error) => {
+                if (error) {
+                    console.error(`UnityMessagingClient: UDP send failed:`, error);
+                    reject(error);
+                } else {
+                    //console.log(`UnityMessagingClient: UDP message sent successfully`);
+                    resolve();
+                }
             });
         });
     }
+
+
 
     /**
      * Serialize message to binary format
