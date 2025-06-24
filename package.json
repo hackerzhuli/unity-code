@@ -32,7 +32,7 @@
         "unitycode.autoRefreshUnity": {
           "type": "boolean",
           "default": true,
-          "description": "Enable/disable automatic Unity asset database refresh when files are saved, this will be automatically disabled if Hot Reload for Unity is running"
+          "description": "Enable/disable automatic Unity asset database refresh when assets are saved, this will be automatically disabled if Hot Reload for Unity is running"
         },
         "unitycode.refreshOnWindowFocus": {
           "type": "boolean",
