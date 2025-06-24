@@ -39,6 +39,15 @@ Logs appear in the "Unity Logs" output channel with timestamps. You can access t
 
 Logs are also forwarded to the Debug Console for developers.
 
+### Unity Console
+View Unity logs in a dedicated console panel with filtering and clickable stack traces.
+
+The Unity Console appears in VS Code's bottom panel and provides:
+- Real-time Unity log display with Info, Warning, and Error filtering
+- Clickable stack traces that navigate directly to source files
+- Clear logs functionality and log history management
+- Command Palette: `Unity Code: Show Unity Console`
+
 ### Settings
 You can control the extension behavior with these settings:
 
