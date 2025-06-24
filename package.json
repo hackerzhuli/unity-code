@@ -34,8 +34,17 @@
         "title": "Unity Code: Show Unity Console"
       }
     ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "unityConsoleContainer",
+          "title": "Unity Console",
+          "icon": "$(console)"
+        }
+      ]
+    },
     "views": {
-      "explorer": [
+      "unityConsoleContainer": [
         {
           "type": "webview",
           "id": "unityConsole",
