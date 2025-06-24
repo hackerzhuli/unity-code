@@ -16,6 +16,7 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
     public _view?: vscode.WebviewView;
     private _logs: UnityLogEntry[] = [];
     private _logCounter = 0;
+    private _selectedLogId: string | null = null;
     private _unityProjectManager?: any;
     private extensionPath: string;
     
@@ -54,15 +55,27 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
                         this._updateWebview();
                         break;
                     case 'selectLog':
-                        // Log selection is handled in the webview
+                        this._selectedLogId = message.logId;
                         break;
                     case 'openFile':
                         this._openFileAtLine(message.filePath, message.line);
+                        break;
+                    case 'webviewReady':
+                        // Webview is ready to receive logs (e.g., after being hidden and shown again)
+                        this._updateWebview();
                         break;
                 }
             },
             undefined
         );
+        
+        // Listen for visibility changes
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                // Re-send logs when the view becomes visible again
+                this._updateWebview();
+            }
+        });
         
         // Send initial data
         this._updateWebview();
@@ -89,6 +102,7 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
     
     public clearLogs(): void {
         this._logs = [];
+        this._selectedLogId = null;
         this._updateWebview();
     }
     
@@ -96,7 +110,8 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
         if (this._view) {
             this._view.webview.postMessage({
                 command: 'updateLogs',
-                logs: this._logs
+                logs: this._logs,
+                selectedLogId: this._selectedLogId
             });
         }
     }

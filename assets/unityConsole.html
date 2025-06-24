@@ -309,6 +309,14 @@
             
             selectedLogId = logId;
             
+            // Notify extension about selection change
+            if (typeof vscode !== 'undefined') {
+                vscode.postMessage({
+                    command: 'selectLog',
+                    logId: logId
+                });
+            }
+            
             // Find the log and display details
             const log = logs.find(l => l.id === logId);
             if (log) {
@@ -364,6 +372,10 @@
             console.log("UnityConsoleWebView: found", logItems.length, "log items");
             console.log("UnityConsoleWebView: activeFilters:", activeFilters);
             
+            // Store current selection before updating visibility
+            const currentSelectedId = selectedLogId;
+            console.log("UnityConsoleWebView: current selectedLogId before visibility update:", currentSelectedId);
+            
             logItems.forEach((item, index) => {
                 const type = item.dataset.type;
                 console.log("UnityConsoleWebView: processing item", index, "type:", type);
@@ -375,6 +387,20 @@
                     console.log("UnityConsoleWebView: item", index, "hidden");
                 }
             });
+            
+            // Check if currently selected log is still visible
+            if (currentSelectedId) {
+                const selectedElement = document.querySelector('.log-item.selected');
+                if (selectedElement && selectedElement.classList.contains('hidden')) {
+                    // Selected log is now hidden, need to select a new one
+                    console.log("UnityConsoleWebView: selected log is now hidden, reselecting");
+                    handleLogSelection(null); // Auto-select first visible log
+                }
+            } else {
+                // No current selection, auto-select first visible log
+                handleLogSelection(null);
+            }
+            
             console.log("UnityConsoleWebView: updateLogVisibility completed");
         }
         
@@ -436,16 +462,47 @@
                 case 'updateLogs':
                     console.log("UnityConsoleWebView: handling setLogs/updateLogs message with logs:", message.logs);
                     logs = message.logs || [];
+                    const receivedSelectedLogId = message.selectedLogId;
                     console.log("UnityConsoleWebView: logs array updated to:", logs);
-                    renderAllLogs();
+                    console.log("UnityConsoleWebView: received selectedLogId:", receivedSelectedLogId);
+                    renderAllLogs(receivedSelectedLogId);
                     break;
                 default:
                     console.log("UnityConsoleWebView: unknown message type:", message.command || message.type);
             }
         });
         
-        function renderAllLogs() {
-            console.log("UnityConsoleWebView: renderAllLogs called");
+        // Send webviewReady message when page loads
+        function sendWebviewReady() {
+            console.log("UnityConsoleWebView: sending webviewReady message");
+            if (typeof vscode !== 'undefined') {
+                vscode.postMessage({
+                    command: 'webviewReady'
+                });
+            }
+        }
+        
+        // Send ready message on load
+        document.addEventListener('DOMContentLoaded', sendWebviewReady);
+        
+        // Also send ready message when page becomes visible (for cases where DOMContentLoaded already fired)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                console.log("UnityConsoleWebView: page became visible, sending webviewReady");
+                sendWebviewReady();
+            }
+        });
+        
+        // Send ready message immediately if DOM is already loaded
+        if (document.readyState === 'loading') {
+            // DOM is still loading
+        } else {
+            // DOM is already loaded
+            sendWebviewReady();
+        }
+        
+        function renderAllLogs(targetSelectedLogId) {
+            console.log("UnityConsoleWebView: renderAllLogs called with targetSelectedLogId:", targetSelectedLogId);
             const logList = document.getElementById('logList');
             let noLogs = document.getElementById('noLogs');
             
@@ -461,6 +518,7 @@
             
             if (logs.length === 0) {
                 console.log("UnityConsoleWebView: no logs, showing noLogs message");
+                selectedLogId = null;
                 if (!noLogs) {
                     noLogs = document.createElement('div');
                     noLogs.className = 'no-logs';
@@ -485,8 +543,44 @@
                 });
                 console.log("UnityConsoleWebView: all logs rendered, calling updateLogVisibility");
                 updateLogVisibility();
+                
+                // Handle log selection after rendering
+                handleLogSelection(targetSelectedLogId);
             }
             console.log("UnityConsoleWebView: renderAllLogs completed, final logList children count:", logList.children.length);
+        }
+        
+        function handleLogSelection(targetSelectedLogId) {
+            console.log("UnityConsoleWebView: handleLogSelection called with:", targetSelectedLogId);
+            
+            // Get all visible log items
+            const visibleLogItems = Array.from(document.querySelectorAll('.log-item:not(.hidden)'));
+            console.log("UnityConsoleWebView: found", visibleLogItems.length, "visible log items");
+            
+            if (visibleLogItems.length === 0) {
+                console.log("UnityConsoleWebView: no visible logs to select");
+                selectedLogId = null;
+                return;
+            }
+            
+            let logToSelect = null;
+            
+            // Try to find the previously selected log if it exists and is visible
+            if (targetSelectedLogId) {
+                logToSelect = visibleLogItems.find(item => item.dataset.id === targetSelectedLogId);
+                console.log("UnityConsoleWebView: searching for previous selection:", targetSelectedLogId, "found:", !!logToSelect);
+            }
+            
+            // If no previous selection or it's not visible, select the first visible log
+            if (!logToSelect) {
+                logToSelect = visibleLogItems[0];
+                console.log("UnityConsoleWebView: auto-selecting first visible log:", logToSelect?.dataset.id);
+            }
+            
+            // Select the log
+            if (logToSelect) {
+                selectLog(logToSelect.dataset.id);
+            }
         }
     </script>
 </body>
