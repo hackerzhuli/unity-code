@@ -502,18 +502,19 @@ export class UnityMessagingClient {
         let messageHandledInternally = false;
         
         if (message.type === MessageType.OnLine) {
+            messageHandledInternally = true;
             console.log('UnityMessagingClient: Unity online');
             this.isUnityOnline = true;
             this.onOnlineStatus.emit(true);
             this.processMessageQueue();
             this.handleFirstResponse();
-            messageHandledInternally = true;
         } else if (message.type === MessageType.OffLine) {
+            messageHandledInternally = true;
             console.log('UnityMessagingClient: Unity went offline');
             this.isUnityOnline = false;
             this.onOnlineStatus.emit(false);
-            messageHandledInternally = true;
         } else if (message.type === MessageType.Pong) {
+            messageHandledInternally = true;
             // Pong response indicates Unity is online and responding
             if (!this.isUnityOnline) {
                 console.log('UnityMessagingClient: Unity online (pong received)');
@@ -522,26 +523,24 @@ export class UnityMessagingClient {
                 this.processMessageQueue();
             }
             this.handleFirstResponse();
+        } else if (message.type === MessageType.PackageName) {
             messageHandledInternally = true;
-        } else if (message.type === MessageType.PackageName && message.value) {
-            this.packageName = message.value;
-            console.log(`UnityMessagingClient: Detected Unity package: ${this.packageName}`);
-            messageHandledInternally = true;
+            if(message.value)
+                {
+                this.packageName = message.value;
+                console.log(`UnityMessagingClient: Detected Unity package: ${this.packageName}`);
+            }
         }
-        
+        else if (message.type === MessageType.Tcp) {
+            messageHandledInternally = true;
+            this.handleTcpMessage(message);
+        }
+
         const handler = this.messageHandlers.get(message.type);
         if (handler) {
             handler(message);
         } else if (!messageHandledInternally) {
-            // Skip logging for ping/pong messages to reduce console noise
-            if (message.type !== MessageType.Ping && message.type !== MessageType.Pong) {
-                console.log(`UnityMessagingClient: No handler registered for message type ${message.type} (${MessageType[message.type] || 'Unknown'})`);
-            }
-        }
-
-        // Handle TCP fallback messages
-        if (message.type === MessageType.Tcp) {
-            this.handleTcpMessage(message);
+            console.log(`UnityMessagingClient: No handler registered for message type ${message.type} (${MessageType[message.type] || 'Unknown'})`);
         }
     }
 
@@ -823,8 +822,9 @@ export class UnityMessagingClient {
      * Initialize default rate limits for message types that need throttling
      */
     private initializeDefaultRateLimits(): void {
-        this.rateLimitConfig.set(MessageType.Refresh, 1000);
-        this.rateLimitConfig.set(MessageType.RetrieveTestList, 500);
+        // prevent frequent refreshes, usually a refresh in Unity takes seconds to minutes, so sending it frequently makes no sense
+        this.rateLimitConfig.set(MessageType.Refresh, 5000);
+        this.rateLimitConfig.set(MessageType.RetrieveTestList, 1000);
         this.rateLimitConfig.set(MessageType.ExecuteTests, 1000);
     }
     

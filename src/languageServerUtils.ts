@@ -161,7 +161,7 @@ function findSymbolRecursiveDotRush(
     languageServerInfo: LanguageServerInfo
 ): vscode.DocumentSymbol | null {
     const targetName = pathParts[currentIndex];
-    console.log(`[DotRush] Looking for symbol: ${targetName} at index ${currentIndex}, available symbols: ${symbols.map(s => `${s.name}(${s.kind})`).join(', ')}`);
+    //console.log(`[DotRush] Looking for symbol: ${targetName} at index ${currentIndex}, available symbols: ${symbols.map(s => `${s.name}(${s.kind})`).join(', ')}`);
     
     for (const symbol of symbols) {
         let symbolNameToMatch = symbol.name;
@@ -174,7 +174,7 @@ function findSymbolRecursiveDotRush(
         
         // Check for exact match first
         if (symbolNameToMatch === targetName) {
-            console.log(`[DotRush] Found matching symbol: ${symbol.name} (matched as ${symbolNameToMatch}), kind: ${symbol.kind}, has children: ${symbol.children?.length || 0}`);
+            //console.log(`[DotRush] Found matching symbol: ${symbol.name} (matched as ${symbolNameToMatch}), kind: ${symbol.kind}, has children: ${symbol.children?.length || 0}`);
             
             // If this is the last part of the path, we found our target
             if (currentIndex === pathParts.length - 1) {
@@ -195,7 +195,7 @@ function findSymbolRecursiveDotRush(
         if (symbol.kind === vscode.SymbolKind.Namespace && symbolNameToMatch.includes('.') && symbolNameToMatch.startsWith(targetName)) {
             const remainingPath = pathParts.slice(currentIndex).join('.');
             if (remainingPath.startsWith(symbolNameToMatch)) {
-                console.log(`[DotRush] Found namespace symbol with dots: ${symbol.name}, matching start of path: ${remainingPath}`);
+                //console.log(`[DotRush] Found namespace symbol with dots: ${symbol.name}, matching start of path: ${remainingPath}`);
                 
                 // Calculate how many path parts this namespace symbol consumes
                 const namespaceParts = symbolNameToMatch.split('.');

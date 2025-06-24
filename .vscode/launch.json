@@ -8,7 +8,7 @@
             "runtimeExecutable": "${execPath}",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}",
-                "--folder-uri=F:\\projects\\unity\\测试UnityCode"
+                "--folder-uri=F:\\projects\\unity\\TestUnityCode"
             ],
             "outFiles": [
                 "${workspaceFolder}/out/**/*.js"

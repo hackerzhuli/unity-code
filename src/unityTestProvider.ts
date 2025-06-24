@@ -607,7 +607,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         for (const test of this.allTests) {
             const symbol = findSymbolByPath(symbols, test.FullName, languageServerInfo);
             if (symbol && symbol.kind === vscode.SymbolKind.Method) {
-                console.log(`Found method symbol for test: ${test.FullName}`);
+                //console.log(`Found method symbol for test: ${test.FullName}`);
                 
                 const codeLens = this.createCodeLens(symbol, [test], document);
                 if (codeLens) {
