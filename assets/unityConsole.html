@@ -186,6 +186,10 @@
         let logs = [];
         let activeFilters = new Set(['info', 'warning', 'error']);
         let selectedLogId = null;
+
+        console.log("UnityConsoleWebView: JavaScript initialized");
+        console.log("UnityConsoleWebView: Initial logs array:", logs);
+        console.log("UnityConsoleWebView: Initial activeFilters:", activeFilters)
         
         function getLogIcon(type) {
             switch (type) {
@@ -216,10 +220,12 @@
         }
         
         function createLogElement(log) {
+            console.log("UnityConsoleWebView: createLogElement called with:", log);
             const div = document.createElement('div');
             div.className = 'log-item';
             div.dataset.type = log.type;
             div.dataset.id = log.id;
+            console.log("UnityConsoleWebView: created div element:", div);
             
             const icon = document.createElement('div');
             icon.className = 'log-icon ' + log.type;
@@ -231,29 +237,40 @@
             
             const time = document.createElement('div');
             time.className = 'log-time';
-            time.textContent = formatTime(log.timestamp);
+            time.textContent = formatTime(new Date(log.timestamp));
+            console.log("UnityConsoleWebView: formatted time:", time.textContent);
             
             div.appendChild(icon);
             div.appendChild(message);
             div.appendChild(time);
+            console.log("UnityConsoleWebView: all elements appended to div");
             
             div.addEventListener('click', () => selectLog(log.id));
+            console.log("UnityConsoleWebView: click listener added to div");
             
             return div;
         }
         
         function addLog(log) {
+            console.log("UnityConsoleWebView: addLog called with:", log);
             logs.push(log);
+            console.log("UnityConsoleWebView: logs array after push:", logs);
             
             const logList = document.getElementById('logList');
             const noLogs = document.getElementById('noLogs');
             
+            console.log("UnityConsoleWebView: logList element:", logList);
+            console.log("UnityConsoleWebView: noLogs element:", noLogs);
+            
             if (noLogs) {
                 noLogs.style.display = 'none';
+                console.log("UnityConsoleWebView: noLogs hidden");
             }
             
             const logElement = createLogElement(log);
+            console.log("UnityConsoleWebView: created logElement:", logElement);
             logList.appendChild(logElement);
+            console.log("UnityConsoleWebView: logElement appended to logList");
             
             updateLogVisibility();
             
@@ -342,15 +359,23 @@
         }
         
         function updateLogVisibility() {
+            console.log("UnityConsoleWebView: updateLogVisibility called");
             const logItems = document.querySelectorAll('.log-item');
-            logItems.forEach(item => {
+            console.log("UnityConsoleWebView: found", logItems.length, "log items");
+            console.log("UnityConsoleWebView: activeFilters:", activeFilters);
+            
+            logItems.forEach((item, index) => {
                 const type = item.dataset.type;
+                console.log("UnityConsoleWebView: processing item", index, "type:", type);
                 if (activeFilters.has(type)) {
                     item.classList.remove('hidden');
+                    console.log("UnityConsoleWebView: item", index, "shown");
                 } else {
                     item.classList.add('hidden');
+                    console.log("UnityConsoleWebView: item", index, "hidden");
                 }
             });
+            console.log("UnityConsoleWebView: updateLogVisibility completed");
         }
         
         function toggleFilter(type) {
@@ -396,38 +421,72 @@
         // Message handling
         window.addEventListener('message', event => {
             const message = event.data;
+            console.log("UnityConsoleWebView: received message:", message);
             
-            switch (message.type) {
+            switch (message.command || message.type) {
                 case 'addLog':
+                    console.log("UnityConsoleWebView: handling addLog message");
                     addLog(message.log);
                     break;
                 case 'clearLogs':
+                    console.log("UnityConsoleWebView: handling clearLogs message");
                     clearLogs();
                     break;
                 case 'setLogs':
+                case 'updateLogs':
+                    console.log("UnityConsoleWebView: handling setLogs/updateLogs message with logs:", message.logs);
                     logs = message.logs || [];
+                    console.log("UnityConsoleWebView: logs array updated to:", logs);
                     renderAllLogs();
                     break;
+                default:
+                    console.log("UnityConsoleWebView: unknown message type:", message.command || message.type);
             }
         });
         
         function renderAllLogs() {
+            console.log("UnityConsoleWebView: renderAllLogs called");
             const logList = document.getElementById('logList');
-            const noLogs = document.getElementById('noLogs');
+            let noLogs = document.getElementById('noLogs');
             
-            logList.innerHTML = '';
+            console.log("UnityConsoleWebView: logList element:", logList);
+            console.log("UnityConsoleWebView: noLogs element:", noLogs);
+            console.log("UnityConsoleWebView: current logs array:", logs);
+            console.log("UnityConsoleWebView: logs.length:", logs.length);
+            
+            // Clear all log items but preserve noLogs element
+            const logItems = logList.querySelectorAll('.log-item');
+            logItems.forEach(item => item.remove());
+            console.log("UnityConsoleWebView: existing log items cleared");
             
             if (logs.length === 0) {
-                logList.appendChild(noLogs);
+                console.log("UnityConsoleWebView: no logs, showing noLogs message");
+                if (!noLogs) {
+                    noLogs = document.createElement('div');
+                    noLogs.className = 'no-logs';
+                    noLogs.id = 'noLogs';
+                    noLogs.textContent = 'No logs to display';
+                    logList.appendChild(noLogs);
+                    console.log("UnityConsoleWebView: noLogs element recreated");
+                }
                 noLogs.style.display = 'flex';
             } else {
-                noLogs.style.display = 'none';
-                logs.forEach(log => {
+                console.log("UnityConsoleWebView: rendering", logs.length, "logs");
+                if (noLogs) {
+                    noLogs.style.display = 'none';
+                    console.log("UnityConsoleWebView: noLogs hidden");
+                }
+                logs.forEach((log, index) => {
+                    console.log("UnityConsoleWebView: processing log", index, ":", log);
                     const logElement = createLogElement(log);
+                    console.log("UnityConsoleWebView: created element for log", index, ":", logElement);
                     logList.appendChild(logElement);
+                    console.log("UnityConsoleWebView: appended element for log", index);
                 });
+                console.log("UnityConsoleWebView: all logs rendered, calling updateLogVisibility");
                 updateLogVisibility();
             }
+            console.log("UnityConsoleWebView: renderAllLogs completed, final logList children count:", logList.children.length);
         }
     </script>
 </body>
