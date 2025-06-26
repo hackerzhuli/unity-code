@@ -1,8 +1,6 @@
 # Compiled output
 out/
 dist/
-*.js
-*.js.map
 !eslint.config.mjs
 
 # binaries

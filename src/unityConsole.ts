@@ -197,10 +197,25 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
         }
     }
     
-    private _getHtmlForWebview(_webview: vscode.Webview): string {
+    private _getHtmlForWebview(webview: vscode.Webview): string {
         try {
             const htmlPath = path.join(this.extensionPath, 'assets/unityConsole.html');
-            return fs.readFileSync(htmlPath, 'utf8');
+            const cssPath = path.join(this.extensionPath, 'assets/unityConsole.css');
+            const jsPath = path.join(this.extensionPath, 'assets/unityConsole.js');
+            
+            // Get URIs for the external files
+            const cssUri = webview.asWebviewUri(vscode.Uri.file(cssPath));
+            const jsUri = webview.asWebviewUri(vscode.Uri.file(jsPath));
+            const cspSource = webview.cspSource;
+            
+            let html = fs.readFileSync(htmlPath, 'utf8');
+            
+            // Replace placeholders with actual URIs
+            html = html.replace(/{{cssUri}}/g, cssUri.toString());
+            html = html.replace(/{{jsUri}}/g, jsUri.toString());
+            html = html.replace(/{{cspSource}}/g, cspSource);
+            
+            return html;
         } catch (error) {
             console.error('Failed to load Unity Console HTML template:', error);
             // Fallback to a simple error message

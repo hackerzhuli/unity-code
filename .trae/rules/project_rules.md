@@ -5,8 +5,7 @@
 Unity Code is a Visual Studio Code extension designed to enhance the Unity game development workflow. The extension provides automated tools and documentation features that streamline common Unity development tasks, making it easier for developers to work with Unity projects directly from VS Code.
 
 ### Key Features
-
-The extension automatically manages Unity meta files when renaming assets, preventing broken references. It provides hover documentation for C# types with direct links to Unity and .NET documentation. The extension intelligently detects Unity projects and only activates in valid Unity environments.
+It provides hover documentation for C# types with direct links to Unity and .NET documentation along with it's xml docs if available. It also shows and run's Unity tests. It shows a Unity Console for logs from Unity. It also enables debugging for Unity projects. It also includes other smaller features to enhance development experience on Unity projects.
 
 ## Tech Stack
 
