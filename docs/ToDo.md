@@ -4,3 +4,5 @@
 - [x] 4. Test Unity Project in a path with space and Chinese characters
 - [ ] 5. Add a setting and also a button(that show enable/disable state like other buttons) in Unity Console to ignore duplicate logs(logs that have exactly the same content including stack trace)
 - [x] 6. Add a debug feature to attach to Unity Editor
+- [ ] 7. Add 1 button in status bar to enter/exit play mode according to state of Unity Editor
+- [ ] 8. Add 1 button in status bar to start/stop Hot Reload for Unity according to it's state.
