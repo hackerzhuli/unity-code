@@ -81,7 +81,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             if (!symbolInfo) {
                 return undefined;
             }            // Generate documentation link based on symbol origin (optional)
-            const docLinkInfo = await this.generateDocumentationLink(symbolInfo);
+            const docLinkInfo = await this.generateDocLink(symbolInfo);
             
             // Create hover content with symbol info and optional documentation link
             // Even if no documentation link is available, we still want to show XML docs
@@ -372,7 +372,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     /**
      * Generate documentation link based on symbol type using configuration
      */
-    private async generateDocumentationLink(symbolInfo: SymbolInfo): Promise<DocumentationLinkInfo | undefined> {
+    private async generateDocLink(symbolInfo: SymbolInfo): Promise<DocLinkInfo | undefined> {
         // Check if this is a package symbol from PackageCache
         if (symbolInfo.definitionLocation && this.unityPackageHelper && this.unityPackageHelper.isPackagePath(symbolInfo.definitionLocation.uri.fsPath)) {
             // Only update packages when we actually need package information
@@ -382,9 +382,14 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             if (packageInfo) {
                 const packageLinks = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
                 if (packageLinks) {
-                    return { url: packageLinks.apiUrl, packageInfo: packageLinks.packageInfo, packageLinks };
+                    const url = packageLinks.apiUrl || undefined;
+                    return { url, packageInfo: packageLinks.packageInfo, packageLinks };
+                } else {
+                    // Try to generate standard documentation link
+                    const config = this.findMatchingConfig(symbolInfo.type);
+                    const url = config ? this.generateLinkFromConfig(symbolInfo.type, config) : undefined;
+                    return { url, packageInfo, packageLinks: undefined };
                 }
-                // If no package-specific URL generated, fall through to standard documentation
             }
         }
 
@@ -399,9 +404,16 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 if (packageInfo) {
                     const packageLinks = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
                     if (packageLinks) {
-                        return { url: packageLinks.apiUrl, packageInfo: packageLinks.packageInfo, packageLinks };
+                        // Use apiUrl if available, otherwise fall back to manualUrl, or undefined if neither exists
+                        const url = packageLinks.apiUrl || packageLinks.manualUrl || undefined;
+                        return { url, packageInfo: packageLinks.packageInfo, packageLinks };
+                    } else {
+                        // Even if no package-specific links, we can still show package information
+                        // Try to generate standard documentation link
+                        const config = this.findMatchingConfig(symbolInfo.type);
+                        const url = config ? this.generateLinkFromConfig(symbolInfo.type, config) : undefined;
+                        return { url, packageInfo, packageLinks: undefined };
                     }
-                    // If no package-specific URL generated, fall through to standard documentation
                 }
             }
         }
@@ -437,6 +449,26 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
      * @returns The package documentation links or undefined if not supported
      */
     private generatePackageDocumentationLink(typeName: string, packageInfo: PackageInfo): PackageDocumentationLinks | undefined {
+        // Check if package has documentationUrl field
+        if (packageInfo.documentationUrl) {
+            // If documentationUrl exists, use it for package documentation
+            // For Unity packages, we can also generate API links if the documentationUrl is from Unity's official site
+            if (packageInfo.documentationUrl.includes('docs.unity3d.com')) {
+                // This is a Unity package with official documentation URL
+                // We can generate both package and API links
+                return this.generateUnityPackageLinksFromDocUrl(typeName, packageInfo);
+            } else {
+                // Non-Unity package with documentationUrl - only provide package link, no class-specific API link
+                console.log(`Using documentationUrl for package ${packageInfo.name}: ${packageInfo.documentationUrl}`);
+                return {
+                    apiUrl: undefined, // No class-specific API link for non-Unity packages
+                    manualUrl: packageInfo.documentationUrl!,
+                    packageInfo
+                };
+            }
+        }
+        
+        // Fall back to old pattern-based approach when documentationUrl is not available
         // Handle Unity packages
         if (packageInfo.name.startsWith('com.unity')) {
             // Skip package-specific URL if this package is in the exclusion list
@@ -496,6 +528,43 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     }
 
     /**
+     * Generate Unity package documentation links using documentationUrl
+     * @param typeName The fully qualified type name
+     * @param packageInfo The Unity package information with documentationUrl
+     * @returns The Unity package documentation links
+     */
+    private generateUnityPackageLinksFromDocUrl(typeName: string, packageInfo: PackageInfo): PackageDocumentationLinks {
+        // Extract package name and version from documentationUrl
+        // Expected format: https://docs.unity3d.com/Packages/com.unity.inputsystem@1.14/manual/index.html
+        const urlMatch = packageInfo.documentationUrl!.match(/\/Packages\/(.*?)@([^/]+)\//); 
+        
+        if (urlMatch) {
+            const packageName = urlMatch[1];
+            const version = urlMatch[2];
+            
+            // Generate API URL using extracted info
+            const apiUrl = `https://docs.unity3d.com/Packages/${packageName}@${version}/api/${typeName}.html`;
+            
+            console.log(`Generated Unity package API URL from documentationUrl: ${apiUrl}`);
+            console.log(`Using provided manual URL: ${packageInfo.documentationUrl}`);
+            
+            return {
+                apiUrl,
+                manualUrl: packageInfo.documentationUrl!,
+                packageInfo
+            };
+        } else {
+            // If we can't parse the URL, fall back to using documentationUrl as manual link only
+            console.warn(`Could not parse Unity package URL format: ${packageInfo.documentationUrl}`);
+            return {
+                apiUrl: undefined,
+                manualUrl: packageInfo.documentationUrl!,
+                packageInfo
+            };
+        }
+    }
+
+    /**
      * Find the matching configuration for a given type name
      */
     private findMatchingConfig(typeName: string): DocLinkConfig | undefined {
@@ -538,7 +607,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
       /**
      * Create hover content with documentation link using type name
      */
-    private createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo?: DocumentationLinkInfo): vscode.Hover {
+    private createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo?: DocLinkInfo): vscode.Hover {
         const hoverContent = new vscode.MarkdownString();        // Show XML documentation if available (at the top)
         if (symbolInfo.xmlDocs && symbolInfo.xmlDocs.trim().length > 0) {
             console.log(`abc Adding XML docs for symbol: ${symbolInfo.name}, docs is: ${symbolInfo.xmlDocs}`);
@@ -556,21 +625,26 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         
         // Only show documentation link information if available
         if (docLinkInfo) {
-            // Use the type name for the documentation link text
-            const typeName = symbolInfo.type;
-            
             // Add package information if available
             if (docLinkInfo.packageInfo) {
-                hoverContent.appendMarkdown(`From package \`${docLinkInfo.packageInfo.displayName}\`(${docLinkInfo.packageInfo.name}), version \`${docLinkInfo.packageInfo.version}\`\n\n`);
+                let embedded = '';
+                if (docLinkInfo.packageInfo.isEmbedded) {
+                    embedded = `(embedded)`;
+                }
+                hoverContent.appendMarkdown(`From package \`${docLinkInfo.packageInfo.displayName}\`(${docLinkInfo.packageInfo.name})${embedded}, version \`${docLinkInfo.packageInfo.version}\`\n\n`);
             }
             
-            // Show documentation link using type name as link text
-            hoverContent.appendMarkdown(`View docs for [${typeName}](${docLinkInfo.url})`);
+            // Show documentation link only if URL is available
+            if (docLinkInfo.url) {
+                const typeName = symbolInfo.type;
+                hoverContent.appendMarkdown(`View docs for [${typeName}](${docLinkInfo.url})`);
+            }
             
             // Add package documentation link for Unity packages using consolidated packageLinks
             if (docLinkInfo.packageLinks) {
                 const packageDisplayName = docLinkInfo.packageLinks.packageInfo.displayName || docLinkInfo.packageLinks.packageInfo.name;
-                hoverContent.appendMarkdown(`\n\nView docs for package [${packageDisplayName}](${docLinkInfo.packageLinks.manualUrl})`);
+                const linkPrefix = docLinkInfo.url ? '\n\n' : '';
+                hoverContent.appendMarkdown(`${linkPrefix}View docs for package [${packageDisplayName}](${docLinkInfo.packageLinks.manualUrl})`);
             }
         }
         
@@ -653,9 +727,9 @@ interface DocLinkConfig {
  * Information about documentation link generation result.
  * @interface DocumentationLinkInfo
  */
-interface DocumentationLinkInfo {
+interface DocLinkInfo {
     /** The generated documentation URL */
-    url: string;
+    url: string | undefined;
     
     /** Package information if the symbol is from a Unity package */
     packageInfo?: PackageInfo;
@@ -670,7 +744,7 @@ interface DocumentationLinkInfo {
  */
 interface PackageDocumentationLinks {
     /** The API documentation URL for the specific type */
-    apiUrl: string;
+    apiUrl: string | undefined;
     
     /** The package manual documentation URL */
     manualUrl: string;
