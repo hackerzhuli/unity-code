@@ -123,11 +123,6 @@
           "default": true,
           "description": "Automatically refresh Unity tests when VS Code window regains focus"
         },
-        "unity-code.showUnityLogs": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable/disable Unity log messages forwarding to VS Code Output Channel"
-        },
         "unity-code.debugger.stepOverPropertiesAndOperators": {
           "type": "boolean",
           "default": true,

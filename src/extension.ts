@@ -20,8 +20,7 @@ let globalUnityProjectManager: UnityProjectManager | null = null;
 let globalUnityStatusBarItem: vscode.StatusBarItem | null = null;
 let globalUnityMessagingClient: UnityMessagingClient | null = null;
 let globalUnityDetector: UnityDetector | null = null;
-// Global reference to Unity log output channel
-let globalUnityLogChannel: vscode.OutputChannel | null = null;
+
 // Global reference to Unity Console manager
 let globalUnityConsoleManager: UnityConsoleManager | null = null;
 
@@ -214,14 +213,10 @@ function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
     globalUnityConsoleManager = new UnityConsoleManager(context, globalUnityProjectManager);
     globalUnityConsoleManager.initialize();
 
-    // Create Unity log output channel for backward compatibility
-    globalUnityLogChannel = vscode.window.createOutputChannel('Unity Logs');
-    console.log('UnityCode: Unity Console initialized - logs will appear in Unity Console WebView and "Unity Logs" output channel');
+    console.log('UnityCode: Unity Console initialized - logs will appear in Unity Console WebView');
 
     // Handle Info messages
     globalUnityMessagingClient.onInfoMessage.subscribe((message) => {
-        const timestamp = new Date().toLocaleTimeString();
-        globalUnityLogChannel?.appendLine(`[${timestamp}] [Info] ${message}`);
         globalUnityConsoleManager?.addLog('info', message);
         // Also log to Debug Console for developers
         console.log(`[Unity Info] ${message}`);
@@ -229,16 +224,12 @@ function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
 
     // Handle Warning messages
     globalUnityMessagingClient.onWarningMessage.subscribe((message) => {
-        const timestamp = new Date().toLocaleTimeString();
-        globalUnityLogChannel?.appendLine(`[${timestamp}] [Warning] ${message}`);
         globalUnityConsoleManager?.addLog('warning', message);
         console.warn(`[Unity Warning] ${message}`);
     });
 
     // Handle Error messages
     globalUnityMessagingClient.onErrorMessage.subscribe((message) => {
-        const timestamp = new Date().toLocaleTimeString();
-        globalUnityLogChannel?.appendLine(`[${timestamp}] [Error] ${message}`);
         globalUnityConsoleManager?.addLog('error', message);
         console.error(`[Unity Error] ${message}`);
     });
@@ -294,14 +285,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         }
     });
 
-    // Register the command to show Unity logs
-    const showUnityLogsDisposable = vscode.commands.registerCommand('unity-code.showUnityLogs', function () {
-        if (globalUnityLogChannel) {
-            globalUnityLogChannel.show();
-        } else {
-            vscode.window.showInformationMessage('Unity Code: Unity logs are not available (no Unity project detected or not connected)');
-        }
-    });
+
 
     // Register the command to show Unity connection status
     const showConnectionStatusDisposable = vscode.commands.registerCommand('unity-code.showConnectionStatus', function () {
@@ -384,7 +368,6 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
 
     context.subscriptions.push(
         refreshTestsDisposable,
-        showUnityLogsDisposable,
         showConnectionStatusDisposable,
         runTestsDisposable,
         renameDisposable, 
@@ -392,12 +375,9 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         windowStateDisposable
     );
     
-    // Add status bar item and log channel to subscriptions for proper cleanup
+    // Add status bar item to subscriptions for proper cleanup
     if (globalUnityStatusBarItem) {
         context.subscriptions.push(globalUnityStatusBarItem);
-    }
-    if (globalUnityLogChannel) {
-        context.subscriptions.push(globalUnityLogChannel);
     }
 }
 
@@ -486,7 +466,6 @@ function cleanup() {
     globalTestProvider?.dispose();
     globalUnityDetector?.stop();
     globalUnityMessagingClient?.dispose();
-    globalUnityLogChannel?.dispose();
     globalUnityConsoleManager?.dispose();
     globalUnityDebuggerManager?.deactivate();
     globalUnityDetector = null;
@@ -495,7 +474,6 @@ function cleanup() {
     globalPackageHelper = null;
     globalUnityStatusBarItem = null;
     globalUnityDebuggerManager = null;
-    globalUnityLogChannel = null;
     globalUnityConsoleManager = null;
 }
 
