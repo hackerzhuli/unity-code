@@ -653,7 +653,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         const codeLens = new vscode.CodeLens(range);
         codeLens.command = {
             title: this.getCodeLensTitle(tests),
-            command: 'unitycode.runTests',
+            command: 'unity-code.runTests',
             arguments: [tests.map(t => t.FullName)]
         };
         

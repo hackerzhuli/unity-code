@@ -40,21 +40,21 @@ The extension provides several configuration options in VS Code settings:
 
 ### Core Settings
 
-- **`unitycode.debugger.stepOverPropertiesAndOperators`** (default: `true`)
+- **`unity-code.debugger.stepOverPropertiesAndOperators`** (default: `true`)
   - Step over properties and operators when debugging Unity code
 
-- **`unitycode.debugger.projectAssembliesOnly`** (default: `true`)
+- **`unity-code.debugger.projectAssembliesOnly`** (default: `true`)
   - Only debug project assemblies, excluding Unity engine and third-party libraries
 
 ### Advanced Settings
 
-- **`unitycode.debugger.automaticSourceLinkDownload`** (default: `false`)
+- **`unity-code.debugger.automaticSourceLinkDownload`** (default: `false`)
   - Automatically download source files using SourceLink when debugging
 
-- **`unitycode.debugger.symbolSearchPaths`** (default: `[]`)
+- **`unity-code.debugger.symbolSearchPaths`** (default: `[]`)
   - Additional paths to search for debug symbols
 
-- **`unitycode.debugger.searchMicrosoftSymbolServer`** (default: `false`)
+- **`unity-code.debugger.searchMicrosoftSymbolServer`** (default: `false`)
   - Search Microsoft symbol server for debug symbols
 
 ## How to Debug

@@ -67,6 +67,6 @@ See [Debugger Usage Guide](./docs/DebuggerUsage.md) for detailed setup and usage
 ### Settings
 You can control the extension behavior with these settings:
 
-- `unitycode.autoRefreshUnity` (default: `true`): Enable/disable automatic Unity asset database refresh when C# files are saved
-- `unitycode.refreshOnWindowFocus` (default: `true`): Automatically refresh Unity tests when VS Code window regains focus
-- `unitycode.showUnityLogs` (default: `true`): Enable/disable Unity log messages forwarding to VS Code Output Channel
+- `unity-code.autoRefreshUnity` (default: `true`): Enable/disable automatic Unity asset database refresh when C# files are saved
+- `unity-code.refreshTestsOnWindowFocus` (default: `true`): Automatically refresh Unity tests when VS Code window regains focus
+- `unity-code.showUnityLogs` (default: `true`): Enable/disable Unity log messages forwarding to VS Code Output Channel

@@ -251,7 +251,7 @@ export class UnityConsoleManager {
         
         // Register command to show Unity Console
         const showConsoleCommand = vscode.commands.registerCommand(
-            'unitycode.showUnityConsole',
+            'unity-code.showUnityConsole',
             () => {
                 // Focus the Unity Console view - this will trigger resolveWebviewView if not already resolved
                 vscode.commands.executeCommand('unityConsole.focus');

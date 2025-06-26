@@ -1,5 +1,5 @@
 {
-  "name": "unitycode",
+  "name": "unity-code",
   "displayName": "Unity Code",
   "description": "VS Code extension that helps you to work with Unity Projects",
   "version": "0.1.0",
@@ -25,15 +25,15 @@
   "contributes": {
     "commands": [
       {
-        "command": "unitycode.refreshTests",
+        "command": "unity-code.refreshTests",
         "title": "Unity Code: Refresh Tests"
       },
       {
-        "command": "unitycode.showUnityLogs",
+        "command": "unity-code.showUnityLogs",
         "title": "Unity Code: Show Unity Logs"
       },
       {
-        "command": "unitycode.showUnityConsole",
+        "command": "unity-code.showUnityConsole",
         "title": "Unity Code: Show Unity Console"
       }
     ],
@@ -52,7 +52,7 @@
           "type": "webview",
           "id": "unityConsole",
           "name": "Unity Console",
-          "when": "unitycode:hasUnityProject"
+          "when": "unity-code:hasUnityProject"
         }
       ]
     },
@@ -113,27 +113,27 @@
     "configuration": {
       "title": "Unity Code",
       "properties": {
-        "unitycode.autoRefreshUnity": {
+        "unity-code.autoRefreshUnity": {
           "type": "boolean",
           "default": true,
           "description": "Enable/disable automatic Unity asset database refresh when assets are saved, this will be automatically disabled if Hot Reload for Unity is running"
         },
-        "unitycode.refreshOnWindowFocus": {
+        "unity-code.refreshTestsOnWindowFocus": {
           "type": "boolean",
           "default": true,
           "description": "Automatically refresh Unity tests when VS Code window regains focus"
         },
-        "unitycode.showUnityLogs": {
+        "unity-code.showUnityLogs": {
           "type": "boolean",
           "default": true,
           "description": "Enable/disable Unity log messages forwarding to VS Code Output Channel"
         },
-        "unitycode.debugger.stepOverPropertiesAndOperators": {
+        "unity-code.debugger.stepOverPropertiesAndOperators": {
           "type": "boolean",
           "default": true,
           "description": "Step over properties and operators when debugging Unity code"
         },
-        "unitycode.debugger.projectAssembliesOnly": {
+        "unity-code.debugger.projectAssembliesOnly": {
           "type": "boolean",
           "default": true,
           "description": "Only debug project assemblies, excluding Unity engine and third-party libraries"

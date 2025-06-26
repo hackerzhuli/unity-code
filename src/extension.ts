@@ -109,7 +109,7 @@ async function onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
  */
 async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
     // Check if auto-refresh is enabled
-    const config = vscode.workspace.getConfiguration('unitycode');
+    const config = vscode.workspace.getConfiguration('unity-code');
     const autoRefreshEnabled = config.get<boolean>('autoRefreshUnity', true);
     
     if (!autoRefreshEnabled || !globalUnityMessagingClient) {
@@ -141,7 +141,7 @@ async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
  */
 async function onDidChangeWindowState(windowState: vscode.WindowState): Promise<void> {
     // Check if window focus refresh is enabled
-    const config = vscode.workspace.getConfiguration('unitycode');
+    const config = vscode.workspace.getConfiguration('unity-code');
     const refreshOnFocusEnabled = config.get<boolean>('refreshOnWindowFocus', true);
     
     if (!refreshOnFocusEnabled || !globalTestProvider || !windowState.focused) {
@@ -165,7 +165,7 @@ async function onDidChangeWindowState(windowState: vscode.WindowState): Promise<
  */
 function createUnityStatusBarItem(): vscode.StatusBarItem {
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    statusBarItem.command = 'unitycode.showConnectionStatus';
+    statusBarItem.command = 'unity-code.showConnectionStatus';
     updateUnityStatusBarItem(statusBarItem, false, false);
     statusBarItem.show();
     return statusBarItem;
@@ -202,7 +202,7 @@ function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
     }
 
     // Check if Unity log forwarding is enabled
-    const config = vscode.workspace.getConfiguration('unitycode');
+    const config = vscode.workspace.getConfiguration('unity-code');
     const showUnityLogs = config.get<boolean>('showUnityLogs', true);
     
     if (!showUnityLogs) {
@@ -280,7 +280,7 @@ function startUnityStatusMonitoring(): void {
  */
 function registerEventListeners(context: vscode.ExtensionContext): void {
     // Register the command to manually refresh tests
-    const refreshTestsDisposable = vscode.commands.registerCommand('unitycode.refreshTests', async function () {
+    const refreshTestsDisposable = vscode.commands.registerCommand('unity-code.refreshTests', async function () {
         if (globalTestProvider) {
             vscode.window.showInformationMessage('Unity Code: Refreshing tests...');
             try {
@@ -295,7 +295,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     });
 
     // Register the command to show Unity logs
-    const showUnityLogsDisposable = vscode.commands.registerCommand('unitycode.showUnityLogs', function () {
+    const showUnityLogsDisposable = vscode.commands.registerCommand('unity-code.showUnityLogs', function () {
         if (globalUnityLogChannel) {
             globalUnityLogChannel.show();
         } else {
@@ -304,7 +304,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     });
 
     // Register the command to show Unity connection status
-    const showConnectionStatusDisposable = vscode.commands.registerCommand('unitycode.showConnectionStatus', function () {
+    const showConnectionStatusDisposable = vscode.commands.registerCommand('unity-code.showConnectionStatus', function () {
         if (globalTestProvider) {
             const connected = globalTestProvider.messagingClient.connected;
             const online = globalTestProvider.messagingClient.unityOnline;
@@ -326,7 +326,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     });
 
     // Register the command to run tests from code lens
-    const runTestsDisposable = vscode.commands.registerCommand('unitycode.runTests', async function (testFullNames: string[]) {
+    const runTestsDisposable = vscode.commands.registerCommand('unity-code.runTests', async function (testFullNames: string[]) {
         if (!globalTestProvider) {
             vscode.window.showWarningMessage('Unity Code: Test provider not available');
             return;
@@ -436,13 +436,13 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     const unityProjectPath = globalUnityProjectManager!.getUnityProjectPath();
     if (!unityProjectPath) {
         // No Unity project found, register hover provider without package helper
-        vscode.commands.executeCommand('setContext', 'unitycode:hasUnityProject', false);
+        vscode.commands.executeCommand('setContext', 'unity-code:hasUnityProject', false);
         registerHoverProvider(context, undefined);
         return;
     }
 
     // Set context variable to show Unity Console view
-    vscode.commands.executeCommand('setContext', 'unitycode:hasUnityProject', true);
+    vscode.commands.executeCommand('setContext', 'unity-code:hasUnityProject', true);
 
     if (!globalNativeBinaryLocator) {
         console.warn('Cannot initialize UnityDetector: NativeBinaryLocator is not available');
