@@ -33,7 +33,7 @@ export async function normalizePath(path: string): Promise<string> {
 }
 
 /**
- * Checks if a given file or directory path is located inside a specified parent directory.
+ * Checks if a given file or directory path is located inside a specified parent directory(if path is the directory itself, it will return false).
  * Both must exist on file system, otherwise return false.
  * @param {string} dirPath The path to the potential parent directory.
  * @param {string} path The path to the file or directory to check for containment.

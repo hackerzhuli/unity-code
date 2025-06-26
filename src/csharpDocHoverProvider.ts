@@ -378,16 +378,13 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             // Only update packages when we actually need package information
             await this.unityPackageHelper.updatePackages();
             
-            const packageName = this.unityPackageHelper.extractPackageNameFromPath(symbolInfo.definitionLocation.uri.fsPath);
-            if (packageName) {
-                const packageInfo = this.unityPackageHelper.getPackageByName(packageName);
-                if (packageInfo) {
-                    const packageLinks = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
-                    if (packageLinks) {
-                        return { url: packageLinks.apiUrl, packageInfo: packageLinks.packageInfo, packageLinks };
-                    }
-                    // If no package-specific URL generated, fall through to standard documentation
+            const packageInfo = await this.unityPackageHelper.getPackageByPath(symbolInfo.definitionLocation.uri.fsPath);
+            if (packageInfo) {
+                const packageLinks = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
+                if (packageLinks) {
+                    return { url: packageLinks.apiUrl, packageInfo: packageLinks.packageInfo, packageLinks };
                 }
+                // If no package-specific URL generated, fall through to standard documentation
             }
         }
 
