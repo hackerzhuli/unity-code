@@ -5,6 +5,9 @@ dist/
 *.js.map
 !eslint.config.mjs
 
+# binaries
+bin/
+
 # Node.js dependencies
 node_modules/
 npm-debug.log*

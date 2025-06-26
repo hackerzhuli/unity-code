@@ -28,12 +28,24 @@ The extension automatically manages Unity meta files when renaming assets, preve
 
 ### Project Structure
 ```
-src/
-├── extension.ts           # Main extension entry point
-├── csharpDocHoverProvider.ts # C# documentation hover functionality
-├── utils.ts              # Utility functions
-└── test/                 # Test suites
+├── assets/               # Static assets and resources
+│   └── unityConsole.html # Unity console HTML template
+├── bin/                  # Compiled binaries and executables
+│   └── win_x64/          # Windows 64-bit native binaries
+│   └── linux_x64/        # Linux 64-bit native binaries
+│   └── mac_arm64/        # macOS 64-bit native binaries
+├── out/                  # The compiled javascript output
+├── docs/                 # Documentation files
+├── src/                  # TypeScript source code
+│   └── test/                      # Unit tests
+├── README.md             # Project readme
+├── eslint.config.mjs     # ESLint configuration
+├── package.json          # NPM package configuration
+└── tsconfig.json         # TypeScript compiler configuration
 ```
+
+### Supported Platforms
+We only support Windows X64 for now. Other support may be added in the future. The reason is we only have built windows binaries. More platform support maybe added.
 
 ### Key Dependencies
 - **@types/vscode** - VS Code API type definitions
