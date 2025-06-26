@@ -7,6 +7,7 @@ import { UnityProjectManager } from './unityProjectManager.js';
 import { UnityMessagingClient } from './unityMessagingClient.js';
 import { UnityDetector } from './unityDetector.js';
 import { UnityConsoleManager } from './unityConsole.js';
+import { NativeBinaryLocator } from './nativeBinaryLocator.js';
 
 // Global reference to test provider for auto-refresh functionality
 let globalTestProvider: UnityTestProvider | null = null;
@@ -22,6 +23,9 @@ let globalUnityDetector: UnityDetector | null = null;
 let globalUnityLogChannel: vscode.OutputChannel | null = null;
 // Global reference to Unity Console manager
 let globalUnityConsoleManager: UnityConsoleManager | null = null;
+
+// Global reference to Native Binary Locator
+let globalNativeBinaryLocator: NativeBinaryLocator | null = null;
 
 /**
  * Handle renaming of a single file and its corresponding meta file
@@ -400,6 +404,12 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
 export async function activate(context: vscode.ExtensionContext) {
     console.log('UnityCode extension is now active!');
     
+    // Initialize Native Binary Locator
+    globalNativeBinaryLocator = new NativeBinaryLocator(context.extensionPath);
+    if (!globalNativeBinaryLocator) {
+        console.warn('Failed to initialize NativeBinaryLocator: unsupported platform or architecture');
+    }
+
     // Initialize Unity project manager with current workspace folders
     globalUnityProjectManager = new UnityProjectManager();
     await globalUnityProjectManager.init(vscode.workspace.workspaceFolders);
@@ -426,7 +436,12 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     // Set context variable to show Unity Console view
     vscode.commands.executeCommand('setContext', 'unitycode:hasUnityProject', true);
 
-    globalUnityDetector = new UnityDetector(unityProjectPath, context.extensionPath);
+    if (!globalNativeBinaryLocator) {
+        console.warn('Cannot initialize UnityDetector: NativeBinaryLocator is not available');
+        return;
+    }
+
+    globalUnityDetector = new UnityDetector(unityProjectPath, globalNativeBinaryLocator);
     
     globalUnityMessagingClient = new UnityMessagingClient(globalUnityDetector);
 

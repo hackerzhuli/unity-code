@@ -1,8 +1,7 @@
 import * as dgram from 'dgram';
-import * as path from 'path';
-import * as os from 'os';
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from './eventEmitter.js';
+import { NativeBinaryLocator } from './nativeBinaryLocator.js';
 
 /**
  * Message types for native messaging protocol
@@ -41,7 +40,17 @@ export class UnityDetector {
     private keepAliveInterval: NodeJS.Timeout | null = null;
     private currentState: ProcessState = { UnityProcessId: 0, IsHotReloadEnabled: false };
     private projectPath: string;
-    private extensionRoot: string;
+    private nativeBinaryLocator: NativeBinaryLocator;
+    
+    /**
+     * Constructor
+     * @param projectPath Path to Unity project
+     * @param nativeBinaryLocator Native binary locator instance
+     */
+    constructor(projectPath: string, nativeBinaryLocator: NativeBinaryLocator) {
+        this.projectPath = projectPath;
+        this.nativeBinaryLocator = nativeBinaryLocator;
+    }
     
     // Event emitter for Unity detection state changes
     public readonly onUnityStateChanged = new EventEmitter<UnityDetectionEvent>();
@@ -67,22 +76,17 @@ export class UnityDetector {
         return this.currentState.IsHotReloadEnabled;
     }
     
-    constructor(projectPath: string, extensionRoot: string) {
-        this.projectPath = projectPath;
-        this.extensionRoot = extensionRoot;
-        this.port = 0;
-    }
-    
     /**
      * Start the Unity detector
      * Launches native binary and establishes UDP connection
      */
     public async start(): Promise<void> {
         console.log('UnityDetector: Starting Unity detection...');
-        
-        // Only support Windows for now
-        if (os.platform() !== 'win32') {
-            console.log('UnityDetector: Non-Windows platform detected, Unity detection disabled');
+
+        // Check if unity_code_native binary exists
+        const binaryPath = this.nativeBinaryLocator.getUnityCodeNativePath();
+        if (!binaryPath) {
+            console.log('UnityDetector: unity_code_native binary not found, Unity detection disabled');
             return;
         }
         
@@ -131,7 +135,11 @@ export class UnityDetector {
      * Start the native binary process
      */
     private async startNativeBinary(): Promise<void> {
-        const binaryPath = this.getNativeBinaryPath();
+        const binaryPath = this.nativeBinaryLocator.getUnityCodeNativePath();
+        
+        if (!binaryPath) {
+            throw new Error('unity_code_native binary not found');
+        }
         
         console.log(`UnityDetector: Starting native binary: ${binaryPath}`);
         
@@ -164,13 +172,7 @@ export class UnityDetector {
         }
     }
     
-    /**
-     * Get the path to the native binary
-     */
-    private getNativeBinaryPath(): string {
-        // Use the provided extension root path
-        return path.join(this.extensionRoot, 'bin', 'win_64', 'unity_code_native.exe');
-    }
+
     
     /**
      * Connect to the native binary via UDP
