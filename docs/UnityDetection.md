@@ -1,10 +1,5 @@
 # Unity Detection
-We have a native binary that lives in bin directory that we run as child process to detect Unity.
-
-example path(windows)(it's platform specific):
-``` txt
-bin/win_64/unity_code_native.exe
-```
+We have a native binary (unity_code_native) that lives in bin directory that we run as child process to detect Unity.
 
 It has a messaging protocol [here]().
 
