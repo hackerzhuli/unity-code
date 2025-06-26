@@ -12,6 +12,9 @@
   "engines": {
     "vscode": "^1.100.0"
   },
+  "extensionDependencies": [
+    "nromanov.dotrush"
+  ],
   "categories": [
     "Other"
   ],
@@ -53,6 +56,60 @@
         }
       ]
     },
+    "breakpoints": [
+      {
+        "language": "csharp"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "unity-code",
+        "languages": [
+          "csharp"
+        ],
+        "label": "Unity Code Debugger",
+        "program": "./bin/win_x64/MonoDebugger.exe",
+        "configurationAttributes": {
+          "attach": {
+            "required": [],
+            "properties": {
+              "cwd": {
+                "type": "string",
+                "description": "Working directory for the debugger",
+                "default": "${workspaceFolder}"
+              },
+              "debuggerOptions": {
+                "type": "object",
+                "description": "Additional debugger options"
+              },
+              "transportId": {
+                "type": "string",
+                "description": "Transport ID for external type resolver"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "name": "Unity Code Attach",
+            "type": "unity-code",
+            "request": "attach"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Unity Code: Attach",
+            "description": "Attach to Unity Editor",
+            "body": {
+              "name": "Unity Code Attach",
+              "type": "unity-code",
+              "request": "attach",
+              "cwd": "${workspaceFolder}"
+            }
+          }
+        ]
+      }
+    ],
     "configuration": {
       "title": "Unity Code",
       "properties": {
@@ -70,6 +127,16 @@
           "type": "boolean",
           "default": true,
           "description": "Enable/disable Unity log messages forwarding to VS Code Output Channel"
+        },
+        "unitycode.debugger.stepOverPropertiesAndOperators": {
+          "type": "boolean",
+          "default": true,
+          "description": "Step over properties and operators when debugging Unity code"
+        },
+        "unitycode.debugger.projectAssembliesOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only debug project assemblies, excluding Unity engine and third-party libraries"
         }
       },
       "testing": {

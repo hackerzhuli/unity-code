@@ -3,3 +3,4 @@
 - [x] 3. Integrationg with Hot Reload for Unity, when Hot Reload for Unity is enabled in Unity, we should not Auto Refresh Unity, because Hot Reload for Unity will recompile and patch the code without a real compile in Unity
 - [x] 4. Test Unity Project in a path with space and Chinese characters
 - [ ] 5. Add a setting and also a button(that show enable/disable state like other buttons) in Unity Console to ignore duplicate logs(logs that have exactly the same content including stack trace)
+- [x] 6. Add a debug feature to attach to Unity Editor

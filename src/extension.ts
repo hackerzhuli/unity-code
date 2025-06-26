@@ -8,6 +8,7 @@ import { UnityMessagingClient } from './unityMessagingClient.js';
 import { UnityDetector } from './unityDetector.js';
 import { UnityConsoleManager } from './unityConsole.js';
 import { NativeBinaryLocator } from './nativeBinaryLocator.js';
+import { UnityDebuggerManager } from './debugger.js';
 
 // Global reference to test provider for auto-refresh functionality
 let globalTestProvider: UnityTestProvider | null = null;
@@ -26,6 +27,8 @@ let globalUnityConsoleManager: UnityConsoleManager | null = null;
 
 // Global reference to Native Binary Locator
 let globalNativeBinaryLocator: NativeBinaryLocator | null = null;
+// Global reference to Unity Debugger Manager
+let globalUnityDebuggerManager: UnityDebuggerManager | null = null;
 
 /**
  * Handle renaming of a single file and its corresponding meta file
@@ -409,6 +412,11 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!globalNativeBinaryLocator) {
         console.warn('Failed to initialize NativeBinaryLocator: unsupported platform or architecture');
     }
+    
+    // Initialize Unity Debugger Manager
+    globalUnityDebuggerManager = new UnityDebuggerManager(context);
+    globalUnityDebuggerManager.activate(context);
+    console.log('UnityCode: Unity debugger manager initialized');
 
     // Initialize Unity project manager with current workspace folders
     globalUnityProjectManager = new UnityProjectManager();
@@ -480,11 +488,13 @@ function cleanup() {
     globalUnityMessagingClient?.dispose();
     globalUnityLogChannel?.dispose();
     globalUnityConsoleManager?.dispose();
+    globalUnityDebuggerManager?.deactivate();
     globalUnityDetector = null;
     globalUnityMessagingClient = null;
     globalTestProvider = null;
     globalPackageHelper = null;
     globalUnityStatusBarItem = null;
+    globalUnityDebuggerManager = null;
     globalUnityLogChannel = null;
     globalUnityConsoleManager = null;
 }

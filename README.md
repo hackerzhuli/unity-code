@@ -48,6 +48,22 @@ The Unity Console appears in VS Code's bottom panel and provides:
 - Clear logs functionality and log history management
 - Command Palette: `Unity Code: Show Unity Console`
 
+### Unity Debugging
+Debug Unity projects directly from VS Code using the integrated MonoDebugger.
+
+Features include:
+- **Attach to Unity Editor**: Seamlessly attach debugger to running Unity Editor
+- **Breakpoint Support**: Set and manage breakpoints in C# scripts
+- **Variable Inspection**: View and modify variable values during debugging
+- **Step Through Code**: Step over, into, and out of functions
+- **Call Stack Navigation**: Navigate through the execution call stack
+- **Exception Handling**: Break on exceptions with detailed information
+- **Configurable Options**: Customize debugging behavior through VS Code settings
+
+**Platform Support**: Currently Windows x64 only (more platforms planned)
+
+See [Debugger Usage Guide](./docs/DebuggerUsage.md) for detailed setup and usage instructions.
+
 ### Settings
 You can control the extension behavior with these settings:
 
