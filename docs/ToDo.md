@@ -1,5 +1,5 @@
 - [x] 1. A dedicated Unity Console to show Unity logs
-- [ ] 2. Unity Test result should come with stack strace and associated Unity logs
+- [ ] 2. Unity Test result should come with stack trace and associated Unity logs(the stack trace lines should be clickable)
 - [x] 3. Integrationg with Hot Reload for Unity, when Hot Reload for Unity is enabled in Unity, we should not Auto Refresh Unity, because Hot Reload for Unity will recompile and patch the code without a real compile in Unity
 - [x] 4. Test Unity Project in a path with space and Chinese characters
 - [x] 5. Add a setting and also a button(that show enable/disable state like other buttons) in Unity Console to ignore duplicate logs(don't store at all if it is enabled, because sometimes logs can come from Update and there can be hundreds of same logs in one second)(logs that have exactly the same content including stack trace)(true by default)
