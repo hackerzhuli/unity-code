@@ -519,13 +519,13 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             const projectPath = this.projectManager.getUnityProjectPath();
             const processedStackTrace = await processTestStackTraceToMarkdown(result.StackTrace, projectPath || '');
             if (processedStackTrace && processedStackTrace.trim()) {
-                outputParts.push(`**Stack Trace:**\n${processedStackTrace}`);
+                outputParts.push(`## Stack Trace\n${processedStackTrace}`);
             }
         }
         
         // Add test output/logs if available and not empty
         if (result.Output && result.Output.trim()) {
-            outputParts.push(`**Test Output:**\n${result.Output.trim()}`);
+            outputParts.push(`## Output\n${result.Output.trim()}`);
         }
         
         // Create TestMessage with MarkdownString if we have content
