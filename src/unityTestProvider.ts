@@ -460,22 +460,58 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     }
 
     /**
-     * Build TestMessage array with markdown support for test results
+     * Build result for terminal
      */
-    private async buildTestMessages(result: TestResultAdaptor): Promise<vscode.TestMessage[]> {
-        const messages: vscode.TestMessage[] = [];
+    private buildOutputForTerminal(result: TestResultAdaptor): string {
         const outputParts: string[] = [];
         
-        // Add status-specific header for failed/inconclusive tests
-        if (result.TestStatus === TestStatusAdaptor.Failed) {
-            outputParts.push('❌ **Test Failed**\n\n');
-        } else if (result.TestStatus === TestStatusAdaptor.Inconclusive) {
-            outputParts.push('⚠️ **Test Inconclusive**\n\n');
+        // Add duration information if available
+        if (result.Duration !== undefined && result.Duration > 0) {
+            const durationMs = result.Duration * 1000;
+            const durationText = durationMs < 1000 
+                ? `${durationMs.toFixed(0)}ms`
+                : `${(result.Duration).toFixed(2)}s`;
+            outputParts.push(`Duration: ${durationText}`);
         }
         
         // Add message if available and not empty
         if (result.Message && result.Message.trim()) {
-            outputParts.push(`**Message:** ${result.Message}\n\n`);
+            outputParts.push(`Message: ${result.Message.trim()}`);
+        }
+        
+        // Add test output/logs if available and not empty
+        if (result.Output && result.Output.trim()) {
+            outputParts.push(`Test Output:\n${result.Output.trim()}`);
+        }
+        
+        return outputParts.join('\r\n'); // don't forget \r, it's for terminal
+    }
+
+    private async buildTestMessages(result: TestResultAdaptor): Promise<vscode.TestMessage[]> {
+        const messages: vscode.TestMessage[] = [];
+        const outputParts: string[] = [];
+        
+        // Add status-specific header for all test types
+        if (result.TestStatus === TestStatusAdaptor.Failed) {
+            outputParts.push('❌ **Test Failed**');
+        } else if (result.TestStatus === TestStatusAdaptor.Inconclusive) {
+            outputParts.push('⚠️ **Test Inconclusive**');
+        } else if (result.TestStatus === TestStatusAdaptor.Passed) {
+            outputParts.push('✅ **Test Passed**');
+        }
+        
+        // Add duration information if available
+        if (result.Duration !== undefined && result.Duration > 0) {
+            const durationMs = result.Duration * 1000;
+            const durationText = durationMs < 1000 
+                ? `${durationMs.toFixed(0)}ms`
+                : `${(result.Duration).toFixed(2)}s`;
+            outputParts.push(`⏱️ **Duration:** ${durationText}`);
+        }
+        
+        // Add message if available and not empty
+        if (result.Message && result.Message.trim()) {
+            outputParts.push(`**Message:** ${result.Message}`);
         }
         
         // Add processed stack trace with clickable links if available and not empty
@@ -483,25 +519,22 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             const projectPath = this.projectManager.getUnityProjectPath();
             const processedStackTrace = await processTestStackTraceToMarkdown(result.StackTrace, projectPath || '');
             if (processedStackTrace && processedStackTrace.trim()) {
-                outputParts.push(`**Stack Trace:**\n${processedStackTrace}\n\n`);
+                outputParts.push(`**Stack Trace:**\n${processedStackTrace}`);
             }
         }
         
         // Add test output/logs if available and not empty
         if (result.Output && result.Output.trim()) {
-            outputParts.push(`**Test Output:**\n${result.Output}\n\n`);
+            outputParts.push(`**Test Output:**\n${result.Output.trim()}`);
         }
         
         // Create TestMessage with MarkdownString if we have content
         if (outputParts.length > 0) {
-            const markdownContent = new vscode.MarkdownString();
-            for (const part of outputParts) {
-                markdownContent.appendMarkdown(part);
-            }
-
+            // Join parts with double newlines for proper markdown spacing
+            const markdownText = outputParts.join('\n\n');
+            const markdownContent = new vscode.MarkdownString(markdownText);
             markdownContent.supportHtml = false;
             markdownContent.isTrusted = true; // Allow command links
-            //console.log(`UnityTestProvider: markdownContent.value = ${markdownContent.value}`)
             messages.push(new vscode.TestMessage(markdownContent));
         }
         
@@ -529,19 +562,19 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             return;
         }
 
-        const duration = undefined; // Unity doesn't provide duration in current protocol
+        // Calculate duration from the test result (Duration is in seconds, VS Code expects milliseconds)
+        const duration = result.Duration ? result.Duration * 1000 : undefined;
         
         // Build test messages with markdown support
         const testMessages = await this.buildTestMessages(result);
 
         switch (result.TestStatus) {
             case TestStatusAdaptor.Passed: {
-                // For passing tests, use appendOutput if there are logs/output
-                if (testMessages.length > 0) {
-                    const markdownContent = testMessages[0].message;
-                    if (markdownContent instanceof vscode.MarkdownString) {
-                        this.currentTestRun.appendOutput(markdownContent.value, undefined, testItem);
-                    }
+                // For passing tests, generate plain text output directly if there's relevant information
+                const plainTextOutput = this.buildOutputForTerminal(result);
+                if (plainTextOutput) {
+                    console.log(`UnityTestProvider: plainTextOutput = ${plainTextOutput}`)
+                    this.currentTestRun.appendOutput(plainTextOutput + '\r\n', undefined, testItem);
                 }
                 this.currentTestRun.passed(testItem, duration);
                 break;
