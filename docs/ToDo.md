@@ -1,5 +1,5 @@
 - [x] 1. A dedicated Unity Console to show Unity logs
-- [ ] 2. Unity Test result should come with stack trace and associated Unity logs(the stack trace lines should be clickable)
+- [x] 2. Unity Test result should come with stack trace and associated Unity logs(the stack trace lines should be clickable)
 - [x] 3. Integrationg with Hot Reload for Unity, when Hot Reload for Unity is enabled in Unity, we should not Auto Refresh Unity, because Hot Reload for Unity will recompile and patch the code without a real compile in Unity
 - [x] 4. Test Unity Project in a path with space and Chinese characters
 - [x] 5. Add a setting and also a button(that show enable/disable state like other buttons) in Unity Console to ignore duplicate logs(don't store at all if it is enabled, because sometimes logs can come from Update and there can be hundreds of same logs in one second)(logs that have exactly the same content including stack trace)(true by default)
@@ -7,9 +7,10 @@
 - [ ] 7. Add 1 button in editor actions to enter/exit play mode according to state of Unity Editor
 - [ ] 8. Add a drop down (down arrow) beside the button metioned above that shows a boolean setting whether to start/stop Hot Reload for Unity(disabled if Hot Reload for Unity package is not installed in the project) 
 - [ ] 9. Add a status bar item right beside Unity to show the state of Hot Reload for Unity(if it is installed as a project package)
-- [ ] 10. Clicking on a test in Testing window (on the left side) goes to the compiled .dll not to the source file, fix it so that it goes to the source file
+- [x] 10. Clicking on a test in Testing window (on the left side) goes to the compiled .dll not to the source file, fix it so that it goes to the source file
 - [x] 11. Remove a file or folder should also remove it's meta file
 - [x] 12. Automatic Rename/Remove .meta file should check for Assets folder and Packages folder, or that the file is an asset
 - [x] 13. Make the log details panel down at the bottom not in the right side in Unity Console, because sometimes we have stack trace file path that can be long, better show them in one line.
 - [ ] 14. Don't run tests when Unity is in Play Mode.
 - [ ] 15. Sometimes (in rare cases) tests didn't run in Unity and we didn't detect that, resulting in test appears running for ever in VS Code.
+- [ ] 16. Now when we get tests, both edit mode and play mode will be blocked because of rate limits.
