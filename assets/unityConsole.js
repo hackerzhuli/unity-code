@@ -354,7 +354,7 @@ function updateLogVisibility() {
     const totalLogs = filteredLogs.length;
     
     // Show the most recent logs by default
-    visibleStartIndex = Math.max(0, totalLogs - VISIBLE_ITEMS);
+    visibleStartIndex = Math.max(0, totalLogs - calculateVisibleItems());
     
     scheduleRender();
 }
@@ -452,7 +452,7 @@ function renderAllLogs(targetSelectedLogId) {
  * Handles log selection logic, including auto-selection of visible logs
  * @param {string|null} targetSelectedLogId - The ID of the log to select, or null for auto-selection
  */
-function handleLogSelection(targetSelectedLogId) {
+function _handleLogSelection(targetSelectedLogId) {
     const visibleLogItems = Array.from(document.querySelectorAll('.log-item'));
     
     if (visibleLogItems.length === 0) {

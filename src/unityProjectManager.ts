@@ -128,57 +128,5 @@ export class UnityProjectManager {
         return false;
     }
 
-    /**
-     * Process Unity stack trace to make file paths clickable in VS Code
-     * Converts absolute paths to relative paths and formats as markdown links
-     * @param stackTrace The Unity stack trace string
-     * @returns The processed stack trace with clickable file links
-     */
-    public async processStackTraceToMarkdown(stackTrace: string): Promise<string> {
-        if (!this.unityProjectPath) {
-            return stackTrace;
-        }
 
-        // Regex to match Unity stack trace lines with file paths and line numbers
-        // Pattern: at ClassName.Method () [0x00001] in FilePath:LineNumber
-        const stackTraceRegex = /(.*?\s+in\s+)([^:]+):(\d+)/g;
-        
-        let processedStackTrace = stackTrace;
-        let match;
-        
-        while ((match = stackTraceRegex.exec(stackTrace)) !== null) {
-            const [fullMatch, prefix, filePath, lineNumber] = match;
-            
-            try {
-                let processedPath = filePath;
-                
-                // Convert absolute path to relative if it's within the project
-                if (path.isAbsolute(filePath)) {
-                    const normalizedFilePath = await normalizePath(filePath);
-                    const normalizedProjectPath = await normalizePath(this.unityProjectPath);
-                    
-                    if (normalizedFilePath.startsWith(normalizedProjectPath)) {
-                        processedPath = path.relative(normalizedProjectPath, normalizedFilePath);
-                        // Ensure forward slashes for consistency
-                        processedPath = processedPath.replace(/\\/g, '/');
-                    }
-                }
-                
-                // Create VS Code markdown link format: [text](vscode://file/absolute/path:line)
-                const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(this.unityProjectPath, filePath);
-                const normalizedAbsolutePath = await normalizePath(absolutePath);
-                const markdownLink = `[${processedPath}:${lineNumber}](vscode://file/${normalizedAbsolutePath.replace(/\\/g, '/')}:${lineNumber})`;
-                
-                // Replace the file path part with the markdown link
-                const replacement = `${prefix}${markdownLink}`;
-                processedStackTrace = processedStackTrace.replace(fullMatch, replacement);
-                
-            } catch (error) {
-                // If path processing fails, keep the original
-                console.warn(`Failed to process stack trace path: ${filePath}`, error);
-            }
-        }
-        
-        return processedStackTrace;
-    }
 }

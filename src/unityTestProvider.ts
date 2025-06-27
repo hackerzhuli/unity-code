@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor } from './unityMessagingClient.js';
-import { logWithLimit } from './utils.js';
+import { logWithLimit, processTestStackTraceToMarkdown } from './utils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
 import { UnityProjectManager } from './unityProjectManager.js';
 
@@ -480,7 +480,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         
         // Add processed stack trace with clickable links if available and not empty
         if (result.StackTrace && result.StackTrace.trim()) {
-            const processedStackTrace = await this.projectManager.processStackTraceToMarkdown(result.StackTrace);
+            const projectPath = this.projectManager.getUnityProjectPath();
+            const processedStackTrace = await processTestStackTraceToMarkdown(result.StackTrace, projectPath || '');
             if (processedStackTrace && processedStackTrace.trim()) {
                 outputParts.push(`**Stack Trace:**\n${processedStackTrace}\n\n`);
             }
@@ -493,9 +494,14 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         
         // Create TestMessage with MarkdownString if we have content
         if (outputParts.length > 0) {
-            const markdownContent = new vscode.MarkdownString(outputParts.join(''));
+            const markdownContent = new vscode.MarkdownString();
+            for (const part of outputParts) {
+                markdownContent.appendMarkdown(part);
+            }
+
             markdownContent.supportHtml = false;
             markdownContent.isTrusted = true; // Allow command links
+            //console.log(`UnityTestProvider: markdownContent.value = ${markdownContent.value}`)
             messages.push(new vscode.TestMessage(markdownContent));
         }
         

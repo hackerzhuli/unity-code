@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
-import { isInsideDirectory, normalizePath } from '../../utils.js';
+import { isInsideDirectory, normalizePath, parseUnityTestStackTraceSourceLocation, processTestStackTraceToMarkdown } from '../../utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,6 +97,187 @@ describe('Utils Unit Tests', () => {
                 const result = await isInsideDirectory(upperCaseDir, lowerCaseFile);
                 assert.strictEqual(result, true);
             }
+        });
+    });
+    
+    describe('parseUnityTestStackTraceSourceLocation', () => {
+        
+        describe('Windows platform stack traces', () => {
+            it('should parse Windows absolute path correctly', () => {
+                const stackTrace = 'at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:32';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                const expectedStartIndex = stackTrace.indexOf(' in ') + 4; // Position after " in "
+                assert.strictEqual(result!.startIndex, expectedStartIndex);
+                assert.strictEqual(result!.endIndex, stackTrace.length);
+                assert.strictEqual(result!.filePath, 'F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs');
+                assert.strictEqual(result!.lineNumber, 32);
+            });
+            
+            it('should parse Windows path with different drive letter', () => {
+                const stackTrace = 'at MyNamespace.TestClass.TestMethod () [0x00001] in C:\\Unity\\Projects\\MyProject\\Assets\\Tests\\TestScript.cs:15';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'C:\\Unity\\Projects\\MyProject\\Assets\\Tests\\TestScript.cs');
+                assert.strictEqual(result!.lineNumber, 15);
+            });
+        });
+        
+        describe('macOS platform stack traces', () => {
+            it('should parse macOS absolute path correctly', () => {
+                const stackTrace = 'at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in /Users/user/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs:32';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                const expectedStartIndex = stackTrace.indexOf(' in ') + 4; // Position after " in "
+                assert.strictEqual(result!.startIndex, expectedStartIndex);
+                assert.strictEqual(result!.endIndex, stackTrace.length);
+                assert.strictEqual(result!.filePath, '/Users/user/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs');
+                assert.strictEqual(result!.lineNumber, 32);
+            });
+            
+            it('should parse macOS path with spaces in directory names', () => {
+                const stackTrace = 'at MyNamespace.TestClass.TestMethod () [0x00001] in /Users/john doe/Unity Projects/My Game/Assets/Scripts/GameLogic.cs:128';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, '/Users/john doe/Unity Projects/My Game/Assets/Scripts/GameLogic.cs');
+                assert.strictEqual(result!.lineNumber, 128);
+            });
+        });
+        
+        describe('Linux platform stack traces', () => {
+            it('should parse Linux absolute path correctly', () => {
+                const stackTrace = 'at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in /home/user/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs:32';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                const expectedStartIndex = stackTrace.indexOf(' in ') + 4; // Position after " in "
+                assert.strictEqual(result!.startIndex, expectedStartIndex);
+                assert.strictEqual(result!.endIndex, stackTrace.length);
+                assert.strictEqual(result!.filePath, '/home/user/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs');
+                assert.strictEqual(result!.lineNumber, 32);
+            });
+            
+            it('should parse Linux path with different user directory', () => {
+                const stackTrace = 'at TestNamespace.UninTest.ValidateLogic () [0x00001] in /home/developer/woinspace/unity-project/Assets/Tests/UnitTests.cs:99';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, '/home/developer/woinspace/unity-project/Assets/Tests/UnitTests.cs');
+                assert.strictEqual(result!.lineNumber, 99);
+            });
+        });
+        
+        describe('Different file extensions', () => {
+            it('should parse .cs files', () => {
+                const stackTrace = 'at Test.Method () [0x00001] in /path/to/Script.cs:10';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, '/path/to/Script.cs');
+                assert.strictEqual(result!.lineNumber, 10);
+            });
+            
+            it('should parse .js files', () => {
+                const stackTrace = 'at Test.Method () [0x00001] in /path/to/script.js:25';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, '/path/to/script.js');
+                assert.strictEqual(result!.lineNumber, 25);
+            });
+            
+            it('should parse .cpp files', () => {
+                const stackTrace = 'at Native.Function () [0x00001] in /path/to/native.cpp:150';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, '/path/to/native.cpp');
+                assert.strictEqual(result!.lineNumber, 150);
+            });
+        });
+        
+        describe('Edge cases and invalid inputs', () => {
+            it('should return null for stack trace without " in " keyword', () => {
+                const stackTrace = 'at Something.Method () [0x00001] at SomeLocation:32';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.strictEqual(result, null);
+            });
+            
+            it('should return null for stack trace without line number', () => {
+                const stackTrace = 'at Something.Method () [0x00001] in /path/to/file.cs';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.strictEqual(result, null);
+            });
+            
+            it('should return null for stack trace with invalid file extension', () => {
+                const stackTrace = 'at Something.Method () [0x00001] in /path/to/file.txt:32';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.strictEqual(result, null);
+            });
+            
+            it('should return null for empty string', () => {
+                const result = parseUnityTestStackTraceSourceLocation('');
+                assert.strictEqual(result, null);
+            });
+            
+            it('should return null for stack trace with invalid line number format', () => {
+                const stackTrace = 'at Something.Method () [0x00001] in /path/to/file.cs:abc';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.strictEqual(result, null);
+            });
+            
+            it('should handle multiple colons in file path correctly', () => {
+                const stackTrace = 'at Something.Method () [0x00001] in C:\\path:with:colons\\file.cs:42';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'C:\\path:with:colons\\file.cs');
+                assert.strictEqual(result!.lineNumber, 42);
+            });
+            
+            it('should handle very large line numbers', () => {
+                const stackTrace = 'at Something.Method () [0x00001] in /path/to/file.cs:999999';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.lineNumber, 999999);
+            });
+        });
+        
+        describe('Real-world examples from documentation', () => {
+            it('should parse the first example from UnityTestExplorer.md', () => {
+                const stackTrace = 'at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:32';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs');
+                assert.strictEqual(result!.lineNumber, 32);
+                
+                // Verify that the extracted substring matches expected source location
+                const extractedSourceLocation = stackTrace.substring(result!.startIndex, result!.endIndex);
+                assert.strictEqual(extractedSourceLocation, 'F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:32');
+            });
+            
+            it('should parse the second example from UnityTestExplorer.md', () => {
+                const stackTrace = 'at Something.Yall.hallo.Huma.YallTest.Test2 () [0x00001] in F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:27';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs');
+                assert.strictEqual(result!.lineNumber, 27);
+                
+                // Verify that the extracted substring matches expected source location
+                const extractedSourceLocation = stackTrace.substring(result!.startIndex, result!.endIndex);
+                assert.strictEqual(extractedSourceLocation, 'F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:27');
+            });
         });
     });
     
@@ -263,6 +444,39 @@ describe('Utils Unit Tests', () => {
                     `Path variation ${i} (${variations[i]}) normalized to ${normalizedPaths[i]} instead of ${firstNormalized}`
                 );
             }
+        });
+    });
+    
+    describe('processTestStackTraceToMarkdown', () => {
+        const projectPath = 'F:\\projects\\unity\\TestUnityCode';
+        
+        describe('Windows platform stack traces', () => {
+            it('should convert absolute paths to relative and create clickable links', async () => {
+                const stackTrace = 'at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:32';
+                const result = await processTestStackTraceToMarkdown(stackTrace, projectPath);
+                
+                assert.ok(result.includes('[Assets/Scripts/Editor/YallTest.cs:32]'));
+                assert.ok(result.includes('(file:///F:/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs#32)'));
+            });
+            
+            it('should handle multiple stack trace lines', async () => {
+                const stackTrace = `at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:32
+at Something.Yall.hallo.Huma.YallTest.Test2 () [0x00001] in F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:27`;
+                const result = await processTestStackTraceToMarkdown(stackTrace, projectPath);
+                
+                assert.ok(result.includes('[Assets/Scripts/Editor/YallTest.cs:32]'));
+                assert.ok(result.includes('[Assets/Scripts/Editor/YallTest.cs:27]'));
+                assert.ok(result.includes('(file:///F:/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs#32)'));
+                assert.ok(result.includes('(file:///F:/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs#27)'));
+            });
+            
+            it('should create clickable links with absolute paths when no project path provided', async () => {
+                const stackTrace = 'at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in F:\\projects\\unity\\TestUnityCode\\Assets\\Scripts\\Editor\\YallTest.cs:32';
+                const result = await processTestStackTraceToMarkdown(stackTrace, '');
+                
+                assert.ok(result.includes('[YallTest.cs:32]'));
+                assert.ok(result.includes('(file:///F:/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs#32)'));
+            });
         });
     });
     

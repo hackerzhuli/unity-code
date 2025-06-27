@@ -508,7 +508,7 @@ export class UnityMessagingClient {
         // Skip logging for ping/pong and log messages to reduce console noise
         if (message.type !== MessageType.Ping && message.type !== MessageType.Pong && 
             message.type !== MessageType.Info && message.type !== MessageType.Warning && message.type !== MessageType.Error) {
-            logWithLimit(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
+            //logWithLimit(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
         }
         
         // Handle Unity online/offline state changes
