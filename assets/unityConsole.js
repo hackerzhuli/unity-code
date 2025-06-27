@@ -478,7 +478,6 @@ function _handleLogSelection(targetSelectedLogId) {
 /**
  * Toggles the ignore duplicates setting
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function toggleIgnoreDuplicates() {
     ignoreDuplicateLogs = !ignoreDuplicateLogs;
     updateIgnoreDuplicatesButton();

@@ -642,10 +642,12 @@ export class UnityMessagingClient {
 
     /**
      * Send message to Unity with rate limiting
+     * @returns true if message was sent or queued successfully, false if it was rejected/discarded
      */
-    async sendMessage(type: MessageType, value: string): Promise<void> {
+    async sendMessage(type: MessageType, value: string): Promise<boolean> {
         if (!this.socket || !this.isConnected) {
             console.error('Not connected to Unity');
+            return false;
         }
 
         // Check rate limit for this message type
@@ -655,6 +657,7 @@ export class UnityMessagingClient {
             const timeSinceLastSend = Date.now() - lastSendTime;
             console.error(`UnityMessagingClient: Rate limit exceeded for message type ${type} (${MessageType[type]}). ` +
                        `Minimum interval: ${rateLimitMs}ms, Time since last send: ${timeSinceLastSend}ms. Message discarded.`);
+            return false;
         }
 
         // Update last send time for rate limiting
@@ -665,12 +668,22 @@ export class UnityMessagingClient {
         
         if (!this.isUnityOnline && !isHeartbeatMessage) {
             console.log(`UnityMessagingClient: Unity is offline, queuing message - Type: ${type} (${MessageType[type]}), Value: "${value}"`);
-            return new Promise((resolve, reject) => {
-                this.messageQueue.push({ type, value, resolve, reject });
+            return new Promise((resolve, _reject) => {
+                this.messageQueue.push({ 
+                    type, 
+                    value, 
+                    resolve: () => resolve(true), 
+                    reject: () => resolve(false) 
+                });
             });
         }
         
-        return this.sendMessageInternal(type, value);
+        try {
+            await this.sendMessageInternal(type, value);
+            return true;
+        } catch (_error) {
+            return false;
+        }
     }
 
     /**
@@ -678,7 +691,9 @@ export class UnityMessagingClient {
      */
     private async sendMessageInternal(type: MessageType, value: string): Promise<void> {
         if (!this.socket || !this.isConnected) {
-            console.error('Not connected to Unity');
+            const errorMsg = 'Not connected to Unity';
+            console.error(errorMsg);
+            throw new Error(errorMsg);
         }
 
         const buffer = this.serializeMessage({ type, value });
@@ -691,6 +706,7 @@ export class UnityMessagingClient {
         if (buffer.length >= this.UDP_BUFFER_SIZE) {
             const errorMsg = `Message too large for UDP (discarded) (${buffer.length} >= ${this.UDP_BUFFER_SIZE}), discarding message - Type: ${type} (${MessageType[type]}), Value: "${value}"`;
             console.error(`UnityMessagingClient: ${errorMsg}`);
+            throw new Error(errorMsg);
         }
 
         return new Promise((resolve, reject) => {
@@ -753,25 +769,28 @@ export class UnityMessagingClient {
 
     /**
      * Request test list from Unity
+     * @returns true if request was sent or queued successfully, false otherwise
      */
-    async requestTestList(testMode: 'EditMode' | 'PlayMode'): Promise<void> {
-        await this.sendMessage(MessageType.RetrieveTestList, testMode);
+    async requestTestList(testMode: 'EditMode' | 'PlayMode'): Promise<boolean> {
+        return await this.sendMessage(MessageType.RetrieveTestList, testMode);
     }
 
     /**
      * Execute tests in Unity
+     * @returns true if request was sent or queued successfully, false otherwise
      */
-    async executeTests(testMode: 'EditMode' | 'PlayMode', testName: string): Promise<void> {
-        await this.sendMessage(MessageType.ExecuteTests, `${testMode}:${testName}`);
+    async executeTests(testMode: 'EditMode' | 'PlayMode', testName: string): Promise<boolean> {
+        return await this.sendMessage(MessageType.ExecuteTests, `${testMode}:${testName}`);
     }
 
     /**
      * Refresh Unity's asset database to trigger recompilation( automatically disable this if Hot Reload is enabled)
+     * @returns true if refresh was sent or queued successfully, false otherwise
      */
-    async refreshAssetDatabase(): Promise<void> {
+    async refreshAssetDatabase(): Promise<boolean> {
         if(!this.isConnected){
             console.log('UnityMessagingClient: Not connected to Unity, cannot refresh asset database');
-            return;
+            return false;
         }
 
         console.log(`UnityMessagingClient: Sending Refresh message (type ${MessageType.Refresh}) to Unity on port ${this.unityPort}`);
@@ -783,13 +802,20 @@ export class UnityMessagingClient {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             if (!this.unityDetector.isHotReloadEnabled) {
-                await this.sendMessage(MessageType.Refresh, '');
-                console.log('UnityMessagingClient: Refresh asset database message sent successfully');
+                const success = await this.sendMessage(MessageType.Refresh, '');
+                if (success) {
+                    console.log('UnityMessagingClient: Refresh asset database message sent successfully');
+                } else {
+                    console.log('UnityMessagingClient: Failed to send refresh asset database message');
+                }
+                return success;
             }else{
                 console.log('UnityMessagingClient: Refresh asset database message not sent because Hot Reload is enabled');
+                return true; // Not sending due to Hot Reload is considered successful
             }
         } catch (error) {
             console.error('UnityMessagingClient: Failed to send refresh message:', error);
+            return false;
         }
     }
 

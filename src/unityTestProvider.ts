@@ -734,7 +734,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     ): Promise<void> {
         // Group tests by class and method
         const testsByClass = new Map<string, TestAdaptor[]>();
-        const processedSymbols = new Set<string>();
+        const _processedSymbols = new Set<string>();
         
         // First, group all tests by their containing class
         for (const test of this.allTests) {
