@@ -11,7 +11,7 @@ The protocol uses UDP as the primary transport with automatic fallback to TCP fo
 ## Network Configuration
 
 ### Port Calculation
-- **Messaging Port**: `56002 + (ProcessId % 1000)`
+- **Messaging Port**: `58000 + (ProcessId % 1000)`
 - **Protocol**: UDP (primary), TCP (fallback for large messages)
 - **Address**: Binds to `IPAddress.Any` (0.0.0.0)
 
@@ -65,7 +65,7 @@ All available message types in the Unity Visual Studio integration:
 | `ProjectPath` | 16 | Request/response for Unity project path | Empty string (request) / Full project path (response) |
 | `Tcp` | 17 | Internal message for TCP fallback coordination | `"<port>:<length>"` format |
 | `RunStarted` | 18 | Test run started | - |
-| `RunFinished` | 19 | Test run finished | - |
+| `RunFinished` | 19 | Test run finished | JSON serialized TestResultAdaptorContainer (single result, no children) |
 | `TestStarted` | 20 | Notification that a test has started | Check specific section below for details |
 | `TestFinished` | 21 | Notification that a test has finished | Check specific section below for details |
 | `TestListRetrieved` | 22 | Notification that test list has been retrieved | Check specific section below for details |
@@ -135,27 +135,103 @@ Detailed value formats for some of the types:
 
 #### TestFinished (Value: 21)
 - **Format**: JSON serialized TestResultAdaptorContainer
+- **Important**: Each message contains exactly one test result. The `TestResultAdaptors` array always contains a single element with no children data. This is an optimization to avoid sending redundant data.
 - **C# Structure**:
 ```csharp
     [Serializable]
     internal class TestResultAdaptorContainer
     {
-        public TestResultAdaptor[] TestResultAdaptors;
+        public TestResultAdaptor[] TestResultAdaptors; // Always contains exactly one element
     }
   
     [Serializable]
     internal class TestResultAdaptor
     {
-        public string Name;
-        public string FullName;
-        public int PassCount;
-        public int FailCount;
-        public int InconclusiveCount;
-        public int SkipCount;
-        public string ResultState; // Empty string in current implementation
-        public string StackTrace;
-        public TestStatusAdaptor TestStatus;
-        public int Parent;         // Index of parent in TestResultAdaptors array, -1 for root
+      /// <summary>
+      /// The name of the test node.
+      /// </summary>
+      public string Name;
+      
+      /// <summary>
+      /// Gets the full name of the test result.
+      /// </summary>
+      public string FullName;
+
+      /// <summary>
+      /// The number of test cases that passed when running the test and all its children.
+      /// </summary>
+      public int PassCount;
+      
+      /// <summary>
+      /// The number of test cases that failed when running the test and all its children.
+      /// </summary>
+      public int FailCount;
+      
+      /// <summary>
+      /// The number of test cases that were inconclusive when running the test and all its children.
+      /// </summary>
+      public int InconclusiveCount;
+      
+      /// <summary>
+      /// The number of test cases that were skipped when running the test and all its children.
+      /// </summary>
+      public int SkipCount;
+
+      /// <summary>
+      /// Gets the state of the result as a string.
+      /// Returns one of these values: Inconclusive, Skipped, Skipped:Ignored, Skipped:Explicit, Passed, Failed, Failed:Error, Failed:Cancelled, Failed:Invalid.
+      /// </summary>
+      public string ResultState;
+      
+      /// <summary>
+      /// Any stacktrace associated with an error or failure, empty if the test passed (only avaiable for leaf tests)
+      /// </summary>
+      public string StackTrace;
+
+      /// <summary>
+      /// The test status as a simplified enum value.
+      /// </summary>
+      public TestStatusAdaptor TestStatus;
+
+      /// <summary>
+      /// The number of asserts executed when running the test and all its children.
+      /// </summary>
+      public int AssertCount;
+      
+      /// <summary>
+      /// Gets the elapsed time for running the test in seconds.
+      /// </summary>
+      public double Duration;
+      
+      /// <summary>
+      /// Gets the time the test started running as Unix timestamp (milliseconds since epoch).
+      /// </summary>
+      public long StartTime;
+      
+      /// <summary>
+      /// Gets the time the test finished running as Unix timestamp (milliseconds since epoch).
+      /// </summary>
+      public long EndTime;
+      
+      /// <summary>
+      /// The error message associated with a test failure or with not running the test, empty if the test (and its children) passed
+      /// </summary>
+      public string Message;
+      
+      /// <summary>
+      /// Gets all logs during the test(only available for leaf tests)(no stack trace for logs is available)
+      /// </summary>
+      public string Output;
+      
+      /// <summary>
+      /// True if this result has any child results.
+      /// </summary>
+      public bool HasChildren;
+
+      /// <summary>
+      /// Index of parent in TestResultAdaptors array, -1 for root.
+      /// </summary>
+      public int Parent;
     }
   
     [Serializable]
@@ -167,7 +243,7 @@ Detailed value formats for some of the types:
         Failed,        // 3
     }
 ```
-- **Description**: Sent when a test finishes execution, contains test results and status
+- **Description**: Sent when a test finishes execution. Each message contains exactly one test result without any children data, ensuring efficient and non-redundant messaging.
 
 #### TestListRetrieved (Value: 22)
 - **Format**: `TestMode:JsonData`

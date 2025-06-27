@@ -74,6 +74,13 @@ export interface TestResultAdaptor {
     ResultState: string;
     StackTrace: string;
     TestStatus: TestStatusAdaptor;
+    AssertCount: number;
+    Duration: number;
+    StartTime: number;
+    EndTime: number;
+    Message: string;
+    Output: string;
+    HasChildren: boolean;
     Parent: number;
 }
 

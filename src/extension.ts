@@ -524,7 +524,7 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     globalUnityMessagingClient = new UnityMessagingClient(globalUnityDetector);
 
     // Initialize test provider for Unity projects
-    globalTestProvider = new UnityTestProvider(context, globalUnityMessagingClient);
+    globalTestProvider = new UnityTestProvider(context, globalUnityMessagingClient, globalUnityProjectManager!);
     
     // Initialize package helper for Unity projects
     const packageHelper = new UnityPackageHelper(unityProjectPath);

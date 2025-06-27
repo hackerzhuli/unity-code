@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor } from './unityMessagingClient.js';
 import { logWithLimit } from './utils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
+import { UnityProjectManager } from './unityProjectManager.js';
 
 /**
  * Unity Test Provider for VS Code Testing API
@@ -10,6 +11,7 @@ import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './la
 export class UnityTestProvider implements vscode.CodeLensProvider {
     private testController: vscode.TestController;
     public messagingClient: UnityMessagingClient; // Made public for auto-refresh access
+    private projectManager: UnityProjectManager;
     private testData = new WeakMap<vscode.TestItem, { id: string; fullName: string; testMode: 'EditMode' | 'PlayMode' }>();
     private runProfile: vscode.TestRunProfile;
     private debugProfile: vscode.TestRunProfile;
@@ -24,10 +26,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
     public readonly onDidChangeCodeLenses = this.onDidChangeCodeLensesEmitter.event;
 
-    constructor(context: vscode.ExtensionContext, messagingClient: UnityMessagingClient) {
+    constructor(context: vscode.ExtensionContext, messagingClient: UnityMessagingClient, projectManager: UnityProjectManager) {
         this.testController = vscode.tests.createTestController('unityTests', 'Unity Tests');
         
         this.messagingClient = messagingClient;
+        this.projectManager = projectManager;
         
         // Register test controller
         context.subscriptions.push(this.testController);
@@ -84,8 +87,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             this.handleTestStarted(message.value);
         });
 
-        this.messagingClient.onMessage(MessageType.TestFinished, (message) => {
-            this.handleTestFinished(message.value);
+        this.messagingClient.onMessage(MessageType.TestFinished, async (message) => {
+            await this.handleTestFinished(message.value);
         });
 
         this.messagingClient.onMessage(MessageType.RunStarted, () => {
@@ -443,12 +446,12 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     /**
      * Handle test finished message from Unity
      */
-    private handleTestFinished(value: string): void {
+    private async handleTestFinished(value: string): Promise<void> {
         try {
             const resultContainer: TestResultAdaptorContainer = JSON.parse(value);
             
             for (const result of resultContainer.TestResultAdaptors) {
-                this.updateTestResult(result);
+                await this.updateTestResult(result);
             }
             
         } catch (error) {
@@ -457,9 +460,52 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     }
 
     /**
+     * Build TestMessage array with markdown support for test results
+     */
+    private async buildTestMessages(result: TestResultAdaptor): Promise<vscode.TestMessage[]> {
+        const messages: vscode.TestMessage[] = [];
+        const outputParts: string[] = [];
+        
+        // Add status-specific header for failed/inconclusive tests
+        if (result.TestStatus === TestStatusAdaptor.Failed) {
+            outputParts.push('❌ **Test Failed**\n\n');
+        } else if (result.TestStatus === TestStatusAdaptor.Inconclusive) {
+            outputParts.push('⚠️ **Test Inconclusive**\n\n');
+        }
+        
+        // Add message if available and not empty
+        if (result.Message && result.Message.trim()) {
+            outputParts.push(`**Message:** ${result.Message}\n\n`);
+        }
+        
+        // Add processed stack trace with clickable links if available and not empty
+        if (result.StackTrace && result.StackTrace.trim()) {
+            const processedStackTrace = await this.projectManager.processStackTraceToMarkdown(result.StackTrace);
+            if (processedStackTrace && processedStackTrace.trim()) {
+                outputParts.push(`**Stack Trace:**\n${processedStackTrace}\n\n`);
+            }
+        }
+        
+        // Add test output/logs if available and not empty
+        if (result.Output && result.Output.trim()) {
+            outputParts.push(`**Test Output:**\n${result.Output}\n\n`);
+        }
+        
+        // Create TestMessage with MarkdownString if we have content
+        if (outputParts.length > 0) {
+            const markdownContent = new vscode.MarkdownString(outputParts.join(''));
+            markdownContent.supportHtml = false;
+            markdownContent.isTrusted = true; // Allow command links
+            messages.push(new vscode.TestMessage(markdownContent));
+        }
+        
+        return messages;
+    }
+
+    /**
      * Update test result in VS Code
      */
-    private updateTestResult(result: TestResultAdaptor): void {
+    private async updateTestResult(result: TestResultAdaptor): Promise<void> {
         // Store test result for code lens
         this.testResults.set(result.FullName, result.TestStatus);
         
@@ -479,14 +525,28 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
 
         const duration = undefined; // Unity doesn't provide duration in current protocol
         
+        // Build test messages with markdown support
+        const testMessages = await this.buildTestMessages(result);
+
         switch (result.TestStatus) {
             case TestStatusAdaptor.Passed: {
+                // For passing tests, use appendOutput if there are logs/output
+                if (testMessages.length > 0) {
+                    const markdownContent = testMessages[0].message;
+                    if (markdownContent instanceof vscode.MarkdownString) {
+                        this.currentTestRun.appendOutput(markdownContent.value, undefined, testItem);
+                    }
+                }
                 this.currentTestRun.passed(testItem, duration);
                 break;
             }
             case TestStatusAdaptor.Failed: {
-                const message = new vscode.TestMessage(result.StackTrace || 'Test failed');
-                this.currentTestRun.failed(testItem, message, duration);
+                // Use TestMessage array for failed tests
+                if (testMessages.length > 0) {
+                    this.currentTestRun.failed(testItem, testMessages, duration);
+                } else {
+                    this.currentTestRun.failed(testItem, new vscode.TestMessage(''), duration);
+                }
                 break;
             }
             case TestStatusAdaptor.Skipped: {
@@ -494,8 +554,12 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 break;
             }
             case TestStatusAdaptor.Inconclusive: {
-                const inconclusiveMessage = new vscode.TestMessage('Test result was inconclusive');
-                this.currentTestRun.failed(testItem, inconclusiveMessage, duration);
+                // Use TestMessage array for inconclusive tests
+                if (testMessages.length > 0) {
+                    this.currentTestRun.failed(testItem, testMessages, duration);
+                } else {
+                    this.currentTestRun.failed(testItem, new vscode.TestMessage(''), duration);
+                }
                 break;
             }
         }
