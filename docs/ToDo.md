@@ -4,5 +4,9 @@
 - [x] 4. Test Unity Project in a path with space and Chinese characters
 - [ ] 5. Add a setting and also a button(that show enable/disable state like other buttons) in Unity Console to ignore duplicate logs(logs that have exactly the same content including stack trace)
 - [x] 6. Add a debug feature to attach to Unity Editor
-- [ ] 7. Add 1 button in status bar to enter/exit play mode according to state of Unity Editor
-- [ ] 8. Add 1 button in status bar to start/stop Hot Reload for Unity according to it's state.
+- [ ] 7. Add 1 button in editor actions to enter/exit play mode according to state of Unity Editor
+- [ ] 8. Add a drop down (arrow down) beside the play/exit button in editor actions that shows a boolean setting whether to start/stop Hot Reload for Unity 
+- [ ] 9. Add a status bar item right beside Unity to show the state of Hot Reload for Unity(if it is installed as a package)
+- [ ] 10. Clicking on a test in Testing window (on the left side) goes to the compiled .dll not to the source file, fix it so that it goes to the source file
+- [ ] 11. Remove a file or folder should also remove it's meta file
+- [ ] 12. Automatic Rename/Remove .meta file should check for Assets folder and Packages folder, or that the file is an asset 
