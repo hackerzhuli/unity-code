@@ -498,8 +498,9 @@ export class UnityMessagingClient {
      * Handle incoming message
      */
     private handleMessage(message: UnityMessage): void {
-        // Skip logging for ping/pong messages to reduce console noise
-        if (message.type !== MessageType.Ping && message.type !== MessageType.Pong) {
+        // Skip logging for ping/pong and log messages to reduce console noise
+        if (message.type !== MessageType.Ping && message.type !== MessageType.Pong && 
+            message.type !== MessageType.Info && message.type !== MessageType.Warning && message.type !== MessageType.Error) {
             logWithLimit(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
         }
         

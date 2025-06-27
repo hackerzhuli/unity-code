@@ -35,6 +35,15 @@ export default [
     }
   },
   {
+    files: ["assets/**/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        acquireVsCodeApi: "readonly"
+      }
+    }
+  },
+  {
     rules: {
       // --- THE CORE FIXES FOR UNUSED VARS ---
 

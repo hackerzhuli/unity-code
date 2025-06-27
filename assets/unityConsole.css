@@ -66,8 +66,35 @@ body {
     opacity: 0.7;
 }
 
+.ignore-duplicates-button {
+    padding: 4px 8px;
+    border: 1px solid var(--vscode-button-border);
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.ignore-duplicates-button.active {
+    background-color: var(--vscode-button-hoverBackground);
+    border-color: var(--vscode-focusBorder);
+}
+
+.ignore-duplicates-button:not(.active) {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    opacity: 0.6;
+}
+
+.ignore-duplicates-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+    opacity: 1;
+}
+
 .clear-button {
-    margin-left: auto;
+    margin-left: 8px;
     padding: 4px 8px;
     border: 1px solid var(--vscode-button-border);
     background-color: var(--vscode-button-background);
@@ -84,6 +111,7 @@ body {
 .content {
     flex: 1;
     display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
@@ -151,8 +179,8 @@ body {
 }
 
 .details-panel {
-    width: 40%;
-    border-left: 1px solid var(--vscode-panel-border);
+    height: 30%;
+    border-top: 1px solid var(--vscode-panel-border);
     background-color: var(--vscode-editor-background);
     overflow-y: auto;
     padding: 8px;
@@ -181,4 +209,10 @@ body {
     height: 100%;
     color: var(--vscode-descriptionForeground);
     font-style: italic;
+}
+
+.virtual-spacer {
+    width: 100%;
+    pointer-events: none;
+    flex-shrink: 0;
 }

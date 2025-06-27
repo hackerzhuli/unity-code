@@ -304,20 +304,16 @@ function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
     // Handle Info messages
     globalUnityMessagingClient.onInfoMessage.subscribe((message) => {
         globalUnityConsoleManager?.addLog('info', message);
-        // Also log to Debug Console for developers
-        console.log(`[Unity Info] ${message}`);
     });
 
     // Handle Warning messages
     globalUnityMessagingClient.onWarningMessage.subscribe((message) => {
         globalUnityConsoleManager?.addLog('warning', message);
-        console.warn(`[Unity Warning] ${message}`);
     });
 
     // Handle Error messages
     globalUnityMessagingClient.onErrorMessage.subscribe((message) => {
         globalUnityConsoleManager?.addLog('error', message);
-        console.error(`[Unity Error] ${message}`);
     });
 }
 

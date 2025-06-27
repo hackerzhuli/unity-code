@@ -20,6 +20,11 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
     private _selectedLogId: string | null = null;
     private _unityProjectManager: UnityProjectManager | null;
     private extensionPath: string;
+    private _ignoreDuplicateLogs: boolean = true; // Default to true as specified
+    private _updateTimer: NodeJS.Timeout | null = null;
+    private _pendingUpdate = false;
+    private static readonly UPDATE_INTERVAL_MS = 200;
+    private static readonly MAX_LOGS = 500;
     
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -67,7 +72,13 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
                         break;
                     case 'webviewReady':
                         // Webview is ready to receive logs (e.g., after being hidden and shown again)
+                        // Use immediate update for better responsiveness when webview is ready
                         this._updateWebview();
+                        break;
+                    case 'toggleIgnoreDuplicates':
+                        this._ignoreDuplicateLogs = message.enabled;
+                        // Save setting to VS Code configuration
+                        vscode.workspace.getConfiguration('unity-code').update('ignoreDuplicateLogs', this._ignoreDuplicateLogs, vscode.ConfigurationTarget.Global);
                         break;
                 }
             },
@@ -78,9 +89,13 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
         webviewView.onDidChangeVisibility(() => {
             if (webviewView.visible) {
                 // Re-send logs when the view becomes visible again
+                // Use immediate update for better responsiveness when the view becomes visible
                 this._updateWebview();
             }
         });
+        
+        // Load ignore duplicates setting from VS Code configuration
+        this._ignoreDuplicateLogs = vscode.workspace.getConfiguration('unity-code').get('ignoreDuplicateLogs', true);
         
         // Send initial data
         this._updateWebview();
@@ -95,20 +110,58 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
             stackTrace: stackTrace || ''
         };
         
-        this._logs.push(logEntry);
-        
-        // Keep only the last 1000 logs to prevent memory issues
-        if (this._logs.length > 1000) {
-            this._logs = this._logs.slice(-1000);
+        // Check for duplicates if ignore duplicates is enabled
+        if (this._ignoreDuplicateLogs) {
+            const isDuplicate = this._logs.some(existingLog => 
+                existingLog.message === logEntry.message && 
+                existingLog.stackTrace === logEntry.stackTrace &&
+                existingLog.type === logEntry.type
+            );
+            
+            if (isDuplicate) {
+                return; // Don't store duplicate log
+            }
         }
         
-        this._updateWebview();
+        this._logs.push(logEntry);
+        
+        // Keep only the last 100 logs to prevent performance issues
+        if (this._logs.length > UnityConsoleProvider.MAX_LOGS) {
+            this._logs = this._logs.slice(-UnityConsoleProvider.MAX_LOGS);
+        }
+        
+        this._scheduleWebviewUpdate();
     }
     
     public clearLogs(): void {
         this._logs = [];
         this._selectedLogId = null;
+        
+        // Cancel any pending updates and update immediately for clear operation
+        if (this._updateTimer) {
+            clearTimeout(this._updateTimer);
+            this._updateTimer = null;
+        }
+        this._pendingUpdate = false;
         this._updateWebview();
+    }
+    
+    private _scheduleWebviewUpdate(): void {
+        if (this._pendingUpdate) {
+            return; // Update already scheduled
+        }
+        
+        this._pendingUpdate = true;
+        
+        if (this._updateTimer) {
+            clearTimeout(this._updateTimer);
+        }
+        
+        this._updateTimer = setTimeout(() => {
+            this._updateWebview();
+            this._pendingUpdate = false;
+            this._updateTimer = null;
+        }, UnityConsoleProvider.UPDATE_INTERVAL_MS);
     }
     
     private _updateWebview(): void {
@@ -116,7 +169,8 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 command: 'updateLogs',
                 logs: this._logs,
-                selectedLogId: this._selectedLogId
+                selectedLogId: this._selectedLogId,
+                ignoreDuplicateLogs: this._ignoreDuplicateLogs
             });
         }
     }

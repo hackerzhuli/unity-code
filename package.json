@@ -132,6 +132,11 @@
           "type": "boolean",
           "default": true,
           "description": "Only debug project assemblies, excluding Unity engine and third-party libraries"
+        },
+        "unity-code.ignoreDuplicateLogs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ignore duplicate logs in Unity Console (logs with exactly the same content including stack trace)"
         }
       },
       "testing": {

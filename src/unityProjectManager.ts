@@ -117,7 +117,7 @@ export class UnityProjectManager {
         }
 
         if (this.unityProjectPath) {
-            var r = await isInDirectory(this.unityProjectPath + '/Assets', path);
+            const r = await isInDirectory(this.unityProjectPath + '/Assets', path);
             if (r) {
                 return true;
             }

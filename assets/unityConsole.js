@@ -2,10 +2,15 @@ const vscode = acquireVsCodeApi();
 let logs = [];
 let activeFilters = new Set(['info', 'warning', 'error']);
 let selectedLogId = null;
+let ignoreDuplicateLogs = true; // Default to true
 
-console.log("UnityConsoleWebView: JavaScript initialized");
-console.log("UnityConsoleWebView: Initial logs array:", logs);
-console.log("UnityConsoleWebView: Initial activeFilters:", activeFilters);
+// Virtual scrolling variables
+let visibleStartIndex = 0;
+let visibleEndIndex = 0;
+const ESTIMATED_ITEM_HEIGHT = 28; // Approximate height of each log item in pixels
+const BUFFER_ITEMS = 6; // Extra items to render for smooth scrolling
+let renderTimeout = null;
+const RENDER_DEBOUNCE_MS = 16; // ~60 FPS
 
 /**
  * Gets the appropriate icon for a log type
@@ -40,6 +45,7 @@ function formatTime(date) {
  * @param {string} text - The text to escape
  * @returns {string} HTML-escaped text
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -65,12 +71,10 @@ function getFirstLine(text) {
  * @returns {HTMLElement} The created log element
  */
 function createLogElement(log) {
-    console.log("UnityConsoleWebView: createLogElement called with:", log);
     const div = document.createElement('div');
     div.className = 'log-item';
     div.dataset.type = log.type;
     div.dataset.id = log.id;
-    console.log("UnityConsoleWebView: created div element:", div);
     
     const icon = document.createElement('div');
     icon.className = 'log-icon ' + log.type;
@@ -83,49 +87,157 @@ function createLogElement(log) {
     const time = document.createElement('div');
     time.className = 'log-time';
     time.textContent = formatTime(new Date(log.timestamp));
-    console.log("UnityConsoleWebView: formatted time:", time.textContent);
     
     div.appendChild(icon);
     div.appendChild(message);
     div.appendChild(time);
-    console.log("UnityConsoleWebView: all elements appended to div");
     
     div.addEventListener('click', () => selectLog(log.id));
-    console.log("UnityConsoleWebView: click listener added to div");
     
     return div;
 }
 
 /**
- * Adds a new log entry to the log list and updates the UI
- * @param {Object} log - The log object to add
+ * Add a new log and maintain scroll position
  */
 function addLog(log) {
-    console.log("UnityConsoleWebView: addLog called with:", log);
-    logs.push(log);
-    console.log("UnityConsoleWebView: logs array after push:", logs);
-    
     const logList = document.getElementById('logList');
-    const noLogs = document.getElementById('noLogs');
+    const wasAtBottom = logList ? (logList.scrollTop + logList.clientHeight >= logList.scrollHeight - 5) : true;
     
-    console.log("UnityConsoleWebView: logList element:", logList);
-    console.log("UnityConsoleWebView: noLogs element:", noLogs);
+    logs.push(log);
     
-    if (noLogs) {
-        noLogs.style.display = 'none';
-        console.log("UnityConsoleWebView: noLogs hidden");
+    // If user was at bottom, keep them at bottom after new log
+    if (wasAtBottom) {
+        const filteredLogs = logs.filter(l => activeFilters.has(l.type));
+        const totalLogs = filteredLogs.length;
+        const visibleItems = calculateVisibleItems();
+        visibleStartIndex = Math.max(0, totalLogs - visibleItems);
+        
+        scheduleRender();
+        
+        // Auto-scroll to bottom only if user was already at bottom
+        if (logList) {
+            setTimeout(() => {
+                logList.scrollTop = logList.scrollHeight;
+            }, 20); // Small delay to ensure rendering is complete
+        }
+    } else {
+        // User is not at bottom, just render without auto-scroll
+        scheduleRender();
+    }
+}
+
+/**
+ * Schedules a debounced render to improve performance
+ */
+function scheduleRender() {
+    if (renderTimeout) {
+        clearTimeout(renderTimeout);
     }
     
-    const logElement = createLogElement(log);
-    console.log("UnityConsoleWebView: created logElement:", logElement);
-    logList.appendChild(logElement);
-    console.log("UnityConsoleWebView: logElement appended to logList");
+    renderTimeout = setTimeout(() => {
+        renderVisibleLogs();
+        updateLogCounts();
+        renderTimeout = null;
+    }, RENDER_DEBOUNCE_MS);
+}
+
+/**
+ * Calculate the number of visible items based on container height
+ */
+function calculateVisibleItems() {
+    const logList = document.getElementById('logList');
+    if (!logList) return 15; // fallback
     
-    updateLogVisibility();
-    updateLogCounts();
+    const containerHeight = logList.clientHeight;
+    const visibleItems = Math.ceil(containerHeight / ESTIMATED_ITEM_HEIGHT) + BUFFER_ITEMS;
+    return Math.max(10, Math.min(visibleItems, 20)); // Clamp between 10-20 items
+}
+
+/**
+ * Optimized rendering function with proper virtual scrolling
+ */
+function renderVisibleLogs() {
+    const logList = document.getElementById('logList');
+    let noLogs = document.getElementById('noLogs');
     
-    // Auto-scroll to bottom
-    logList.scrollTop = logList.scrollHeight;
+    // Preserve scroll position before clearing
+    const currentScrollTop = logList.scrollTop;
+    
+    // Clear all content
+    logList.innerHTML = '';
+    
+    if (logs.length === 0) {
+        selectedLogId = null;
+        if (!noLogs) {
+            noLogs = document.createElement('div');
+            noLogs.className = 'no-logs';
+            noLogs.id = 'noLogs';
+            noLogs.textContent = 'No logs to display';
+        }
+        logList.appendChild(noLogs);
+        noLogs.style.display = 'flex';
+        return;
+    }
+    
+    // Filter logs based on active filters
+    const filteredLogs = logs.filter(log => activeFilters.has(log.type));
+    
+    if (filteredLogs.length === 0) {
+        selectedLogId = null;
+        if (!noLogs) {
+            noLogs = document.createElement('div');
+            noLogs.className = 'no-logs';
+            noLogs.id = 'noLogs';
+            noLogs.textContent = 'No logs to display';
+        }
+        logList.appendChild(noLogs);
+        noLogs.style.display = 'flex';
+        return;
+    }
+    
+    const totalLogs = filteredLogs.length;
+    const visibleItems = calculateVisibleItems();
+    
+    // Calculate visible range
+    visibleEndIndex = Math.min(visibleStartIndex + visibleItems, totalLogs);
+    
+    // Create top spacer for items before visible range
+    if (visibleStartIndex > 0) {
+        const topSpacer = document.createElement('div');
+        topSpacer.style.height = `${visibleStartIndex * ESTIMATED_ITEM_HEIGHT}px`;
+        topSpacer.className = 'virtual-spacer';
+        logList.appendChild(topSpacer);
+    }
+    
+    // Render visible logs
+    const fragment = document.createDocumentFragment();
+    for (let i = visibleStartIndex; i < visibleEndIndex; i++) {
+        const log = filteredLogs[i];
+        const logElement = createLogElement(log);
+        fragment.appendChild(logElement);
+    }
+    logList.appendChild(fragment);
+    
+    // Create bottom spacer for items after visible range
+    const remainingItems = totalLogs - visibleEndIndex;
+    if (remainingItems > 0) {
+        const bottomSpacer = document.createElement('div');
+        bottomSpacer.style.height = `${remainingItems * ESTIMATED_ITEM_HEIGHT}px`;
+        bottomSpacer.className = 'virtual-spacer';
+        logList.appendChild(bottomSpacer);
+    }
+    
+    // Handle selection
+    if (selectedLogId) {
+        const selectedElement = logList.querySelector(`[data-id="${selectedLogId}"]`);
+        if (selectedElement) {
+            selectedElement.classList.add('selected');
+        }
+    }
+    
+    // Restore scroll position to prevent jumping
+    logList.scrollTop = currentScrollTop;
 }
 
 /**
@@ -134,19 +246,21 @@ function addLog(log) {
 function clearLogs() {
     logs = [];
     selectedLogId = null;
+    visibleStartIndex = 0;
+    visibleEndIndex = 0;
     
     const logList = document.getElementById('logList');
     const noLogs = document.getElementById('noLogs');
     const detailsContent = document.getElementById('detailsContent');
     
     logList.innerHTML = '';
-    logList.appendChild(noLogs);
-    noLogs.style.display = 'flex';
+    if (noLogs) {
+        logList.appendChild(noLogs);
+        noLogs.style.display = 'flex';
+    }
     detailsContent.textContent = 'Select a log entry to view details';
     
-    // Reset log counts
     updateLogCounts();
-    
     vscode.postMessage({ type: 'clearLogs' });
 }
 
@@ -232,43 +346,17 @@ function processStackTrace(text) {
 
 /**
  * Updates the visibility of log items based on active filters
+ * Now optimized to trigger a re-render instead of manipulating individual items
  */
 function updateLogVisibility() {
-    console.log("UnityConsoleWebView: updateLogVisibility called");
-    const logItems = document.querySelectorAll('.log-item');
-    console.log("UnityConsoleWebView: found", logItems.length, "log items");
-    console.log("UnityConsoleWebView: activeFilters:", activeFilters);
+    // Reset visible range to show latest logs
+    const filteredLogs = logs.filter(log => activeFilters.has(log.type));
+    const totalLogs = filteredLogs.length;
     
-    // Store current selection before updating visibility
-    const currentSelectedId = selectedLogId;
-    console.log("UnityConsoleWebView: current selectedLogId before visibility update:", currentSelectedId);
+    // Show the most recent logs by default
+    visibleStartIndex = Math.max(0, totalLogs - VISIBLE_ITEMS);
     
-    logItems.forEach((item, index) => {
-        const type = item.dataset.type;
-        console.log("UnityConsoleWebView: processing item", index, "type:", type);
-        if (activeFilters.has(type)) {
-            item.classList.remove('hidden');
-            console.log("UnityConsoleWebView: item", index, "shown");
-        } else {
-            item.classList.add('hidden');
-            console.log("UnityConsoleWebView: item", index, "hidden");
-        }
-    });
-    
-    // Check if currently selected log is still visible
-    if (currentSelectedId) {
-        const selectedElement = document.querySelector('.log-item.selected');
-        if (selectedElement && selectedElement.classList.contains('hidden')) {
-            // Selected log is now hidden, need to select a new one
-            console.log("UnityConsoleWebView: selected log is now hidden, reselecting");
-            handleLogSelection(null); // Auto-select first visible log
-        }
-    } else {
-        // No current selection, auto-select first visible log
-        handleLogSelection(null);
-    }
-    
-    console.log("UnityConsoleWebView: updateLogVisibility completed");
+    scheduleRender();
 }
 
 /**
@@ -278,10 +366,8 @@ function updateLogVisibility() {
 function toggleFilter(type) {
     if (type === 'all') {
         if (activeFilters.size === 3) {
-            // If all are active, deactivate all
             activeFilters.clear();
         } else {
-            // If not all are active, activate all
             activeFilters = new Set(['info', 'warning', 'error']);
         }
     } else {
@@ -303,7 +389,7 @@ function updateLogCounts() {
     const counts = { info: 0, warning: 0, error: 0 };
     
     logs.forEach(log => {
-        if (counts.hasOwnProperty(log.type)) {
+        if (Object.prototype.hasOwnProperty.call(counts, log.type)) {
             counts[log.type]++;
         }
     });
@@ -337,53 +423,29 @@ function updateFilterButtons() {
  * @param {string|null} targetSelectedLogId - The ID of the log to select after rendering
  */
 function renderAllLogs(targetSelectedLogId) {
-    console.log("UnityConsoleWebView: renderAllLogs called with targetSelectedLogId:", targetSelectedLogId);
+    selectedLogId = targetSelectedLogId;
+    
+    // Reset to show latest logs only if user is at bottom
     const logList = document.getElementById('logList');
-    let noLogs = document.getElementById('noLogs');
+    const wasAtBottom = logList ? (logList.scrollTop + logList.clientHeight >= logList.scrollHeight - 5) : true;
     
-    console.log("UnityConsoleWebView: logList element:", logList);
-    console.log("UnityConsoleWebView: noLogs element:", noLogs);
-    console.log("UnityConsoleWebView: current logs array:", logs);
-    console.log("UnityConsoleWebView: logs.length:", logs.length);
+    const filteredLogs = logs.filter(log => activeFilters.has(log.type));
+    const totalLogs = filteredLogs.length;
+    const visibleItems = calculateVisibleItems();
     
-    // Clear all log items but preserve noLogs element
-    const logItems = logList.querySelectorAll('.log-item');
-    logItems.forEach(item => item.remove());
-    console.log("UnityConsoleWebView: existing log items cleared");
-    
-    if (logs.length === 0) {
-        console.log("UnityConsoleWebView: no logs, showing noLogs message");
-        selectedLogId = null;
-        if (!noLogs) {
-            noLogs = document.createElement('div');
-            noLogs.className = 'no-logs';
-            noLogs.id = 'noLogs';
-            noLogs.textContent = 'No logs to display';
-            logList.appendChild(noLogs);
-            console.log("UnityConsoleWebView: noLogs element recreated");
-        }
-        noLogs.style.display = 'flex';
-    } else {
-        console.log("UnityConsoleWebView: rendering", logs.length, "logs");
-        if (noLogs) {
-            noLogs.style.display = 'none';
-            console.log("UnityConsoleWebView: noLogs hidden");
-        }
-        logs.forEach((log, index) => {
-            console.log("UnityConsoleWebView: processing log", index, ":", log);
-            const logElement = createLogElement(log);
-            console.log("UnityConsoleWebView: created element for log", index, ":", logElement);
-            logList.appendChild(logElement);
-            console.log("UnityConsoleWebView: appended element for log", index);
-        });
-        console.log("UnityConsoleWebView: all logs rendered, calling updateLogVisibility");
-        updateLogVisibility();
-        updateLogCounts();
-        
-        // Handle log selection after rendering
-        handleLogSelection(targetSelectedLogId);
+    if (wasAtBottom) {
+        visibleStartIndex = Math.max(0, totalLogs - visibleItems);
     }
-    console.log("UnityConsoleWebView: renderAllLogs completed, final logList children count:", logList.children.length);
+    
+    renderVisibleLogs();
+    updateLogCounts();
+    
+    // Auto-scroll to bottom only if user was already at bottom
+    if (logList && totalLogs > 0 && wasAtBottom) {
+        setTimeout(() => {
+            logList.scrollTop = logList.scrollHeight;
+        }, 0);
+    }
 }
 
 /**
@@ -391,35 +453,49 @@ function renderAllLogs(targetSelectedLogId) {
  * @param {string|null} targetSelectedLogId - The ID of the log to select, or null for auto-selection
  */
 function handleLogSelection(targetSelectedLogId) {
-    console.log("UnityConsoleWebView: handleLogSelection called with:", targetSelectedLogId);
-    
-    // Get all visible log items
-    const visibleLogItems = Array.from(document.querySelectorAll('.log-item:not(.hidden)'));
-    console.log("UnityConsoleWebView: found", visibleLogItems.length, "visible log items");
+    const visibleLogItems = Array.from(document.querySelectorAll('.log-item'));
     
     if (visibleLogItems.length === 0) {
-        console.log("UnityConsoleWebView: no visible logs to select");
         selectedLogId = null;
         return;
     }
     
     let logToSelect = null;
     
-    // Try to find the previously selected log if it exists and is visible
     if (targetSelectedLogId) {
         logToSelect = visibleLogItems.find(item => item.dataset.id === targetSelectedLogId);
-        console.log("UnityConsoleWebView: searching for previous selection:", targetSelectedLogId, "found:", !!logToSelect);
     }
     
-    // If no previous selection or it's not visible, select the first visible log
     if (!logToSelect) {
         logToSelect = visibleLogItems[0];
-        console.log("UnityConsoleWebView: auto-selecting first visible log:", logToSelect?.dataset.id);
     }
     
-    // Select the log
     if (logToSelect) {
         selectLog(logToSelect.dataset.id);
+    }
+}
+
+/**
+ * Toggles the ignore duplicates setting
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function toggleIgnoreDuplicates() {
+    ignoreDuplicateLogs = !ignoreDuplicateLogs;
+    updateIgnoreDuplicatesButton();
+    
+    vscode.postMessage({
+        command: 'toggleIgnoreDuplicates',
+        enabled: ignoreDuplicateLogs
+    });
+}
+
+/**
+ * Updates the visual state of the ignore duplicates button
+ */
+function updateIgnoreDuplicatesButton() {
+    const button = document.getElementById('ignoreDuplicatesButton');
+    if (button) {
+        button.classList.toggle('active', ignoreDuplicateLogs);
     }
 }
 
@@ -427,7 +503,6 @@ function handleLogSelection(targetSelectedLogId) {
  * Sends a ready message to the VS Code extension
  */
 function sendWebviewReady() {
-    console.log("UnityConsoleWebView: sending webviewReady message");
     if (typeof vscode !== 'undefined') {
         vscode.postMessage({
             command: 'webviewReady'
@@ -442,49 +517,103 @@ document.querySelectorAll('.filter-button').forEach(button => {
     });
 });
 
+// Add event listeners for ignore duplicates and clear buttons
+document.getElementById('ignoreDuplicatesButton')?.addEventListener('click', toggleIgnoreDuplicates);
+document.getElementById('clearButton')?.addEventListener('click', clearLogs);
+
 // Message handling
 window.addEventListener('message', event => {
     const message = event.data;
-    console.log("UnityConsoleWebView: received message:", message);
     
     switch (message.command || message.type) {
         case 'addLog':
-            console.log("UnityConsoleWebView: handling addLog message");
             addLog(message.log);
             break;
         case 'clearLogs':
-            console.log("UnityConsoleWebView: handling clearLogs message");
             clearLogs();
             break;
         case 'setLogs':
-        case 'updateLogs':
-            console.log("UnityConsoleWebView: handling setLogs/updateLogs message with logs:", message.logs);
+        case 'updateLogs': {
             logs = message.logs || [];
             const receivedSelectedLogId = message.selectedLogId;
-            console.log("UnityConsoleWebView: logs array updated to:", logs);
-            console.log("UnityConsoleWebView: received selectedLogId:", receivedSelectedLogId);
+            
+            // Update ignore duplicates state if provided
+            if (typeof message.ignoreDuplicateLogs !== 'undefined') {
+                ignoreDuplicateLogs = message.ignoreDuplicateLogs;
+                updateIgnoreDuplicatesButton();
+            }
+            
             renderAllLogs(receivedSelectedLogId);
             break;
-        default:
-            console.log("UnityConsoleWebView: unknown message type:", message.command || message.type);
+        }
     }
 });
 
 // Send ready message on load
-document.addEventListener('DOMContentLoaded', sendWebviewReady);
+document.addEventListener('DOMContentLoaded', () => {
+    updateIgnoreDuplicatesButton(); // Initialize button state
+    sendWebviewReady();
+});
 
 // Also send ready message when page becomes visible (for cases where DOMContentLoaded already fired)
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-        console.log("UnityConsoleWebView: page became visible, sending webviewReady");
+        console.log("UnityConsole: page became visible, sending webviewReady");
         sendWebviewReady();
     }
 });
 
-// Send ready message immediately if DOM is already loaded
+/**
+ * Handle scroll events to update visible logs
+ */
+function handleScroll() {
+    const logList = document.getElementById('logList');
+    if (!logList) return;
+    
+    const filteredLogs = logs.filter(log => activeFilters.has(log.type));
+    if (filteredLogs.length === 0) return;
+    
+    const scrollTop = logList.scrollTop;
+    const visibleItems = calculateVisibleItems();
+    const totalLogs = filteredLogs.length;
+    
+    // Calculate the start index based on scroll position
+    const newStartIndex = Math.floor(scrollTop / ESTIMATED_ITEM_HEIGHT);
+    visibleStartIndex = Math.max(0, Math.min(newStartIndex, totalLogs - visibleItems));
+    
+    // Only re-render if the visible range has changed significantly
+    const currentEndIndex = Math.min(visibleStartIndex + visibleItems, totalLogs);
+    if (Math.abs(currentEndIndex - visibleEndIndex) > 2) {
+        scheduleRender();
+    }
+}
+
+/**
+ * Handle window resize events to recalculate visible items
+ */
+function handleResize() {
+    scheduleRender();
+}
+
+// Initialize when DOM is loaded
 if (document.readyState === 'loading') {
-    // DOM is still loading
+    document.addEventListener('DOMContentLoaded', () => {
+        sendWebviewReady();
+        
+        // Add scroll and resize event listeners
+        const logList = document.getElementById('logList');
+        if (logList) {
+            logList.addEventListener('scroll', handleScroll);
+        }
+        window.addEventListener('resize', handleResize);
+    });
 } else {
-    // DOM is already loaded
     sendWebviewReady();
+    
+    // Add scroll and resize event listeners
+    const logList = document.getElementById('logList');
+    if (logList) {
+        logList.addEventListener('scroll', handleScroll);
+    }
+    window.addEventListener('resize', handleResize);
 }
