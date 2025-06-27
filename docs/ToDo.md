@@ -8,5 +8,5 @@
 - [ ] 8. Add a drop down (arrow down) beside the play/exit button in editor actions that shows a boolean setting whether to start/stop Hot Reload for Unity 
 - [ ] 9. Add a status bar item right beside Unity to show the state of Hot Reload for Unity(if it is installed as a package)
 - [ ] 10. Clicking on a test in Testing window (on the left side) goes to the compiled .dll not to the source file, fix it so that it goes to the source file
-- [ ] 11. Remove a file or folder should also remove it's meta file
-- [ ] 12. Automatic Rename/Remove .meta file should check for Assets folder and Packages folder, or that the file is an asset 
+- [x] 11. Remove a file or folder should also remove it's meta file
+- [x] 12. Automatic Rename/Remove .meta file should check for Assets folder and Packages folder, or that the file is an asset

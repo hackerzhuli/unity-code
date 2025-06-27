@@ -35,31 +35,16 @@ let globalUnityDebuggerManager: UnityDebuggerManager | null = null;
  * @param newUri The new file URI
  */
 async function handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
-    // Skip meta files themselves
-    if (oldUri.fsPath.endsWith('.meta') || newUri.fsPath.endsWith('.meta')) {
-        return;
-    }
-    
-    // Find which workspace folder the old file belongs to
-    const oldWorkspaceFolder = vscode.workspace.getWorkspaceFolder(oldUri);
-    const newWorkspaceFolder = vscode.workspace.getWorkspaceFolder(newUri);
-    
-    // Both old and new paths must belong to the same workspace
-    if (!oldWorkspaceFolder || !newWorkspaceFolder || 
-        oldWorkspaceFolder.uri.fsPath !== newWorkspaceFolder.uri.fsPath) {
-        return;
-    }
-    
     // Check if we have a Unity project and both paths are within it
     if (!globalUnityProjectManager || !globalUnityProjectManager.isWorkingWithUnityProject()) {
         return;
     }
     
-    // Check if both old and new paths are in the Assets folder of the Unity project
-    const isOldInAssets = await globalUnityProjectManager.isInAssetsFolder(oldUri.fsPath);
-    const isNewInAssets = await globalUnityProjectManager.isInAssetsFolder(newUri.fsPath);
+    // Check if the new new path is an asset of the Unity project
+    // The old file don't exist any more, so we can't check it
+    const isAsset = await globalUnityProjectManager.isAsset(newUri.fsPath);
     
-    if (!isOldInAssets || !isNewInAssets) {
+    if (!isAsset) {
         return;
     }
     
@@ -104,35 +89,136 @@ async function onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
 }
 
 /**
- * Handle C# file save events for auto-refresh
+ * Refresh Unity asset database if conditions are met
+ * @param filePath The file path that triggered the refresh
+ * @param action The action that triggered the refresh (for logging)
  */
-async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
+async function refreshAssetDatabaseIfNeeded(filePath: string, action: string): Promise<void> {
+    if (!globalUnityMessagingClient || !globalUnityProjectManager) {
+        return;
+    }
+
     // Check if auto-refresh is enabled
     const config = vscode.workspace.getConfiguration('unity-code');
     const autoRefreshEnabled = config.get<boolean>('autoRefreshUnity', true);
     
-    if (!autoRefreshEnabled || !globalUnityMessagingClient) {
-        return;
-    }
-
-    // don't refresh if it's a .meta file
-    if (document.uri.fsPath.endsWith(".meta")){
+    if (!autoRefreshEnabled) {
         return;
     }
 
     // Check if we have a Unity project and the file is within it
+    if (!globalUnityProjectManager.isWorkingWithUnityProject()) {
+        return;
+    }
+    
+    // Check if the file is an asset (not a .meta file and either exists as an asset or has a corresponding .meta file)
+    if (filePath.endsWith('.meta')) {
+        return;
+    }
+    
+    const isAsset = globalUnityProjectManager.isAsset(filePath);
+    const hasMetaFile = fs.existsSync(`${filePath}.meta`);
+    
+    if (!isAsset && !hasMetaFile) {
+        return;
+    }
+
+    console.log(`UnityCode: Asset ${filePath} was ${action}, refreshing Unity asset database...`);
+    try {
+        await globalUnityMessagingClient.refreshAssetDatabase();
+    } catch (error) {
+        console.error(`UnityCode: Error refreshing asset database after ${action}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+/**
+ * Handle deletion of a single file and its corresponding meta file
+ * @param deletedUri The deleted file URI
+ */
+async function handleFileDelete(deletedUri: vscode.Uri): Promise<void> {
+    // Check if we have a Unity project
     if (!globalUnityProjectManager || !globalUnityProjectManager.isWorkingWithUnityProject()) {
         return;
     }
     
-    // Check if the saved file is in the assets folder
-    // anything in assets folder is fine, except a .meta file
-    if (!globalUnityProjectManager.isInAssetsFolder(document.uri.fsPath)) {
+    const deletedFilePath = deletedUri.fsPath;
+    const metaPath = `${deletedFilePath}.meta`;
+    
+    // Check if this was a .cs file with a corresponding meta file (indicating it was a Unity asset)
+    const wasCsAsset = deletedFilePath.endsWith('.cs') && fs.existsSync(metaPath);
+    
+    // If it was a C# asset file, refresh the asset database before deleting the meta file
+    if (wasCsAsset) {
+        await refreshAssetDatabaseIfNeeded(deletedFilePath, 'deleted');
+    }
+    
+    // Delete the meta file if it exists
+    await deleteMetaFile(deletedFilePath);
+}
+
+/**
+ * Delete the meta file for a given asset file
+ * @param deletedFilePath The deleted file path
+ */
+async function deleteMetaFile(deletedFilePath: string): Promise<void> {
+    const metaPath = `${deletedFilePath}.meta`;
+    
+    // Check if the meta file exists and delete it
+    if (fs.existsSync(metaPath)) {
+        try {
+            fs.unlinkSync(metaPath);
+            console.log(`UnityCode: detected asset ${deletedFilePath} was deleted, so deleted meta file ${metaPath}`);
+        } catch (error) {
+            console.error(`UnityCode: Error deleting meta file: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+}
+
+/**
+ * Handle file delete events from VS Code
+ * @param event The file delete event
+ */
+async function onDidDeleteFiles(event: vscode.FileDeleteEvent): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
         return;
     }
+    
+    // Process each deleted file
+    for (const deletedUri of event.files) {
+        await handleFileDelete(deletedUri);
+    }
+}
 
-    console.log(`UnityCode: file saved: ${document.fileName}, refreshing Unity and tests...`);
-    await globalUnityMessagingClient.refreshAssetDatabase();
+/**
+ * Handle file save events for auto-refresh
+ */
+async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
+    await refreshAssetDatabaseIfNeeded(document.uri.fsPath, 'saved');
+}
+
+/**
+ * Handle creation of a single file and refresh asset database if needed
+ * @param createdUri The created file URI
+ */
+async function handleFileCreate(createdUri: vscode.Uri): Promise<void> {
+    await refreshAssetDatabaseIfNeeded(createdUri.fsPath, 'created');
+}
+
+/**
+ * Handle file create events from VS Code
+ * @param event The file create event
+ */
+async function onDidCreateFiles(event: vscode.FileCreateEvent): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        return;
+    }
+    
+    // Process each created file
+    for (const createdUri of event.files) {
+        await handleFileCreate(createdUri);
+    }
 }
 
 /**
@@ -355,6 +441,12 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     // Listen for file rename events using workspace API
     const renameDisposable = vscode.workspace.onDidRenameFiles(onDidRenameFiles);
 
+    // Listen for file delete events using workspace API
+    const deleteDisposable = vscode.workspace.onDidDeleteFiles(onDidDeleteFiles);
+
+    // Listen for file create events using workspace API
+    const createDisposable = vscode.workspace.onDidCreateFiles(onDidCreateFiles);
+
     // Listen for file save events for auto-refresh
     const saveDisposable = vscode.workspace.onDidSaveTextDocument(onDidSaveDocument);
 
@@ -370,7 +462,9 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         refreshTestsDisposable,
         showConnectionStatusDisposable,
         runTestsDisposable,
-        renameDisposable, 
+        renameDisposable,
+        deleteDisposable,
+        createDisposable,
         saveDisposable,
         windowStateDisposable
     );

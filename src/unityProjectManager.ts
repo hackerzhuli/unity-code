@@ -107,14 +107,24 @@ export class UnityProjectManager {
     }
 
     /**
-     * Check if a given path is inside the Assets folder of this Unity project
+     * Check if a given path is an assets file or folder (not including meta file) of this Unity project
      * @param path The path to check
-     * @returns boolean True if the path is in the Assets folder, the path must exist on file system, otherwise false
+     * @returns boolean True if the path is an asset, otherwise false
      */
-    public async isInAssetsFolder(path: string): Promise<boolean> {
-        if (this.unityProjectPath) {
-            return await isInDirectory(this.unityProjectPath + '/Assets', path);
+    public async isAsset(path: string): Promise<boolean> {
+        if (path.endsWith(".meta")) {
+            return false;
         }
+
+        if (this.unityProjectPath) {
+            var r = await isInDirectory(this.unityProjectPath + '/Assets', path);
+            if (r) {
+                return true;
+            }
+
+            return await isInDirectory(this.unityProjectPath + "/Packages", path);
+        }
+
         return false;
     }
 }

@@ -238,7 +238,7 @@ export class UnityMessagingClient {
      * Calculate messaging port for a given Unity process ID
      */
     private calculatePortForProcess(processId: number): number {
-        const port = 56002 + (processId % 1000);
+        const port = 58000 + (processId % 1000);
         console.log(`UnityMessagingClient: Calculated port ${port} for process ID ${processId} (formula: 56001 + ${processId} % 1000 = 56001 + ${processId % 1000})`);
         return port;
     }
