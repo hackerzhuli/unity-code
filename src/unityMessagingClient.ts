@@ -51,6 +51,7 @@ export interface TestAdaptor {
     Method: string;
     Assembly: string;
     Parent: number;
+    SourceLocation: string;
 }
 
 export interface TestAdaptorContainer {
@@ -509,6 +510,8 @@ export class UnityMessagingClient {
         if (message.type !== MessageType.Ping && message.type !== MessageType.Pong && 
             message.type !== MessageType.Info && message.type !== MessageType.Warning && message.type !== MessageType.Error) {
             //logWithLimit(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
+            if(message.type === MessageType.TestListRetrieved)
+                console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}"`);
         }
         
         // Handle Unity online/offline state changes

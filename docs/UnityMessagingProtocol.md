@@ -122,13 +122,46 @@ Detailed value formats for some of the types:
   [Serializable]
   internal class TestAdaptor
   {
-      public string Id;
-      public string Name;
-      public string FullName;
-      public string Type;        // TypeInfo?.FullName
-      public string Method;      // Method?.Name
-      public string Assembly;    // TypeInfo?.Assembly?.Location
-      public int Parent;         // Index of parent in TestAdaptors array, -1 for root
+		/// <summary>
+		/// The unique identifier of the test.
+		/// </summary>
+		public string Id;
+		
+		/// <summary>
+		/// The name of the test node.
+		/// </summary>
+		public string Name;
+		
+		/// <summary>
+		/// The full name of the test including namespace and class.
+		/// </summary>
+		public string FullName;
+
+		/// <summary>
+		/// The full name of the type containing the test method.
+		/// </summary>
+		public string Type;
+		
+		/// <summary>
+		/// The name of the test method.
+		/// </summary>
+		public string Method;
+
+		/// <summary>
+		/// The location of the assembly containing the test.
+		/// </summary>
+		public string Assembly;
+		
+		/// <summary>
+		/// Index of parent in TestAdaptors array, -1 for root.
+		/// </summary>
+		public int Parent;
+
+		/// <summary>
+		/// Source location of the test in format "Assets/Path/File.cs:LineNumber".
+		/// Only populated for methods and types, null for namespaces or assemblies or other things
+		/// </summary>
+		public string SourceLocation;
   }
   ```
 - **Description**: Sent when a test starts execution, contains test metadata and hierarchy

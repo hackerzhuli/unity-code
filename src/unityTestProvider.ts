@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor } from './unityMessagingClient.js';
 import { logWithLimit, processTestStackTraceToMarkdown } from './utils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
@@ -12,7 +13,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private testController: vscode.TestController;
     public messagingClient: UnityMessagingClient; // Made public for auto-refresh access
     private projectManager: UnityProjectManager;
-    private testData = new WeakMap<vscode.TestItem, { id: string; fullName: string; testMode: 'EditMode' | 'PlayMode' }>();
+    private testData = new WeakMap<vscode.TestItem, { id: string; fullName: string; testMode: 'EditMode' | 'PlayMode'; sourceLocation?: string }>();
     private runProfile: vscode.TestRunProfile;
     private debugProfile: vscode.TestRunProfile;
     private currentTestRun: vscode.TestRun | null = null;
@@ -227,20 +228,58 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         
         // First pass: create all test items
         testContainer.TestAdaptors.forEach((test, index) => {
+            // Use SourceLocation if available, fallback to Assembly
+            let fileUri: vscode.Uri | undefined;
+            if (test.SourceLocation) {
+                // SourceLocation format: "Assets/Path/File.cs:LineNumber"
+                // Extract just the file path part (remove line number)
+                const colonIndex = test.SourceLocation.lastIndexOf(':');
+                const filePath = colonIndex > 0 ? test.SourceLocation.substring(0, colonIndex) : test.SourceLocation;
+                
+                // Convert to absolute path if it's a relative path
+                const projectPath = this.projectManager.getUnityProjectPath();
+                if (projectPath && !path.isAbsolute(filePath)) {
+                    // Handle relative paths by joining with project path
+                    const absolutePath = path.join(projectPath, filePath);
+                    fileUri = vscode.Uri.file(absolutePath);
+                } else {
+                    // Use the path as-is (either absolute or no project path available)
+                    fileUri = vscode.Uri.file(filePath);
+                }
+            } else if (test.Assembly) {
+                // Fallback to Assembly field
+                fileUri = vscode.Uri.file(test.Assembly);
+            }
+            
             const testItem = this.testController.createTestItem(
                 `${testMode}_${test.Id}`,
                 test.Name,
-                vscode.Uri.file(test.Assembly || '')
+                fileUri
             );
             
             testItem.description = test.FullName;
             testItem.canResolveChildren = false;
             
+            // Set range if we have source location with line number (only for methods, not types)
+            if (test.SourceLocation && test.Method) {
+                const colonIndex = test.SourceLocation.lastIndexOf(':');
+                if (colonIndex > 0) {
+                    const lineNumberStr = test.SourceLocation.substring(colonIndex + 1);
+                    const lineNumber = parseInt(lineNumberStr, 10);
+                    if (!isNaN(lineNumber) && lineNumber > 0) {
+                        // VS Code uses 0-based line numbers
+                        const line = lineNumber - 1;
+                        testItem.range = new vscode.Range(line, 0, line, 0);
+                    }
+                }
+            }
+            
             // Store test data
             this.testData.set(testItem, {
                 id: test.Id,
                 fullName: test.FullName,
-                testMode: testMode
+                testMode: testMode,
+                sourceLocation: test.SourceLocation
             });
             
             testItems.set(index, testItem);
@@ -706,19 +745,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             testsByClass.get(classPath)!.push(test);
         }
         
-        // Create code lenses for each test method
-        for (const test of this.allTests) {
-            const symbol = findSymbolByPath(symbols, test.FullName, languageServerInfo);
-            if (symbol && symbol.kind === vscode.SymbolKind.Method) {
-                //console.log(`Found method symbol for test: ${test.FullName}`);
-                
-                const codeLens = this.createCodeLens(symbol, [test], document);
-                if (codeLens) {
-                    codeLenses.push(codeLens);
-                }
-                processedSymbols.add(test.FullName);
-            }
-        }
+        // Skip creating code lenses for individual test methods since VS Code now shows run buttons automatically
+        // when tests have source locations. We only create code lenses for types/classes.
         
         // Create code lenses for test classes (containing multiple tests)
         for (const [classPath, testsInClass] of testsByClass) {
