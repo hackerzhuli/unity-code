@@ -886,7 +886,6 @@ export class UnityMessagingClient {
     private initializeDefaultRateLimits(): void {
         // prevent frequent refreshes, usually a refresh in Unity takes seconds to minutes, so sending it frequently makes no sense
         this.rateLimitConfig.set(MessageType.Refresh, 5000);
-        this.rateLimitConfig.set(MessageType.RetrieveTestList, 1000);
         this.rateLimitConfig.set(MessageType.ExecuteTests, 1000);
     }
     
