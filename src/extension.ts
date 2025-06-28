@@ -29,6 +29,8 @@ let globalNativeBinaryLocator: NativeBinaryLocator | null = null;
 // Global reference to Unity Debugger Manager
 let globalUnityDebuggerManager: UnityDebuggerManager | null = null;
 
+
+
 /**
  * Handle renaming of a single file and its corresponding meta file
  * @param oldUri The original file URI
@@ -120,6 +122,12 @@ async function refreshAssetDatabaseIfNeeded(filePath: string, action: string): P
     const hasMetaFile = fs.existsSync(`${filePath}.meta`);
     
     if (!isAsset && !hasMetaFile) {
+        return;
+    }
+
+    // Skip asset database refresh if tests are currently running
+    if (globalTestProvider && globalTestProvider.isTestsRunning()) {
+        console.log(`UnityCode: Tests are running, skipping asset database refresh for ${filePath} (${action})`);
         return;
     }
 
@@ -352,6 +360,12 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     // Register the command to manually refresh tests
     const refreshTestsDisposable = vscode.commands.registerCommand('unity-code.refreshTests', async function () {
         if (globalTestProvider) {
+            // Check if tests are currently running
+            if (globalTestProvider.isTestsRunning()) {
+                vscode.window.showWarningMessage('Unity Code: Tests are currently running. Please wait for tests to complete before refreshing.');
+                return;
+            }
+            
             vscode.window.showInformationMessage('Unity Code: Refreshing tests...');
             try {
                 await globalTestProvider.refreshTests();
@@ -363,8 +377,6 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
             vscode.window.showWarningMessage('Unity Code: Test provider not available');
         }
     });
-
-
 
     // Register the command to show Unity connection status
     const showConnectionStatusDisposable = vscode.commands.registerCommand('unity-code.showConnectionStatus', function () {

@@ -119,6 +119,12 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 return;
             }
             
+            // Check if tests are currently running to avoid race conditions
+            if (this.isRunning) {
+                console.log('UnityCode: Compilation finished, but tests are running. Skipping test refresh.');
+                return;
+            }
+            
             // Unity compilation finished, refresh tests automatically
             console.log('UnityCode: Compilation finished, refreshing tests...');
             this.discoverTests();
@@ -328,6 +334,13 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         this.testController.items.add(modeItem);
         
         return modeItem;
+    }
+
+    /**
+     * Check if tests are currently running
+     */
+    public isTestsRunning(): boolean {
+        return this.isRunning;
     }
 
     /**
@@ -563,7 +576,9 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         
         // Add message if available and not empty
         if (result.Message && result.Message.trim()) {
-            outputParts.push(`**Message:** ${result.Message}`);
+            // Replace newlines with markdown line breaks to ensure proper formatting
+            const formattedMessage = result.Message.trim().replace(/\n/g, '  \n');
+            outputParts.push(`**Message:** ${formattedMessage}`);
         }
         
         // Add processed stack trace with clickable links if available and not empty
@@ -577,7 +592,9 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         
         // Add test output/logs if available and not empty
         if (result.Output && result.Output.trim()) {
-            outputParts.push(`## Output\n${result.Output.trim()}`);
+            // Replace newlines with markdown line breaks to ensure proper formatting
+            const formattedOutput = result.Output.trim().replace(/\n/g, '  \n');
+            outputParts.push(`## Output\n${formattedOutput}`);
         }
         
         // Create TestMessage with MarkdownString if we have content
@@ -624,32 +641,40 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             case TestStatusAdaptor.Passed: {
                 // For passing tests, generate plain text output directly if there's relevant information
                 const plainTextOutput = this.buildOutputForTerminal(result);
-                if (plainTextOutput) {
+                if (plainTextOutput && this.currentTestRun) {
                     console.log(`UnityTestProvider: plainTextOutput = ${plainTextOutput}`)
                     this.currentTestRun.appendOutput(plainTextOutput + '\r\n', undefined, testItem);
                 }
-                this.currentTestRun.passed(testItem, duration);
+                if (this.currentTestRun) {
+                    this.currentTestRun.passed(testItem, duration);
+                }
                 break;
             }
             case TestStatusAdaptor.Failed: {
-                // Use TestMessage array for failed tests
-                if (testMessages.length > 0) {
-                    this.currentTestRun.failed(testItem, testMessages, duration);
-                } else {
-                    this.currentTestRun.failed(testItem, new vscode.TestMessage(''), duration);
+                if (this.currentTestRun) {
+                    // Use TestMessage array for failed tests
+                    if (testMessages.length > 0) {
+                        this.currentTestRun.failed(testItem, testMessages, duration);
+                    } else {
+                        this.currentTestRun.failed(testItem, new vscode.TestMessage(''), duration);
+                    }
                 }
                 break;
             }
             case TestStatusAdaptor.Skipped: {
-                this.currentTestRun.skipped(testItem);
+                if (this.currentTestRun) {
+                    this.currentTestRun.skipped(testItem);
+                }
                 break;
             }
             case TestStatusAdaptor.Inconclusive: {
-                // Use TestMessage array for inconclusive tests
-                if (testMessages.length > 0) {
-                    this.currentTestRun.failed(testItem, testMessages, duration);
-                } else {
-                    this.currentTestRun.failed(testItem, new vscode.TestMessage(''), duration);
+                if (this.currentTestRun) {
+                    // Use TestMessage array for inconclusive tests
+                    if (testMessages.length > 0) {
+                        this.currentTestRun.failed(testItem, testMessages, duration);
+                    } else {
+                        this.currentTestRun.failed(testItem, new vscode.TestMessage(''), duration);
+                    }
                 }
                 break;
             }
