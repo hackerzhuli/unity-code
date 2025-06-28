@@ -382,13 +382,18 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         request: vscode.TestRunRequest,
         token: vscode.CancellationToken
     ): Promise<void> {
+        if (this.isRunning) {
+            vscode.window.showWarningMessage('UnityCode: Tests are already running. Please wait for the current test run to complete.');
+            return;
+        }
+
         if (!this.messagingClient.connected) {
             vscode.window.showErrorMessage('UnityCode: Not connected to Unity Editor. Auto-connection will handle reconnection.');
             return;
         }
 
-        if (this.isRunning) {
-            vscode.window.showWarningMessage('UnityCode: Tests are already running. Please wait for the current test run to complete.');
+        if (this.messagingClient.unityPlaying) {
+            vscode.window.showWarningMessage('UnityCode: Cannot run tests while Unity is in Play Mode. Please stop Play Mode first.');
             return;
         }
 
