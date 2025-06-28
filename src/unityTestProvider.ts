@@ -390,96 +390,70 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     }
 
     /**
-     * Run tests
+     * Run tests(only support running one test at a time, due to limitation from Unity)
      */
     public async runTests(
         request: vscode.TestRunRequest,
         token: vscode.CancellationToken
     ): Promise<void> {
         if (this.isRunning) {
-            vscode.window.showWarningMessage('UnityCode: Tests are already running. Please wait for the current test run to complete.');
+            console.warn('UnityCode: Tests are already running. Please wait for the current test run to complete.');
             return;
         }
 
         if (!this.messagingClient.connected) {
-            vscode.window.showErrorMessage('UnityCode: Not connected to Unity Editor. Auto-connection will handle reconnection.');
+            console.error('UnityCode: Not connected to Unity Editor. Auto-connection will handle reconnection.');
             return;
         }
 
         if (this.messagingClient.unityPlaying) {
-            vscode.window.showWarningMessage('UnityCode: Cannot run tests while Unity is in Play Mode. Please stop Play Mode first.');
+            console.warn('UnityCode: Cannot run tests while Unity is in Play Mode. Please stop Play Mode first.');
             return;
         }
 
-        this.setRunningState(true);
-        
+        // If no specific tests requested, run all tests
+        const testsToRun = request.include;
+        if(!testsToRun || testsToRun.length === 0){
+            console.error('UnityCode: No tests to run. Please add tests to run.');
+            return;
+        }
+
+        // Unity test execution is unreliable with multiple tests, so we only support running one test at a time
+        if (testsToRun.length > 1) {
+            console.error('UnityCode: Multiple test execution is not supported due to Unity reliability issues. Running only the first test.');
+        }
+
+        // Create test run for only the first test
+        const testToRun = testsToRun[0];
+        if(!testToRun){
+            console.error('UnityCode: No test to run. Please add test to run.');
+            return;
+        }
+
+        const testData = this.testData.get(testToRun);
+        if (!testData) {
+            console.error(`UnityCode: Test data not found for ${testToRun}`);
+            return;
+        }
+        if (token.isCancellationRequested) {
+            return;
+        }
+
         try {
-            // If no specific tests requested, run all tests
-            const testsToRun = request.include || this.getAllTests();
-            
-            // Unity test execution is unreliable with multiple tests, so we only support running one test at a time
-            if (testsToRun.length > 1) {
-                console.error('UnityCode: Multiple test execution is not supported due to Unity reliability issues. Running only the first test.');
-                vscode.window.showWarningMessage('UnityCode: Multiple test execution is not supported. Running only the first test.');
-            }
-            
-            // Create test run for only the first test
-            const testToRun = testsToRun[0];
-            if (testToRun) {
+            const success = await this.messagingClient.executeTests(testData.testMode, testData.fullName);
+            if (!success) {
+                console.error(`UnityCode: Failed to send test execution message for ${testData.fullName}`);
+            }else{
+                this.setRunningState(true);
                 this.currentTestRun = this.testController.createTestRun(new vscode.TestRunRequest([testToRun]));
-                
-                if (token.isCancellationRequested) {
-                    return;
-                }
-                
-                // Inline test execution logic
-                const testData = this.testData.get(testToRun);
-                if (!testData) {
-                    // This might be a container (mode or namespace), run all children
-                    for (const [, child] of testToRun.children) {
-                        const childTestData = this.testData.get(child);
-                        if (childTestData) {
-                            if (this.currentTestRun) {
-                                this.currentTestRun.started(child);
-                }
-                
-                            const success = await this.messagingClient.executeTests(childTestData.testMode, childTestData.fullName);
-                            if (!success) {
-                                console.error(`UnityCode: Failed to send test execution message for ${childTestData.fullName}`);
-                                if (this.currentTestRun) {
-                                    this.currentTestRun.skipped(child);
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    if (this.currentTestRun) {
-                        this.currentTestRun.started(testToRun);
-                    }
-                    
-                    const success = await this.messagingClient.executeTests(testData.testMode, testData.fullName);
-                    if (!success) {
-                        console.error(`UnityCode: Failed to send test execution message for ${testData.fullName}`);
-                        if (this.currentTestRun) {
-                            this.currentTestRun.failed(testToRun, new vscode.TestMessage('Failed to send test execution message to Unity'));
-                        }
-                    }
-                }
+                this.currentTestRun.started(testToRun);
             }
-            
         } catch (error) {
             console.error('UnityCode: Error running tests:', error);
-            vscode.window.showErrorMessage(`UnityCode: Failed to run tests: ${error instanceof Error ? error.message : String(error)}`);
+            //vscode.window.showErrorMessage(`UnityCode: Failed to run tests: ${error instanceof Error ? error.message : String(error)}`);
             
-            // Reset running state on error
-            this.setRunningState(false);
-            if (this.currentTestRun) {
-                this.currentTestRun.end();
-                this.currentTestRun = null;
-            }
-        } finally {
-            // Ensure running state is reset if cancellation occurred
-            if (token.isCancellationRequested) {
+            if(this.isRunning){
+                // Reset running state on error
                 this.setRunningState(false);
                 if (this.currentTestRun) {
                     this.currentTestRun.end();
