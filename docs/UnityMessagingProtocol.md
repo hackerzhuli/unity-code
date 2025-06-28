@@ -123,7 +123,7 @@ Detailed value formats for some of the types:
   internal class TestAdaptor
   {
 		/// <summary>
-		/// The unique identifier of the test.
+		/// The ID of the test tree node. The ID can change if you add new tests to the suite. Use UniqueName, if you want to have a more permanent point of reference.
 		/// </summary>
 		public string Id;
 		
@@ -162,8 +162,19 @@ Detailed value formats for some of the types:
 		/// Only populated for methods and types, null for namespaces or assemblies or other things
 		/// </summary>
 		public string SourceLocation;
+
+		/// <summary>
+		/// Indicates if the test has the UnityTest attribute(if it is a method).
+		/// </summary>
+		public bool IsHaveUnityTestAttribute;
+
+		/// <summary>
+		/// A unique generated name for the test node. E.g., Tests.dll/MyNamespace/MyTestClass/[Tests][MyNamespace.MyTestClass.MyTest].
+		/// </summary>
+		public string UniqueName;
   }
-  ```
+```
+
 - **Description**: Sent when a test starts execution, contains test metadata and hierarchy
 
 #### TestFinished (Value: 21)

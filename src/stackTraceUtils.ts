@@ -97,9 +97,11 @@ export async function processTestStackTraceToMarkdown(stackTrace: string, projec
         if (sourceLocation) {
             try {
                 let processedPath = sourceLocation.filePath;
+                let absolutePath: string;
                 
-                // Convert absolute path to relative if it's within the project
+                // Handle both absolute and relative paths
                 if (path.isAbsolute(sourceLocation.filePath)) {
+                    absolutePath = sourceLocation.filePath;
                     const normalizedFilePath = await normalizePath(sourceLocation.filePath);
                     const normalizedProjectPath = await normalizePath(projectPath);
                     
@@ -108,10 +110,25 @@ export async function processTestStackTraceToMarkdown(stackTrace: string, projec
                         // Ensure forward slashes for consistency
                         processedPath = processedPath.replace(/\\/g, '/');
                     }
+                } else {
+                    // For relative paths, join with project path to get absolute path
+                    absolutePath = path.join(projectPath, sourceLocation.filePath);
+                    // Normalize the absolute path and handle it like any other absolute path
+                    const normalizedAbsolutePath = await normalizePath(absolutePath);
+                    const normalizedProjectPath = await normalizePath(projectPath);
+                    
+                    if (normalizedAbsolutePath.startsWith(normalizedProjectPath)) {
+                        processedPath = path.relative(normalizedProjectPath, normalizedAbsolutePath);
+                        // Ensure forward slashes for consistency
+                        processedPath = processedPath.replace(/\\/g, '/');
+                    } else {
+                        // If not within project, use the normalized absolute path
+                        processedPath = normalizedAbsolutePath;
+                    }
+                    absolutePath = normalizedAbsolutePath;
                 }
                 
                 // Create VS Code markdown link format: [text](file:///absolute/path#line)
-                const absolutePath = path.isAbsolute(sourceLocation.filePath) ? sourceLocation.filePath : path.join(projectPath, sourceLocation.filePath);
                 const normalizedAbsolutePath = await normalizePath(absolutePath);
                 const markdownLink = `[${processedPath}:${sourceLocation.lineNumber}](file:///${normalizedAbsolutePath.replace(/\\/g, '/')}#${sourceLocation.lineNumber})`;
                 

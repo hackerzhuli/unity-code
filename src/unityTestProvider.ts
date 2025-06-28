@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor } from './unityMessagingClient.js';
 import { logWithLimit } from './utils.js';
-import { processTestStackTraceToMarkdown } from './stackTraceUtils.js';
+import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown } from './stackTraceUtils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
 import { UnityProjectManager } from './unityProjectManager.js';
 
@@ -14,7 +14,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private testController: vscode.TestController;
     public messagingClient: UnityMessagingClient; // Made public for auto-refresh access
     private projectManager: UnityProjectManager;
-    private testData = new WeakMap<vscode.TestItem, { id: string; fullName: string; testMode: 'EditMode' | 'PlayMode'; sourceLocation?: string }>();
+    private testData = new WeakMap<vscode.TestItem, { uniqueName: string; fullName: string; testMode: 'EditMode' | 'PlayMode'; sourceLocation?: string }>();
     private runProfile: vscode.TestRunProfile;
     private debugProfile: vscode.TestRunProfile;
     private currentTestRun: vscode.TestRun | null = null;
@@ -267,7 +267,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             }
             
             const testItem = this.testController.createTestItem(
-                `${testMode}_${test.Id}`,
+                `${testMode}_${test.UniqueName}`,
                 test.Name,
                 fileUri
             );
@@ -291,7 +291,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             
             // Store test data
             this.testData.set(testItem, {
-                id: test.Id,
+                uniqueName: test.UniqueName,
                 fullName: test.FullName,
                 testMode: testMode,
                 sourceLocation: test.SourceLocation
@@ -585,8 +585,18 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         // Add processed stack trace with clickable links if available and not empty
         if (result.StackTrace && result.StackTrace.trim()) {
             const projectPath = this.projectManager.getUnityProjectPath();
-            const processedStackTrace = await processTestStackTraceToMarkdown(result.StackTrace, projectPath || '');
-            if (processedStackTrace && processedStackTrace.trim()) {
+            
+            let processedStackTrace: string;
+            if (result.StackTrace.startsWith('at ')) {
+                // Normal stack trace format (starts with "at ")
+                processedStackTrace = await processTestStackTraceToMarkdown(result.StackTrace, projectPath || '');
+            } else {
+                // Log stack trace format (doesn't start with "at ")
+                processedStackTrace = await processConsoleLogStackTraceToMarkdown(result.StackTrace, projectPath || '');
+            }
+            // Replace newlines with markdown line breaks to ensure proper formatting
+            processedStackTrace = processedStackTrace.replace(/\n/g, '  \n');
+            if (processedStackTrace) {
                 outputParts.push(`## Stack Trace\n${processedStackTrace}`);
             }
         }

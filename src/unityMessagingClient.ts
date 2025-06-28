@@ -53,6 +53,8 @@ export interface TestAdaptor {
     Assembly: string;
     Parent: number;
     SourceLocation: string;
+    IsHaveUnityTestAttribute: boolean;
+    UniqueName: string;
 }
 
 export interface TestAdaptorContainer {

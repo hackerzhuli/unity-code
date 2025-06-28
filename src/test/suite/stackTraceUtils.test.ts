@@ -296,6 +296,56 @@ describe('Stack Trace Utils Unit Tests', () => {
                 throw error;
             }
         });
+        
+        it('should handle paths within project but outside Assets directory', async () => {
+            // Create a file in the project root (not in Assets)
+            const projectRootFile = path.join(testProjectPath, 'ProjectSettings', 'ProjectVersion.cs');
+            const stackTrace = `at TestNamespace.TestClass.TestMethod () [0x00001] in ${projectRootFile}:10`;
+            
+            // Create the test file temporarily
+            const mkdir = promisify(fs.mkdir);
+            const writeFile = promisify(fs.writeFile);
+            const unlink = promisify(fs.unlink);
+            const rmdir = promisify(fs.rmdir);
+            
+            try {
+                await mkdir(path.dirname(projectRootFile), { recursive: true });
+                await writeFile(projectRootFile, 'test content');
+                
+                const result = await processTestStackTraceToMarkdown(stackTrace, testProjectPath);
+                
+                // Should contain relative path from project root, not just the filename
+                assert.strictEqual(result.includes('[ProjectSettings/ProjectVersion.cs:10]'), true);
+                assert.strictEqual(result.includes('file:///'), true);
+                
+                // Clean up
+                await unlink(projectRootFile);
+                await rmdir(path.dirname(projectRootFile));
+            } catch (error) {
+                // Clean up on error
+                try {
+                    await unlink(projectRootFile);
+                    await rmdir(path.dirname(projectRootFile));
+                } catch (_cleanupError) {
+                    // Ignore cleanup errors
+                }
+                throw error;
+            }
+        });
+
+        it('should normalize relative paths with leading dot', async () => {
+            // Test case for relative path with leading dot that needs normalization
+            const relativePath = '.\\Library\\PackageCache\\com.unity.test-framework@dfdbd02f5918\\UnityEngine.TestRunner\\NUnitExtensions\\Attributes\\TestEnumerator.cs';
+            const stackTrace = `at UnityEngine.TestTools.TestEnumerator+<Execute>d__7.MoveNext () [0x0004e] in ${relativePath}:44`;
+            
+            const result = await processTestStackTraceToMarkdown(stackTrace, testProjectPath);
+            
+            // Should normalize the path and remove leading dot
+            assert.strictEqual(result.includes('[Library/PackageCache/com.unity.test-framework@dfdbd02f5918/UnityEngine.TestRunner/NUnitExtensions/Attributes/TestEnumerator.cs:44]'), true);
+            assert.strictEqual(result.includes('file:///'), true);
+            // Should not contain the leading dot
+            assert.strictEqual(result.includes('./'), false);
+        });
     });
 
     describe('parseUnityConsoleStackTraceSourceLocation', () => {
