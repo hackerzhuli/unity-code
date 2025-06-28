@@ -140,16 +140,35 @@ export interface TestResultAdaptorContainer {
  * - Heartbeat messages (Ping/Pong) are exempt from rate limiting to maintain connection health
  */
 export class UnityMessagingClient {
+    /**
+     * UDP socket for communication with Unity
+     * @private
+     */
     private socket: dgram.Socket | null = null;
+
+    /**
+     * Port number for Unity communication (calculated based on process ID)
+     * @private
+     */
     private unityPort: number = 0;
+
+    /**
+     * IP address for Unity communication (always localhost)
+     * @private
+     */
     private unityAddress: string = '127.0.0.1';
+
+    /**
+     * Map of message type handlers for processing incoming Unity messages
+     * @private
+     */
     private messageHandlers: Map<MessageType, (message: UnityMessage) => void> = new Map();
-    
+
     /**
      * Rate limiting configuration - maps MessageType to minimum interval in milliseconds
      */
     private rateLimitConfig: Map<MessageType, number> = new Map();
-    
+
     /**
      * Track last send time for each message type
      */
@@ -162,49 +181,141 @@ export class UnityMessagingClient {
      * Connection flow:
      * 1. isConnected = true: Unity process detected, UDP socket bound, initial ping sent
      * 2. isUnityOnline = true: Unity responded with pong or OnLine message, ready for communication
-     * 
      * @private
      */
     private isConnected: boolean = false;
+
+    /**
+     * Indicates whether Unity is online and responding to messages
+     * @private
+     */
     private isUnityOnline: boolean = false;
+
+    /**
+     * Indicates whether Unity Editor is currently in play mode
+     * @private
+     */
+    private isUnityEditorPlaying: boolean = false;
+
+    /**
+     * Timer for sending periodic heartbeat messages to Unity
+     * @private
+     */
     private heartbeatInterval: NodeJS.Timeout | null = null;
+
+    /**
+     * Maximum size for UDP message buffer
+     * @private
+     */
     private readonly UDP_BUFFER_SIZE = 8192;
+
+    /**
+     * Timeout duration for TCP fallback connections
+     * @private
+     */
     private readonly TCP_TIMEOUT = 5000;
+
+    /**
+     * Name of the Unity package currently loaded
+     * @private
+     */
     private packageName: string = '';
-    private messageQueue: Array<{ type: MessageType; value: string; resolve: () => void; reject: (error: Error) => void }> = [];
-    private readonly NORMAL_HEARTBEAT = 3000; // 3 seconds for normal heartbeat
-    private readonly INITIAL_AGGRESSIVE_HEARTBEAT = 500; // 500ms for initial connection detection
+
+    /**
+     * Normal heartbeat interval in milliseconds (3 seconds)
+     * @private
+     */
+    private readonly NORMAL_HEARTBEAT = 3000;
+
+    /**
+     * Aggressive heartbeat interval for initial connection detection (500ms)
+     * @private
+     */
+    private readonly INITIAL_AGGRESSIVE_HEARTBEAT = 500;
+
+    /**
+     * Current heartbeat interval being used
+     * @private
+     */
     private currentHeartbeatInterval: number = this.INITIAL_AGGRESSIVE_HEARTBEAT;
+
+    /**
+     * Timer for initial aggressive heartbeat phase
+     * @private
+     */
     private initialHeartbeatTimeout: NodeJS.Timeout | null = null;
+
+    /**
+     * Flag indicating whether we've received the first response from Unity
+     * @private
+     */
     private hasReceivedFirstResponse: boolean = false;
-    
+
+    /**
+     * Flag indicating whether the client has been disposed
+     * @private
+     */
     private isDisposed: boolean = false;
-    
-    // Process monitoring for smart disconnection detection
+
+    /**
+     * Process ID of the currently connected Unity instance for monitoring
+     * @private
+     */
     private connectedProcessId: number | null = null;
-    
-    // Unity detector for active monitoring
+
+    /**
+     * Unity detector instance for active process monitoring
+     * @private
+     */
     private unityDetector: UnityDetector;
-    
-    // Connection status event - emits true for connected, false for disconnected
+
+    /**
+     * Event emitter for connection status changes
+     * Emits true when connected to Unity, false when disconnected
+     * @public
+     */
     public readonly onConnectionStatus = new EventEmitter<boolean>();
-    
-    // Online status event - emits true for online, false for offline
+
+    /**
+     * Event emitter for Unity online status changes
+     * Emits true when Unity is online and responding, false when offline
+     * @public
+     */
     public readonly onOnlineStatus = new EventEmitter<boolean>();
-    
-    // Log message events - emits log messages from Unity
+
+    /**
+     * Event emitter for Unity play mode status changes
+     * Emits true when Unity enters play mode, false when exiting play mode
+     * @public
+     */
+    public readonly onPlayStatus = new EventEmitter<boolean>();
+
+    /**
+     * Event emitter for Unity info log messages
+     * @public
+     */
     public readonly onInfoMessage = new EventEmitter<string>();
+
+    /**
+     * Event emitter for Unity warning log messages
+     * @public
+     */
     public readonly onWarningMessage = new EventEmitter<string>();
+
+    /**
+     * Event emitter for Unity error log messages
+     * @public
+     */
     public readonly onErrorMessage = new EventEmitter<string>();
 
     constructor(unityDetector: UnityDetector) {
         this.unityDetector = unityDetector;
         this.setupSocket();
-        
+
         if (this.unityDetector) {
             this.initializeUnityDetectorEvents();
         }
-        
+
         // Initialize default rate limits for specific message types
         this.initializeDefaultRateLimits();
     }
@@ -216,12 +327,12 @@ export class UnityMessagingClient {
         if (!this.unityDetector) {
             return;
         }
-        
+
         try {
             // Subscribe to Unity state changes
             this.unityDetector.onUnityStateChanged.subscribe((event: UnityDetectionEvent) => {
                 console.log(`UnityMessagingClient: Unity state changed - Running: ${event.isRunning}, PID: ${event.processId}, Hot Reload: ${event.isHotReloadEnabled}`);
-                
+
                 if (event.isRunning && event.processId) {
                     // Unity started or changed - attempt connection once
                     if (!this.isConnected || this.connectedProcessId !== event.processId) {
@@ -236,7 +347,7 @@ export class UnityMessagingClient {
                     }
                 }
             });
-            
+
             console.log('UnityMessagingClient: Unity detector events initialized and started');
         } catch (error) {
             console.error('UnityMessagingClient: Failed to initialize Unity detector events:', error);
@@ -260,12 +371,12 @@ export class UnityMessagingClient {
             console.log(`UnityMessagingClient: Skipping connection attempt (isDisposed=${this.isDisposed}, isConnected=${this.isConnected})`);
             return;
         }
-        
+
         console.log(`UnityMessagingClient: Attempting to connect to Unity process ${processId}`);
-        
+
         try {
             const success = await this.connectInternal(processId);
-            
+
             if (success) {
                 console.log(`UnityMessagingClient: Successfully connected to Unity process ${processId}`);
             } else {
@@ -303,15 +414,17 @@ export class UnityMessagingClient {
             this.handleConnectionLoss();
         });
     }
-    
+
     /**
      * Handle connection loss
      */
     private handleConnectionLoss(): void {
         const wasConnected = this.isConnected;
         const wasOnline = this.isUnityOnline;
+        const wasPlaying = this.isUnityEditorPlaying;
         this.isConnected = false;
         this.isUnityOnline = false;
+        this.isUnityEditorPlaying = false;
         this.connectedProcessId = null;
         this.hasReceivedFirstResponse = false;
         this.currentHeartbeatInterval = this.INITIAL_AGGRESSIVE_HEARTBEAT; // Reset to aggressive heartbeat for next connection
@@ -324,7 +437,10 @@ export class UnityMessagingClient {
         if (wasOnline) {
             this.onOnlineStatus.emit(false);
         }
-        
+        if (wasPlaying) {
+            this.onPlayStatus.emit(false);
+        }
+
         console.log('UnityMessagingClient: Connection lost - waiting for Unity detection event to reconnect');
     }
 
@@ -339,7 +455,7 @@ export class UnityMessagingClient {
 
         try {
             console.log(`UnityMessagingClient: connectInternal: Connecting to Unity process ${processId}`);
-            
+
             // Store the connected process ID for monitoring
             this.connectedProcessId = processId;
             const activePort = this.calculatePortForProcess(this.connectedProcessId);
@@ -350,20 +466,20 @@ export class UnityMessagingClient {
             // Set connected state before sending initial ping
             this.isConnected = true;
             console.log(`UnityMessagingClient: connectInternal: Connected to Unity process ${this.connectedProcessId} on port ${activePort}`);
-            
+
             // Send initial ping to establish connection
             await this.sendMessageInternal(MessageType.Ping, '');
-            
+
             // Unity online status will be determined by first pong or OnLine message
             this.isUnityOnline = false;
             this.hasReceivedFirstResponse = false;
-            
+
             this.startHeartbeat();
-            
+
             // Trigger connection event
             console.log(`UnityMessagingClient: connectInternal: Emitting connection event for new Unity connection`);
             this.onConnectionStatus.emit(true);
-            
+
             return true;
         } catch (error) {
             console.log(`UnityMessagingClient: connectInternal: Failed with error:`, error);
@@ -383,7 +499,7 @@ export class UnityMessagingClient {
         this.isConnected = false;
         this.isUnityOnline = false;
         this.hasReceivedFirstResponse = false;
-        
+
         // Emit status change events
         if (wasConnected) {
             this.onConnectionStatus.emit(false);
@@ -391,16 +507,9 @@ export class UnityMessagingClient {
         if (wasOnline) {
             this.onOnlineStatus.emit(false);
         }
-        
+
         this.stopHeartbeat();
 
-        // Clear message queue and reject pending messages
-        this.messageQueue.forEach(queuedMessage => {
-            queuedMessage.reject(new Error('Client disposed'));
-        });
-
-        this.messageQueue = [];
-        
         if (this.socket) {
             this.socket.close();
             this.socket = null;
@@ -420,7 +529,7 @@ export class UnityMessagingClient {
             }
         }, this.currentHeartbeatInterval);
     }
-    
+
     /**
      * Handle first response from Unity - request package name and switch to normal heartbeat
      */
@@ -428,14 +537,12 @@ export class UnityMessagingClient {
         if (!this.hasReceivedFirstResponse) {
             this.hasReceivedFirstResponse = true;
             console.log('UnityMessagingClient: First response received, requesting package name and switching to normal heartbeat');
-            
 
-            
             // Switch to normal heartbeat after a delay
             this.scheduleNormalHeartbeat();
         }
     }
-    
+
     /**
      * Schedule transition to normal heartbeat interval after initial aggressive period
      */
@@ -443,42 +550,20 @@ export class UnityMessagingClient {
         if (this.initialHeartbeatTimeout) {
             clearTimeout(this.initialHeartbeatTimeout);
         }
-        
+
         this.initialHeartbeatTimeout = setTimeout(() => {
             if (!this.isDisposed && this.hasReceivedFirstResponse) {
                 console.log('UnityMessagingClient: Switching from aggressive to normal heartbeat interval');
-                
+
                 this.currentHeartbeatInterval = this.NORMAL_HEARTBEAT;
                 console.log(`UnityMessagingClient: Set heartbeat interval to ${this.NORMAL_HEARTBEAT}ms`);
-                
+
                 // Restart heartbeat with normal interval
                 if (this.heartbeatInterval) {
                     this.startHeartbeat();
                 }
             }
         }, 2000); // Wait 2 seconds after first response before switching
-    }
-
-    /**
-     * Process queued messages when Unity comes back online
-     */
-    private processMessageQueue(): void {
-        if (this.messageQueue.length === 0) {
-            return;
-        }
-        
-        console.log(`UnityMessagingClient: Processing ${this.messageQueue.length} queued messages`);
-        const queue = [...this.messageQueue];
-        this.messageQueue = [];
-        
-        queue.forEach(async (queuedMessage) => {
-            try {
-                await this.sendMessageInternal(queuedMessage.type, queuedMessage.value);
-                queuedMessage.resolve();
-            } catch (error) {
-                queuedMessage.reject(error as Error);
-            }
-        });
     }
 
     /**
@@ -489,7 +574,7 @@ export class UnityMessagingClient {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
         }
-        
+
         if (this.initialHeartbeatTimeout) {
             clearTimeout(this.initialHeartbeatTimeout);
             this.initialHeartbeatTimeout = null;
@@ -508,22 +593,22 @@ export class UnityMessagingClient {
      */
     private handleMessage(message: UnityMessage): void {
         // Skip logging for ping/pong and log messages to reduce console noise
-        if (message.type !== MessageType.Ping && message.type !== MessageType.Pong && 
+        if (message.type !== MessageType.Ping && message.type !== MessageType.Pong &&
             message.type !== MessageType.Info && message.type !== MessageType.Warning && message.type !== MessageType.Error) {
             //logWithLimit(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
-            if(message.type === MessageType.TestListRetrieved)
+            if (message.type === MessageType.TestListRetrieved)
                 console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}"`);
         }
-        
+
         // Handle Unity online/offline state changes
         let messageHandledInternally = false;
-        
+
         if (message.type === MessageType.OnLine) {
             messageHandledInternally = true;
             console.log('UnityMessagingClient: Unity online');
             this.isUnityOnline = true;
             this.onOnlineStatus.emit(true);
-            this.processMessageQueue();
+
             this.handleFirstResponse();
         } else if (message.type === MessageType.OffLine) {
             messageHandledInternally = true;
@@ -537,13 +622,12 @@ export class UnityMessagingClient {
                 console.log('UnityMessagingClient: Unity online (pong received)');
                 this.isUnityOnline = true;
                 this.onOnlineStatus.emit(true);
-                this.processMessageQueue();
+
             }
             this.handleFirstResponse();
         } else if (message.type === MessageType.PackageName) {
             messageHandledInternally = true;
-            if(message.value)
-                {
+            if (message.value) {
                 this.packageName = message.value;
                 console.log(`UnityMessagingClient: Detected Unity package: ${this.packageName}`);
             }
@@ -556,6 +640,16 @@ export class UnityMessagingClient {
         } else if (message.type === MessageType.Error) {
             messageHandledInternally = true;
             this.onErrorMessage.emit(message.value);
+        } else if (message.type === MessageType.Play) {
+            messageHandledInternally = true;
+            console.log('UnityMessagingClient: Unity started playing');
+            this.isUnityEditorPlaying = true;
+            this.onPlayStatus.emit(true);
+        } else if (message.type === MessageType.Stop) {
+            messageHandledInternally = true;
+            console.log('UnityMessagingClient: Unity stopped playing');
+            this.isUnityEditorPlaying = false;
+            this.onPlayStatus.emit(false);
         } else if (message.type === MessageType.Tcp) {
             messageHandledInternally = true;
             this.handleTcpMessage(message);
@@ -660,7 +754,7 @@ export class UnityMessagingClient {
             const lastSendTime = this.lastSendTimes.get(type) || 0;
             const timeSinceLastSend = Date.now() - lastSendTime;
             console.error(`UnityMessagingClient: Rate limit exceeded for message type ${type} (${MessageType[type]}). ` +
-                       `Minimum interval: ${rateLimitMs}ms, Time since last send: ${timeSinceLastSend}ms. Message discarded.`);
+                `Minimum interval: ${rateLimitMs}ms, Time since last send: ${timeSinceLastSend}ms. Message discarded.`);
             return false;
         }
 
@@ -669,27 +763,27 @@ export class UnityMessagingClient {
 
         // Wait for Unity to come online for non-heartbeat messages
         const isHeartbeatMessage = type === MessageType.Ping || type === MessageType.Pong;
-        
+
         if (!this.isUnityOnline && !isHeartbeatMessage) {
             console.log(`UnityMessagingClient: Unity is offline, waiting for Unity to come online - Type: ${type} (${MessageType[type]}), Value: "${value}", Timeout: ${timeoutMs}ms`);
-            
+
             const startTime = Date.now();
-            
+
             // Wait for Unity to come online with polling
             while (!this.isUnityOnline && (Date.now() - startTime) < timeoutMs) {
                 await wait(1000); // Wait 1 second
             }
-            
+
             // Check if Unity came online or we timed out
             if (!this.isUnityOnline) {
                 console.log(`UnityMessagingClient: Timeout waiting for Unity to come online - Type: ${type} (${MessageType[type]}), Value: "${value}"`);
                 return false;
             }
-            
+
             const elapsedTime = Date.now() - startTime;
             console.log(`UnityMessagingClient: Unity came online after ${elapsedTime}ms, sending message - Type: ${type} (${MessageType[type]}), Value: "${value}"`);
         }
-        
+
         try {
             await this.sendMessageInternal(type, value);
             return true;
@@ -745,10 +839,10 @@ export class UnityMessagingClient {
 
         // Write message type (4 bytes, little-endian)
         buffer.writeInt32LE(message.type, 0);
-        
+
         // Write string length (4 bytes, little-endian)
         buffer.writeInt32LE(valueBuffer.length, 4);
-        
+
         // Write string value
         valueBuffer.copy(buffer, 8);
 
@@ -765,10 +859,10 @@ export class UnityMessagingClient {
 
         // Read message type (4 bytes, little-endian)
         const type = buffer.readInt32LE(0) as MessageType;
-        
+
         // Read string length (4 bytes, little-endian)
         const stringLength = buffer.readInt32LE(4);
-        
+
         if (buffer.length < 8 + stringLength) {
             throw new Error('Invalid message format: incomplete string data');
         }
@@ -800,7 +894,7 @@ export class UnityMessagingClient {
      * @returns true if refresh was sent or queued successfully, false otherwise
      */
     async refreshAssetDatabase(): Promise<boolean> {
-        if(!this.isConnected){
+        if (!this.isConnected) {
             console.log('UnityMessagingClient: Not connected to Unity, cannot refresh asset database');
             return false;
         }
@@ -821,7 +915,7 @@ export class UnityMessagingClient {
                     console.log('UnityMessagingClient: Failed to send refresh asset database message');
                 }
                 return success;
-            }else{
+            } else {
                 console.log('UnityMessagingClient: Refresh asset database message not sent because Hot Reload is enabled');
                 return true; // Not sending due to Hot Reload is considered successful
             }
@@ -846,6 +940,13 @@ export class UnityMessagingClient {
     }
 
     /**
+     * Check if Unity is currently playing
+     */
+    get unityPlaying(): boolean {
+        return this.isUnityEditorPlaying;
+    }
+
+    /**
      * Get Unity package name
      */
     get unityPackageName(): string {
@@ -857,13 +958,6 @@ export class UnityMessagingClient {
      */
     get currentHeartbeat(): number {
         return this.currentHeartbeatInterval;
-    }
-
-    /**
-     * Get number of queued messages
-     */
-    get queuedMessageCount(): number {
-        return this.messageQueue.length;
     }
 
     /**
@@ -879,7 +973,7 @@ export class UnityMessagingClient {
     get connectedUnityProcessId(): number | null {
         return this.connectedProcessId;
     }
-        
+
     /**
      * Initialize default rate limits for message types that need throttling
      */
@@ -888,7 +982,7 @@ export class UnityMessagingClient {
         this.rateLimitConfig.set(MessageType.Refresh, 5000);
         this.rateLimitConfig.set(MessageType.ExecuteTests, 1000);
     }
-    
+
     /**
      * Check if a message type is currently rate limited
      */
@@ -897,16 +991,16 @@ export class UnityMessagingClient {
         if (!rateLimitMs) {
             return false; // No rate limit configured for this message type
         }
-        
+
         const lastSendTime = this.lastSendTimes.get(type);
         if (!lastSendTime) {
             return false; // First time sending this message type
         }
-        
+
         const timeSinceLastSend = Date.now() - lastSendTime;
         return timeSinceLastSend < rateLimitMs;
     }
-    
+
     /**
      * Update the last send time for a message type
      */
