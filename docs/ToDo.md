@@ -13,5 +13,5 @@
 - [x] 13. Make the log details panel down at the bottom not in the right side in Unity Console, because sometimes we have stack trace file path that can be long, better show them in one line.
 - [ ] 14. Don't run tests when Unity is in Play Mode.
 - [ ] 15. Sometimes (in rare cases) tests didn't run in Unity and we didn't detect that, resulting in test appears running for ever in VS Code.
-- [ ] 16. Now when we get tests, both edit mode and play mode will be blocked because of rate limits.
+- [x] 16. Now when we get tests, both edit mode and play mode will be blocked because of rate limits.
 - [ ] 17. We should refresh tests when Unity finised compilation, not when user get back to VS Code
