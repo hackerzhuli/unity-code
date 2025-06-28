@@ -3,6 +3,7 @@ import * as net from 'net';
 import { UnityDetector, UnityDetectionEvent } from './unityDetector.js';
 import { logWithLimit } from './utils.js';
 import { EventEmitter } from './eventEmitter.js';
+import { wait } from './asyncUtils.js';
 
 export enum MessageType {
     None = 0,
@@ -642,9 +643,12 @@ export class UnityMessagingClient {
 
     /**
      * Send message to Unity with rate limiting
-     * @returns true if message was sent or queued successfully, false if it was rejected/discarded
+     * @param type The message type to send
+     * @param value The message value to send
+     * @param timeoutMs Timeout in milliseconds to wait for Unity to come online (default: 30000ms)
+     * @returns true if message was sent successfully, false if it was rejected/discarded or timed out
      */
-    async sendMessage(type: MessageType, value: string): Promise<boolean> {
+    async sendMessage(type: MessageType, value: string, timeoutMs: number = 30000): Promise<boolean> {
         if (!this.socket || !this.isConnected) {
             console.error('Not connected to Unity');
             return false;
@@ -663,19 +667,27 @@ export class UnityMessagingClient {
         // Update last send time for rate limiting
         this.updateLastSendTime(type);
 
-        // Queue all non-heartbeat messages when Unity is offline for reliability
+        // Wait for Unity to come online for non-heartbeat messages
         const isHeartbeatMessage = type === MessageType.Ping || type === MessageType.Pong;
         
         if (!this.isUnityOnline && !isHeartbeatMessage) {
-            console.log(`UnityMessagingClient: Unity is offline, queuing message - Type: ${type} (${MessageType[type]}), Value: "${value}"`);
-            return new Promise((resolve, _reject) => {
-                this.messageQueue.push({ 
-                    type, 
-                    value, 
-                    resolve: () => resolve(true), 
-                    reject: () => resolve(false) 
-                });
-            });
+            console.log(`UnityMessagingClient: Unity is offline, waiting for Unity to come online - Type: ${type} (${MessageType[type]}), Value: "${value}", Timeout: ${timeoutMs}ms`);
+            
+            const startTime = Date.now();
+            
+            // Wait for Unity to come online with polling
+            while (!this.isUnityOnline && (Date.now() - startTime) < timeoutMs) {
+                await wait(1000); // Wait 1 second
+            }
+            
+            // Check if Unity came online or we timed out
+            if (!this.isUnityOnline) {
+                console.log(`UnityMessagingClient: Timeout waiting for Unity to come online - Type: ${type} (${MessageType[type]}), Value: "${value}"`);
+                return false;
+            }
+            
+            const elapsedTime = Date.now() - startTime;
+            console.log(`UnityMessagingClient: Unity came online after ${elapsedTime}ms, sending message - Type: ${type} (${MessageType[type]}), Value: "${value}"`);
         }
         
         try {
@@ -799,7 +811,7 @@ export class UnityMessagingClient {
             await this.unityDetector?.requestUnityState();
 
             // wait for 100 ms to allow receive Unity state
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await wait(100);
 
             if (!this.unityDetector.isHotReloadEnabled) {
                 const success = await this.sendMessage(MessageType.Refresh, '');

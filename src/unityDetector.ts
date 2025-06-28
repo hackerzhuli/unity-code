@@ -2,6 +2,7 @@ import * as dgram from 'dgram';
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from './eventEmitter.js';
 import { NativeBinaryLocator } from './nativeBinaryLocator.js';
+import { wait } from './asyncUtils.js';
 
 /**
  * Message types for native messaging protocol
@@ -159,7 +160,7 @@ export class UnityDetector {
         });
         
         // Give the binary time to start
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await wait(1000);
     }
     
     /**
