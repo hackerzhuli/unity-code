@@ -222,27 +222,24 @@ async function onDidCreateFiles(event: vscode.FileCreateEvent): Promise<void> {
 }
 
 /**
- * Handle window focus events for auto-refresh
+ * Handle Unity compilation finished events for auto-refresh
  */
-async function onDidChangeWindowState(windowState: vscode.WindowState): Promise<void> {
-    // Check if window focus refresh is enabled
-    const config = vscode.workspace.getConfiguration('unity-code');
-    const refreshOnFocusEnabled = config.get<boolean>('refreshOnWindowFocus', true);
-    
-    if (!refreshOnFocusEnabled || !globalTestProvider || !windowState.focused) {
+function setupCompilationFinishedRefresh(): void {
+    if (!globalTestProvider) {
         return;
     }
 
-    console.log('UnityCode: Window regained focus, refreshing tests...');
+    // Check if compilation refresh is enabled
+    const config = vscode.workspace.getConfiguration('unity-code');
+    const refreshOnCompilationEnabled = config.get<boolean>('refreshTestsOnCompilation', true);
     
-    try {
-        // Only refresh tests when window gains focus
-        if (globalTestProvider.messagingClient.connected) {
-            await globalTestProvider.refreshTests();
-        }
-    } catch (error) {
-        console.error('UnityCode: Error during focus refresh:', error);
+    if (!refreshOnCompilationEnabled) {
+        return;
     }
+
+    // The CompilationFinished message handler is already set up in UnityTestProvider
+    // This function just ensures the configuration is respected
+    console.log('UnityCode: Compilation-based test refresh is enabled');
 }
 
 /**
@@ -446,9 +443,6 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     // Listen for file save events for auto-refresh
     const saveDisposable = vscode.workspace.onDidSaveTextDocument(onDidSaveDocument);
 
-    // Listen for window state changes for focus-based refresh
-    const windowStateDisposable = vscode.window.onDidChangeWindowState(onDidChangeWindowState);
-
     // Create Unity status bar item for Unity projects
     if (globalUnityProjectManager && globalUnityProjectManager.isWorkingWithUnityProject()) {
         globalUnityStatusBarItem = createUnityStatusBarItem();
@@ -461,8 +455,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         renameDisposable,
         deleteDisposable,
         createDisposable,
-        saveDisposable,
-        windowStateDisposable
+        saveDisposable
     );
     
     // Add status bar item to subscriptions for proper cleanup
@@ -525,6 +518,9 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
 
     // Initialize test provider for Unity projects
     globalTestProvider = new UnityTestProvider(context, globalUnityMessagingClient, globalUnityProjectManager!);
+    
+    // Setup compilation-based test refresh
+    setupCompilationFinishedRefresh();
     
     // Initialize package helper for Unity projects
     const packageHelper = new UnityPackageHelper(unityProjectPath);

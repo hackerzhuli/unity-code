@@ -111,6 +111,14 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         });
 
         this.messagingClient.onMessage(MessageType.CompilationFinished, () => {
+            // Check if compilation refresh is enabled
+            const config = vscode.workspace.getConfiguration('unity-code');
+            const refreshOnCompilationEnabled = config.get<boolean>('refreshTestsOnCompilation', true);
+            
+            if (!refreshOnCompilationEnabled) {
+                return;
+            }
+            
             // Unity compilation finished, refresh tests automatically
             console.log('UnityCode: Compilation finished, refreshing tests...');
             this.discoverTests();

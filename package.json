@@ -118,10 +118,10 @@
           "default": true,
           "description": "Enable/disable automatic Unity asset database refresh when assets are saved, this will be automatically disabled if Hot Reload for Unity is running"
         },
-        "unity-code.refreshTestsOnWindowFocus": {
+        "unity-code.refreshTestsOnCompilation": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically refresh Unity tests when VS Code window regains focus"
+          "description": "Automatically refresh Unity tests when Unity compilation finishes"
         },
         "unity-code.debugger.stepOverPropertiesAndOperators": {
           "type": "boolean",
