@@ -412,18 +412,59 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         }
 
         this.setRunningState(true);
-        this.currentTestRun = this.testController.createTestRun(request);
         
         try {
             // If no specific tests requested, run all tests
             const testsToRun = request.include || this.getAllTests();
             
-            for (const test of testsToRun) {
+            // Unity test execution is unreliable with multiple tests, so we only support running one test at a time
+            if (testsToRun.length > 1) {
+                console.error('UnityCode: Multiple test execution is not supported due to Unity reliability issues. Running only the first test.');
+                vscode.window.showWarningMessage('UnityCode: Multiple test execution is not supported. Running only the first test.');
+            }
+            
+            // Create test run for only the first test
+            const testToRun = testsToRun[0];
+            if (testToRun) {
+                this.currentTestRun = this.testController.createTestRun(new vscode.TestRunRequest([testToRun]));
+                
                 if (token.isCancellationRequested) {
-                    break;
+                    return;
                 }
                 
-                await this.runSingleTest(test);
+                // Inline test execution logic
+                const testData = this.testData.get(testToRun);
+                if (!testData) {
+                    // This might be a container (mode or namespace), run all children
+                    for (const [, child] of testToRun.children) {
+                        const childTestData = this.testData.get(child);
+                        if (childTestData) {
+                            if (this.currentTestRun) {
+                                this.currentTestRun.started(child);
+                }
+                
+                            const success = await this.messagingClient.executeTests(childTestData.testMode, childTestData.fullName);
+                            if (!success) {
+                                console.error(`UnityCode: Failed to send test execution message for ${childTestData.fullName}`);
+                                if (this.currentTestRun) {
+                                    this.currentTestRun.skipped(child);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if (this.currentTestRun) {
+                        this.currentTestRun.started(testToRun);
+                    }
+                    
+                    const success = await this.messagingClient.executeTests(testData.testMode, testData.fullName);
+                    if (!success) {
+                        console.error(`UnityCode: Failed to send test execution message for ${testData.fullName}`);
+                        if (this.currentTestRun) {
+                            this.currentTestRun.failed(testToRun, new vscode.TestMessage('Failed to send test execution message to Unity'));
+                        }
+                    }
+                }
             }
             
         } catch (error) {
@@ -444,32 +485,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                     this.currentTestRun.end();
                     this.currentTestRun = null;
                 }
-            }
-        }
-    }
-
-    /**
-     * Run a single test
-     */
-    private async runSingleTest(test: vscode.TestItem): Promise<void> {
-        const testData = this.testData.get(test);
-        if (!testData) {
-            // This might be a container (mode or namespace), run all children
-            for (const [, child] of test.children) {
-                await this.runSingleTest(child);
-            }
-            return;
-        }
-
-        if (this.currentTestRun) {
-            this.currentTestRun.started(test);
-        }
-
-        try {
-            await this.messagingClient.executeTests(testData.testMode, testData.fullName);
-        } catch (error) {
-            if (this.currentTestRun) {
-                this.currentTestRun.failed(test, new vscode.TestMessage(`Failed to execute test: ${error instanceof Error ? error.message : String(error)}`));
             }
         }
     }
@@ -773,127 +788,85 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     }
 
     /**
-     * Find code lenses by grouping tests and finding matching symbols
+     * Find code lenses by creating one code lens per test class
      */
     private async findTestCodeLenses(
         symbols: vscode.DocumentSymbol[],
         document: vscode.TextDocument,
         codeLenses: vscode.CodeLens[],
         languageServerInfo: LanguageServerInfo
-    ): Promise<void> {
-        // Group tests by class and method
-        const testsByClass = new Map<string, TestAdaptor[]>();
-        const _processedSymbols = new Set<string>();
-        
-        // First, group all tests by their containing class
+    ): Promise<void> {        
+        // Create one code lens for each unique test class
         for (const test of this.allTests) {
-            const classPath = this.getClassPath(test.FullName);
-            if (!testsByClass.has(classPath)) {
-                testsByClass.set(classPath, []);
+            // make sure test is a class, not method/or namespace/or other things
+            if(!test.Type){
+                continue;
             }
-            testsByClass.get(classPath)!.push(test);
-        }
-        
-        // Skip creating code lenses for individual test methods since VS Code now shows run buttons automatically
-        // when tests have source locations. We only create code lenses for types/classes.
-        
-        // Create code lenses for test classes (containing multiple tests)
-        for (const [classPath, testsInClass] of testsByClass) {
-            if (testsInClass.length > 1) { // Only create class-level code lens if there are multiple tests
-                const classSymbol = findSymbolByPath(symbols, classPath, languageServerInfo);
-                if (classSymbol && (classSymbol.kind === vscode.SymbolKind.Class || classSymbol.kind === vscode.SymbolKind.Struct)) {
-                    console.log(`Found class symbol for ${testsInClass.length} tests: ${classPath}`);
-                    
-                    const codeLens = this.createCodeLens(classSymbol, testsInClass, document);
-                    if (codeLens) {
-                        codeLenses.push(codeLens);
-                    }
+
+            if(test.Method){
+                continue;
+            }
+
+            const classSymbol = findSymbolByPath(symbols, test.FullName, languageServerInfo);
+            if (classSymbol && (classSymbol.kind === vscode.SymbolKind.Class || classSymbol.kind === vscode.SymbolKind.Struct)) {
+                console.log(`Found class symbol for test class: ${test.FullName}`);
+                
+                const codeLen = this.createCodeLens(classSymbol, test, document);
+                if (codeLen) {
+                    codeLenses.push(codeLen);
                 }
             }
         }
     }
 
     /**
-     * Extract the class path from a full test name (removes the method name)
+     * Create a code lens for the given symbol and test
      */
-    private getClassPath(fullName: string): string {
-        const parts = fullName.split('.');
-        // Remove the last part (method name) to get the class path
-        return parts.slice(0, -1).join('.');
-    }
-
-    /**
-     * Create a code lens for the given symbol and tests
-     */
-    private createCodeLens(symbol: vscode.DocumentSymbol, tests: TestAdaptor[], _document: vscode.TextDocument): vscode.CodeLens | null {
+    private createCodeLens(symbol: vscode.DocumentSymbol, test: TestAdaptor, _document: vscode.TextDocument): vscode.CodeLens | null {
         // Use the symbol's selection range for better positioning
         const range = symbol.selectionRange;
         
         // Create code lens with test information
         const codeLens = new vscode.CodeLens(range);
         codeLens.command = {
-            title: this.getCodeLensTitle(tests),
+            title: this.getCodeLensTitle(test),
             command: 'unity-code.runTests',
-            arguments: [tests.map(t => t.FullName)]
+            arguments: [test.FullName]
         };
         
         return codeLens;
     }
 
     /**
-     * Get the title for the code lens based on test results
+     * Get the title for the code lens based on test result
      */
-    private getCodeLensTitle(tests: TestAdaptor[]): string {
-        if (tests.length === 0) {
-            return '';
-        }
-
-        const testCount = tests.length;
-        let passedCount = 0;
-        let failedCount = 0;
-        let skippedCount = 0;
-        let inconclusiveCount = 0;
-        let noResultCount = 0;
-
-        for (const test of tests) {
-            const result = this.testResults.get(test.FullName);
-            if (result === undefined) {
-                noResultCount++;
-            } else {
-                switch (result) {
-                    case TestStatusAdaptor.Passed:
-                        passedCount++;
-                        break;
-                    case TestStatusAdaptor.Failed:
-                        failedCount++;
-                        break;
-                    case TestStatusAdaptor.Skipped:
-                        skippedCount++;
-                        break;
-                    case TestStatusAdaptor.Inconclusive:
-                        inconclusiveCount++;
-                        break;
-                }
+    private getCodeLensTitle(test: TestAdaptor): string {
+        const result = this.testResults.get(test.FullName);
+        
+        let statusIcon = '⚪'; // Default for no result
+        if (result !== undefined) {
+            switch (result) {
+                case TestStatusAdaptor.Passed:
+                    statusIcon = '✅';
+                    break;
+                case TestStatusAdaptor.Failed:
+                    statusIcon = '❌';
+                    break;
+                case TestStatusAdaptor.Skipped:
+                    statusIcon = '⏭️';
+                    break;
+                case TestStatusAdaptor.Inconclusive:
+                    statusIcon = '❓';
+                    break;
             }
         }
-
-        // Build status string
-        const statusParts: string[] = [];
-        if (passedCount > 0) statusParts.push(`✅ ${passedCount}`);
-        if (failedCount > 0) statusParts.push(`❌ ${failedCount}`);
-        if (skippedCount > 0) statusParts.push(`⏭️ ${skippedCount}`);
-        if (inconclusiveCount > 0) statusParts.push(`❓ ${inconclusiveCount}`);
-        if (noResultCount > 0) statusParts.push(`⚪ ${noResultCount}`);
-
-        const statusText = statusParts.length > 0 ? ` (${statusParts.join(' ')})` : '';
-        const testText = testCount === 1 ? 'test' : 'tests';
         
         // Show running indicator when tests are executing
         if (this.isRunning) {
-            return `⏳ Running ${testCount} ${testText}${statusText}`;
+            return `⏳ Running class tests ${statusIcon}`;
         }
         
-        return `▶️ Run ${testCount} ${testText}${statusText}`;
+        return `▶️ Run class tests ${statusIcon}`;
     }
 
     /**

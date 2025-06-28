@@ -401,7 +401,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     });
 
     // Register the command to run tests from code lens
-    const runTestsDisposable = vscode.commands.registerCommand('unity-code.runTests', async function (testFullNames: string[]) {
+    const runTestsDisposable = vscode.commands.registerCommand('unity-code.runTests', async function (testFullName: string) {
         if (!globalTestProvider) {
             vscode.window.showWarningMessage('Unity Code: Test provider not available');
             return;
@@ -412,30 +412,21 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
             return;
         }
 
-        if (!testFullNames || testFullNames.length === 0) {
-            vscode.window.showWarningMessage('Unity Code: No tests specified to run');
+        if (!testFullName) {
+            vscode.window.showWarningMessage('Unity Code: No test specified to run');
             return;
         }
 
         try {
-            // Create a test run request for the specific tests
-            const testItems: vscode.TestItem[] = [];
-            
-            // Find test items by their full names
-            for (const fullName of testFullNames) {
-                const testItem = globalTestProvider.findTestByFullName(fullName);
-                if (testItem) {
-                    testItems.push(testItem);
-                }
-            }
-
-            if (testItems.length === 0) {
-                vscode.window.showWarningMessage('Unity Code: Could not find test items to run');
+            // Find test item by its full name
+            const testItem = globalTestProvider.findTestByFullName(testFullName);
+            if (!testItem) {
+                vscode.window.showWarningMessage('Unity Code: Could not find test item to run');
                 return;
             }
 
             // Create and execute test run request
-            const request = new vscode.TestRunRequest(testItems);
+            const request = new vscode.TestRunRequest([testItem]);
             await globalTestProvider.runTests(request, new vscode.CancellationTokenSource().token);
             
         } catch (error) {

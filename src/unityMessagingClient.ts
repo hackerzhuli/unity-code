@@ -885,7 +885,7 @@ export class UnityMessagingClient {
 
     /**
      * Execute tests in Unity
-     * @returns true if request was sent or queued successfully, false otherwise
+     * @returns true if request was sent, false otherwise
      */
     async executeTests(testMode: 'EditMode' | 'PlayMode', testName: string): Promise<boolean> {
         return await this.sendMessage(MessageType.ExecuteTests, `${testMode}:${testName}`);
