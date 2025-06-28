@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import { promisify } from 'util';
 import * as nodePath from 'path';
 
+
 /**
  * Console log with automatic truncation for long messages
  * Limits the entire log message to a maximum length to prevent console spam

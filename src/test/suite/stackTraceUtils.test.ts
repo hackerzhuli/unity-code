@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
-import { parseUnityTestStackTraceSourceLocation, processTestStackTraceToMarkdown } from '../../stackTraceUtils.js';
+import { parseUnityTestStackTraceSourceLocation, processTestStackTraceToMarkdown, parseUnityConsoleStackTraceSourceLocation, processConsoleLogStackTraceToMarkdown } from '../../stackTraceUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -295,6 +295,223 @@ describe('Stack Trace Utils Unit Tests', () => {
                 }
                 throw error;
             }
+        });
+    });
+
+    describe('parseUnityConsoleStackTraceSourceLocation', () => {
+        
+        describe('Basic console log parsing', () => {
+            it('should parse relative path correctly', () => {
+                const logLine = 'Script:AnotherMethod () (at Assets/Scripts/Script.cs:12)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.notStrictEqual(result, null);
+                const expectedStartIndex = logLine.indexOf('(at ') + 4; // Position after "(at "
+                const expectedEndIndex = logLine.indexOf(')', expectedStartIndex);
+                assert.strictEqual(result!.startIndex, expectedStartIndex);
+                assert.strictEqual(result!.endIndex, expectedEndIndex);
+                assert.strictEqual(result!.filePath, 'Assets/Scripts/Script.cs');
+                assert.strictEqual(result!.lineNumber, 12);
+            });
+            
+            it('should parse nested directory path', () => {
+                const logLine = 'GameManager:Start () (at Assets/Scripts/Managers/GameManager.cs:25)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'Assets/Scripts/Managers/GameManager.cs');
+                assert.strictEqual(result!.lineNumber, 25);
+            });
+            
+            it('should parse path with spaces in directory names', () => {
+                const logLine = 'PlayerController:Update () (at Assets/My Scripts/Player Controller.cs:45)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'Assets/My Scripts/Player Controller.cs');
+                assert.strictEqual(result!.lineNumber, 45);
+            });
+        });
+        
+        describe('Different file extensions', () => {
+            it('should parse .cs files', () => {
+                const logLine = 'Test:Method () (at Scripts/Test.cs:10)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'Scripts/Test.cs');
+                assert.strictEqual(result!.lineNumber, 10);
+            });
+            
+            it('should parse .js files', () => {
+                const logLine = 'Script:Function () (at Scripts/script.js:15)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'Scripts/script.js');
+                assert.strictEqual(result!.lineNumber, 15);
+            });
+        });
+        
+        describe('Edge cases and invalid inputs', () => {
+            it('should return null for log without "(at " keyword', () => {
+                const logLine = 'Script:Method () in Assets/Scripts/Script.cs:10';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.strictEqual(result, null);
+            });
+            
+            it('should return null for log without closing parenthesis', () => {
+                const logLine = 'Script:Method () (at Assets/Scripts/Script.cs:10';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.strictEqual(result, null);
+            });
+            
+            it('should return null for log without line number', () => {
+                const logLine = 'Script:Method () (at Assets/Scripts/Script.cs)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.strictEqual(result, null);
+            });
+            
+            it('should return null for invalid file extension', () => {
+                const logLine = 'Script:Method () (at Assets/Scripts/Script.txt:10)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.strictEqual(result, null);
+            });
+            
+            it('should return null for empty string', () => {
+                const result = parseUnityConsoleStackTraceSourceLocation('');
+                assert.strictEqual(result, null);
+            });
+            
+            it('should handle multiple "(at " occurrences correctly', () => {
+                const logLine = 'Script:Method (at something) (at Assets/Scripts/Script.cs:20)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'Assets/Scripts/Script.cs');
+                assert.strictEqual(result!.lineNumber, 20);
+            });
+        });
+        
+        describe('Real-world examples', () => {
+            it('should parse typical Unity console log format', () => {
+                const logLine = 'Script:Awake () (at Assets/Scripts/Script.cs:8)';
+                const result = parseUnityConsoleStackTraceSourceLocation(logLine);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, 'Assets/Scripts/Script.cs');
+                assert.strictEqual(result!.lineNumber, 8);
+                
+                // Verify that the extracted substring matches expected source location
+                const extractedSourceLocation = logLine.substring(result!.startIndex, result!.endIndex);
+                assert.strictEqual(extractedSourceLocation, 'Assets/Scripts/Script.cs:8');
+            });
+        });
+    });
+
+    describe('processConsoleLogStackTraceToMarkdown', () => {
+        const tempDir = path.join(__dirname, 'temp-console-log-test-dir');
+        const testProjectPath = path.join(tempDir, 'TestProject');
+        const testFile = path.join(testProjectPath, 'Assets', 'Scripts', 'TestScript.cs');
+        
+        before(async () => {
+            // Create test directory structure
+            const mkdir = promisify(fs.mkdir);
+            const writeFile = promisify(fs.writeFile);
+            
+            await mkdir(path.dirname(testFile), { recursive: true });
+            await writeFile(testFile, 'test content');
+        });
+        
+        after(async () => {
+            // Clean up test directories
+            const rmdir = promisify(fs.rmdir);
+            const unlink = promisify(fs.unlink);
+            
+            try {
+                await unlink(testFile);
+                await rmdir(path.dirname(testFile));
+                await rmdir(path.dirname(path.dirname(testFile)));
+                await rmdir(testProjectPath);
+                await rmdir(tempDir);
+            } catch (error) {
+                console.warn('Console log cleanup failed:', error);
+            }
+        });
+        
+        it('should return empty string for empty log text', async () => {
+            const result = await processConsoleLogStackTraceToMarkdown('', testProjectPath);
+            assert.strictEqual(result, '');
+        });
+        
+        it('should return original log when no project path provided', async () => {
+            const logText = 'Script:Method () (at Assets/Scripts/Script.cs:10)';
+            const result = await processConsoleLogStackTraceToMarkdown(logText, '');
+            assert.strictEqual(result, logText);
+        });
+        
+        it('should process console log with relative path', async () => {
+            const relativePath = 'Assets/Scripts/TestScript.cs';
+            const logText = `TestScript:TestMethod () (at ${relativePath}:25)`;
+            const result = await processConsoleLogStackTraceToMarkdown(logText, testProjectPath);
+            
+            // Should contain markdown link with relative path
+            assert.strictEqual(result.includes(`[${relativePath}:25]`), true);
+            assert.strictEqual(result.includes('file:///'), true);
+        });
+        
+        it('should keep original line when no source location found', async () => {
+            const logText = 'Some debug message without source location';
+            const result = await processConsoleLogStackTraceToMarkdown(logText, testProjectPath);
+            assert.strictEqual(result, logText);
+        });
+        
+        it('should handle multiple lines in console log', async () => {
+            const relativePath = 'Assets/Scripts/TestScript.cs';
+            const logText = [
+                `TestScript:Method1 () (at ${relativePath}:10)`,
+                'Debug message without location',
+                `TestScript:Method2 () (at ${relativePath}:20)`
+            ].join('\n');
+            
+            const result = await processConsoleLogStackTraceToMarkdown(logText, testProjectPath);
+            const lines = result.split('\n');
+            
+            // Should have 3 lines
+            assert.strictEqual(lines.length, 3);
+            
+            // First and third lines should contain markdown links
+            assert.strictEqual(lines[0].includes(`[${relativePath}:10]`), true);
+            assert.strictEqual(lines[2].includes(`[${relativePath}:20]`), true);
+            
+            // Second line should remain unchanged
+            assert.strictEqual(lines[1], 'Debug message without location');
+        });
+        
+        it('should handle absolute paths correctly', async () => {
+            const absolutePath = testFile;
+            const logText = `TestScript:TestMethod () (at ${absolutePath}:15)`;
+            
+            const result = await processConsoleLogStackTraceToMarkdown(logText, testProjectPath);
+            
+            // Should contain the absolute path in the link
+            assert.strictEqual(result.includes(absolutePath), true);
+            assert.strictEqual(result.includes('file:///'), true);
+        });
+        
+        it('should handle paths with spaces', async () => {
+            const pathWithSpaces = 'Assets/My Scripts/Test Script.cs';
+            const logText = `TestScript:Method () (at ${pathWithSpaces}:30)`;
+            
+            const result = await processConsoleLogStackTraceToMarkdown(logText, testProjectPath);
+            
+            // Should contain markdown link with the spaced path
+            assert.strictEqual(result.includes(`[${pathWithSpaces}:30]`), true);
+            assert.strictEqual(result.includes('file:///'), true);
         });
     });
 });

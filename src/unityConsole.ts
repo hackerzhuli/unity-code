@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { UnityProjectManager } from './unityProjectManager.js';
+import { parseUnityConsoleStackTraceSourceLocation } from './stackTraceUtils.js';
+import { openFileAtLine } from './vscodeUtils.js';
 
 export interface UnityLogEntry {
     id: string;
@@ -66,8 +68,6 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
                     case 'openFile':
                         if (message.stackTraceLine) {
                             this._openFileFromStackTrace(message.stackTraceLine);
-                        } else {
-                            this._openFileAtLine(message.filePath, message.line);
                         }
                         break;
                     case 'webviewReady':
@@ -177,79 +177,29 @@ export class UnityConsoleProvider implements vscode.WebviewViewProvider {
     
     private async _openFileFromStackTrace(stackTraceLine: string): Promise<void> {
         try {
-            // Parse Unity stack trace line to extract file path and line number
-            // Unity stack trace formats:
-            // 1. "Script:Awake () (at Assets/Scripts/Script.cs:10)"
-            // 2. "UnityEngine.Debug:Log(Object) (at C:/buildslave/unity/build/Runtime/Export/Debug.bindings.cs:35)"
-            // 3. "Assets/Scripts/Script.cs:10"
+            // Use the utility function to parse Unity console stack trace
+            const sourceLocation = parseUnityConsoleStackTraceSourceLocation(stackTraceLine);
             
-            let filePath: string | null = null;
-            let lineNumber = 1;
-            
-            // Try to match pattern: (at path/file.cs:line)
-            let match = stackTraceLine.match(/\(at\s+(.+\.cs):(\d+)\)/);
-            if (match) {
-                filePath = match[1];
-                lineNumber = parseInt(match[2]);
-            } else {
-                // Try to match pattern: path/file.cs:line
-                match = stackTraceLine.match(/([^\s]+\.cs):(\d+)/);
-                if (match) {
-                    filePath = match[1];
-                    lineNumber = parseInt(match[2]);
-                }
-            }
-            
-            if (!filePath) {
+            if (!sourceLocation) {                
                 console.error(`Could not parse file path from stack trace line: ${stackTraceLine}`);
                 return;
             }
             
-            // Remove any leading path separators or "Assets/" prefix for Unity relative paths
-            if (filePath.startsWith('Assets/') || filePath.startsWith('Assets\\')) {
-                filePath = filePath.substring(7); // Remove "Assets/" or "Assets\\"
+            // Get Unity project path from the project manager
+            const unityProjectPath = this._unityProjectManager?.getUnityProjectPath();
+            if (!unityProjectPath) {
+                console.error('UnityProjectManager is not initialized or Unity project path is not available');
+                return;
             }
             
-            await this._openFileAtLine(filePath, lineNumber);
+            await openFileAtLine(sourceLocation.filePath, sourceLocation.lineNumber, unityProjectPath);
             
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to parse stack trace: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
-    private async _openFileAtLine(filePath: string, line: number): Promise<void> {
-        try {
-            // Convert relative Unity path to absolute path
-            let absolutePath = filePath;
-            if (!path.isAbsolute(filePath)) {
-                if (!this._unityProjectManager){
-                    console.error('UnityProjectManager is not initialized');
-                    return;
-                }
-                const unityProjectPath = this._unityProjectManager.getUnityProjectPath();
-                if (unityProjectPath) {
-                    absolutePath = path.join(unityProjectPath, 'Assets', filePath);
-                }
-            }
-            
-            // Check if file exists
-            if (!fs.existsSync(absolutePath)) {
-                console.error(`File not found: ${absolutePath}`);
-                return;
-            }
-            
-            const document = await vscode.workspace.openTextDocument(absolutePath);
-            const editor = await vscode.window.showTextDocument(document);
-            
-            // Navigate to the specific line (VS Code uses 0-based line numbers)
-            const position = new vscode.Position(Math.max(0, line - 1), 0);
-            editor.selection = new vscode.Selection(position, position);
-            editor.revealRange(new vscode.Range(position, position));
-            
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
+
     
     private _getHtmlForWebview(webview: vscode.Webview): string {
         try {

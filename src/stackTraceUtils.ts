@@ -134,3 +134,116 @@ export async function processTestStackTraceToMarkdown(stackTrace: string, projec
     
     return processedLines.join('\n\n');
 }
+
+/**
+ * Parses a Unity Console log stack trace line to identify the source location part.
+ * Unity Console logs have a different format than test stack traces.
+ * 
+ * Expected format:
+ * - "Script:AnotherMethod () (at Assets/Scripts/Script.cs:12)"
+ * - "Script:Awake () (at Assets/Scripts/Script.cs:8)"
+ * 
+ * @param logLine A single line from Unity Console log
+ * @returns StackTraceSourceLocation object with indices and parsed data, or null if no source location found
+ */
+export function parseUnityConsoleStackTraceSourceLocation(logLine: string): StackTraceSourceLocation | null {
+    // Unity console log pattern: "ClassName:Method () (at FilePath:LineNumber)"
+    // The source location part is "FilePath:LineNumber" after "(at " and before ")"
+    
+    const atKeyword = '(at ';
+    const atIndex = logLine.lastIndexOf(atKeyword);
+    
+    if (atIndex === -1) {
+        return null;
+    }
+    
+    // Find the closing parenthesis after "(at "
+    const closingParenIndex = logLine.indexOf(')', atIndex);
+    if (closingParenIndex === -1) {
+        return null;
+    }
+    
+    // Start of source location is after "(at "
+    const sourceLocationStart = atIndex + atKeyword.length;
+    
+    // Extract the text between "(at " and ")"
+    const sourceLocationText = logLine.substring(sourceLocationStart, closingParenIndex).trim();
+    const colonMatch = sourceLocationText.match(/^(.+):(\d+)$/);
+    
+    if (!colonMatch) {
+        return null;
+    }
+    
+    const filePath = colonMatch[1];
+    const lineNumber = parseInt(colonMatch[2], 10);
+    
+    // Validate that this looks like a valid file path
+    // Should end with common code file extensions
+    if (!filePath.match(/\.(cs|js|ts|cpp|c|h|hpp)$/i)) {
+        return null;
+    }
+    
+    return {
+        startIndex: sourceLocationStart,
+        endIndex: closingParenIndex,
+        filePath,
+        lineNumber
+    };
+}
+
+/**
+ * Process Unity Console log stack trace to make file paths clickable in VS Code
+ * Converts relative paths to absolute paths and formats as markdown links
+ * @param logText The Unity Console log text (can be multi-line)
+ * @param projectPath The Unity project path
+ * @returns The processed log with clickable file links
+ */
+export async function processConsoleLogStackTraceToMarkdown(logText: string, projectPath: string): Promise<string> {
+    if (!logText || !logText.trim()) {
+        return '';
+    }
+
+    // If no project path is available, we can't process the log
+    if (!projectPath || !projectPath.trim()) {
+        return logText;
+    }
+
+    // Process each line of the log
+    const lines = logText.split('\n');
+    const processedLines: string[] = [];
+    
+    for (const line of lines) {
+        const sourceLocation = parseUnityConsoleStackTraceSourceLocation(line);
+        
+        if (sourceLocation) {
+            try {
+                // Unity console logs typically use relative paths
+                let absolutePath = sourceLocation.filePath;
+                
+                // If it's a relative path, make it absolute
+                if (!path.isAbsolute(sourceLocation.filePath)) {
+                    absolutePath = path.join(projectPath, sourceLocation.filePath);
+                }
+                
+                const normalizedAbsolutePath = await normalizePath(absolutePath);                
+                const markdownLink = `[${sourceLocation.filePath}:${sourceLocation.lineNumber}](file:///${normalizedAbsolutePath.replace(/\\/g, '/')}#${sourceLocation.lineNumber})`;
+                
+                // Replace the source location part with the markdown link
+                const beforeSourceLocation = line.substring(0, sourceLocation.startIndex);
+                const afterSourceLocation = line.substring(sourceLocation.endIndex);
+                const processedLine = beforeSourceLocation + markdownLink + afterSourceLocation;
+                processedLines.push(processedLine);
+                
+            } catch (error) {
+                // If path processing fails, keep the original line
+                console.warn(`Failed to process console log path: ${sourceLocation.filePath}`, error);
+                processedLines.push(line);
+            }
+        } else {
+            // No source location found, keep the original line
+            processedLines.push(line);
+        }
+    }
+    
+    return processedLines.join('\n');
+}
