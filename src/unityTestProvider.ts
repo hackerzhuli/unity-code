@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor } from './unityMessagingClient.js';
-import { logWithLimit, processTestStackTraceToMarkdown } from './utils.js';
+import { logWithLimit } from './utils.js';
+import { processTestStackTraceToMarkdown } from './stackTraceUtils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
 import { UnityProjectManager } from './unityProjectManager.js';
 
