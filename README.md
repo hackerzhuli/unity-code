@@ -38,7 +38,28 @@ If you would like, you can create a fork and publish it on [Open VSX](https://op
 ### Build
 First you have to build the native binaries, they are [unity_code_native](https://github.com/hackerzhuli/unity_code_native) and [UnityCodeSharp](https://github.com/hackerzhuli/UnityCodeSharp).
 
-Once you have built them, copy them(just the executables are enough) into the platform specific folder in bin directory. And proceed to build the extension.
+Once you have built them, copy them(just the executables are enough) into the platform specific folder in bin directory. Like shown below, only copy what is needed.
+
+```
+assets/
+├──unityConsole.html
+└──...
+bin/
+├── win_x64/
+│   ├── unity_code_native.exe
+│   └── MonoDebugger.exe
+├── linux_x64/
+│   ├── unity_code_native
+│   └── MonoDebugger
+└── mac_arm64/
+    ├── unity_code_native
+    └── MonoDebugger
+src/
+├──extension.ts
+└──...
+```
+
+And proceed to build the extension.
 
 ``` bash
 # Build the extension, TODO: show I include the command to install vsce?
