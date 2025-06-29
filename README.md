@@ -33,7 +33,7 @@ I only support Windows x64.
 
 For people who want to use this extension on other platforms, you have to build it yourself.
 
-If you would like, you can create a fork and publish it as your own extension for other platforms to share your build with the community. Your extension will be able to work with my Unity package without issues.
+If you would like, you can create a fork and publish it on [Open VSX](https://open-vsx.org/) as your own extension to share your build with the community. Your extension will be able to work with my Unity package without issues.
 
 ### Build
 First you have to build the native binaries, they are [unity_code_native](https://github.com/hackerzhuli/unity_code_native) and [UnityCodeSharp](https://github.com/hackerzhuli/UnityCodeSharp).
