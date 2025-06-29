@@ -1,26 +1,26 @@
-## Unity Code
+## Description
 
-Unity Code is a Visual Studio Code extension that enhances Unity development experience in Cursor, Windsurf and Trae with Unity Tests, Unity Debugger, another other useful features for Unity devlopment.
+Unity Code is a Visual Studio Code extension that enhances Unity development experience in Cursor, Windsurf and Trae with Unity Tests, Unity Debugger, and other useful features for Unity devlopment.
 
 ## Motivation
-Why create my own Unity extension when there is a official Unity extension? Because we are not allowed to use Unity extension and C# Dev Kit(Unity extension depends on) outside of VS Code according to their license or terms of use. That is why I decided to build Unity Code. So I and anyone else can develop Unity games in Cursor, Windsurf and Trae with ease. It's totally free and open source!
+Why create my own Unity extension when there is an official Unity extension? Because we are not allowed to use Unity extension and C# Dev Kit(Unity extension depends on) outside of VS Code according to their license or terms of use. That is why I decided to build Unity Code. So I can develop Unity games in Cursor, Windsurf and Trae with ease. So can you, it's totally free and open source!
 
 ## Features
 
 ### Unity Test Explorer
-Displays Unity tests in your code editor's Testing window. You can also run tests right where your method is at! See the test results and stack trace(for failed tests) right inside your test method!
+Displays Unity tests in your code editor's Testing window. Run tests right where your method is at! See the test results and stack trace(for failed tests) right inside your test method!
 
 ### Unity Console
 See Unity logs in your code editor with clickable stack trace!
 
 ### Unity Debugger
-Attach to Unity Editor directly from your code editor using the integrated MonoDebugger.
+Attach to Unity Editor from your code editor using the integrated MonoDebugger and crush the bugs!
 
 ### Automatic Meta File Renaming
 Automatically renames Unity `.meta` files when you rename assets in your code editor, making refactoring class names more easy. It also does what's needed when you move/delete an asset in your code editor.
 
 ### C# Documentation Hover
-Shows beautiful markdown from xml docs for in project classes and members. Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET and also some popular .NET libraries. 
+Shows beautiful markdown from xml docs for in project classes and members. Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET.
 
 ### Auto-refresh on C# File Save
 When you save a C# file in a Unity project, the extension will automatically trigger a recompile (if you have enabled it in settings).
