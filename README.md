@@ -19,7 +19,7 @@ Attach to Unity Editor from your code editor using the integrated MonoDebugger a
 ### Automatic Meta File Renaming
 Automatically renames Unity `.meta` files when you rename assets in your code editor, making refactoring class names more easy. It also does what's needed when you move/delete an asset in your code editor.
 
-### C# Documentation Hover
+### Mouse hover documentation for C#
 Shows beautiful markdown from xml docs for in project classes and members. Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET.
 
 ### Auto refresh asset database when saving assets
