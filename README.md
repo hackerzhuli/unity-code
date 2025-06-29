@@ -22,8 +22,8 @@ Automatically renames Unity `.meta` files when you rename assets in your code ed
 ### C# Documentation Hover
 Shows beautiful markdown from xml docs for in project classes and members. Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET.
 
-### Auto-refresh on C# File Save
-When you save a C# file in a Unity project, the extension will automatically trigger a recompile (if you have enabled it in settings).
+### Auto refresh asset database when saving assets
+When you save an asset in your code editor, the extension will automatically trigger an asset database refresh (if you have enabled it in settings), which means if you saved a C# script, it will trigger a recompile.
 
 ## Dependencies
 To use this extension, you have to first install my Unity package [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code) in Unity. Also this extension depends on [Dot Rush](https://github.com/JaneySprings/DotRush).
@@ -62,7 +62,7 @@ src/
 And proceed to build the extension.
 
 ``` bash
-# Build the extension, TODO: show I include the command to install vsce?
+# Build the extension, TODO: Should I include the command to install vsce?
 npm install
 npm run build
 ```
