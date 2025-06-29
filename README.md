@@ -1,72 +1,47 @@
 ## Unity Code
 
-A Visual Studio Code extension that enhances Unity development workflow with neat automatic tools, Unity Tests, and great official doc links or xml docs when mouse hover a symbol.
+Unity Code is a Visual Studio Code extension that enhances Unity development experience in Cursor, Windsurf and Trae with Unity Tests, Unity Debugger, another other useful features for Unity devlopment.
+
+## Motivation
+Why create my own Unity extension when there is a official Unity extension? Because we are not allowed to use Unity extension and C# Dev Kit(Unity extension depends on) outside of VS Code according to their license or terms of use. That is why I decided to build Unity Code. So I and anyone else can develop Unity games in Cursor, Windsurf and Trae with ease. It's totally free and open source!
 
 ## Features
 
-### Automatic Meta File Renaming
-Automatically renames Unity `.meta` files when you rename assets in VS Code, making refactoring class names more easy.
-
-### C# Documentation Hover
-Shows beautiful markdown from xml docs for in project classes and members.
-
-Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET and also some popular .NET libraries. 
-
 ### Unity Test Explorer
-Detects and displays Unity tests in VS Code's Test Explorer. Run tests directly inside VS Code!
-
-Also there is code lens above test methods and classes, run tests right after you wrote your code, just click on the run test button above the test method you changed(you must save the file to trigger Unity's refresh, see settings below).
-
-Also, you need to install my Visual Studio Editor package in Unity in order to leverage the full power of this extension. You can click run tests right when Unity Editor is compiling, and the tests will run right after the compile finished(Even Rider can't do this reliablely)! Thanks to my Unity package and this extension understanding Unity perfectly!
-
-### Language Server Integration
-Works with both C# Dev Kit and Dot Rush. Pick what you want.
-
-### VS Code Forks
-Should work in any VS Code fork, however my Unity package only supports popular VS Code forks for now but you can create a pull request for your favorate VS Code fork.
-
-### Auto-refresh on C# File Save
-When you save a C# file in a Unity project, the extension will trigger Unity's asset database refresh.
-
-This ensures Unity detects your code changes and triggers recompilation.
-
-### Unity Log Forwarding
-Receive Unity Editor log messages (Info, Warning, Error) directly in VS Code's Output Channel.
-
-Logs appear in the "Unity Logs" output channel with timestamps. You can access them via:
-- Command Palette: `Unity Code: Show Unity Logs`
-- View → Output → Select "Unity Logs" from dropdown
-
-Logs are also forwarded to the Debug Console for developers.
+Displays Unity tests in your code editor's Testing window. You can also run tests right where your method is at! See the test results and stack trace(for failed tests) right inside your test method!
 
 ### Unity Console
-View Unity logs in a dedicated console panel with filtering and clickable stack traces.
+See Unity logs in your code editor with clickable stack trace!
 
-The Unity Console appears in VS Code's bottom panel and provides:
-- Real-time Unity log display with Info, Warning, and Error filtering
-- Clickable stack traces that navigate directly to source files
-- Clear logs functionality and log history management
-- Command Palette: `Unity Code: Show Unity Console`
+### Unity Debugger
+Attach to Unity Editor directly from your code editor using the integrated MonoDebugger.
 
-### Unity Debugging
-Debug Unity projects directly from VS Code using the integrated MonoDebugger.
+### Automatic Meta File Renaming
+Automatically renames Unity `.meta` files when you rename assets in your code editor, making refactoring class names more easy. It also does what's needed when you move/delete an asset in your code editor.
 
-Features include:
-- **Attach to Unity Editor**: Seamlessly attach debugger to running Unity Editor
-- **Breakpoint Support**: Set and manage breakpoints in C# scripts
-- **Variable Inspection**: View and modify variable values during debugging
-- **Step Through Code**: Step over, into, and out of functions
-- **Call Stack Navigation**: Navigate through the execution call stack
-- **Exception Handling**: Break on exceptions with detailed information
-- **Configurable Options**: Customize debugging behavior through VS Code settings
+### C# Documentation Hover
+Shows beautiful markdown from xml docs for in project classes and members. Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET and also some popular .NET libraries. 
 
-**Platform Support**: Currently Windows x64 only (more platforms planned)
+### Auto-refresh on C# File Save
+When you save a C# file in a Unity project, the extension will automatically trigger a recompile (if you have enabled it in settings).
 
-See [Debugger Usage Guide](./docs/DebuggerUsage.md) for detailed setup and usage instructions.
+## Dependencies
+To use this extension, you have to first install my Unity package [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code) in Unity. Also this extension depends on Dot Rush.
 
-### Settings
-You can control the extension behavior with these settings:
+## Platform Support
+I only support Windows x64.
 
-- `unity-code.autoRefreshUnity` (default: `true`): Enable/disable automatic Unity asset database refresh when C# files are saved
-- `unity-code.refreshTestsOnWindowFocus` (default: `true`): Automatically refresh Unity tests when VS Code window regains focus
-- `unity-code.showUnityLogs` (default: `true`): Enable/disable Unity log messages forwarding to VS Code Output Channel
+For people who want to use this extension on other platforms, you have to build it yourself.
+
+If you would like, you can create a fork and publish it as your own extension for other platforms to share your build with the community. Your extension will be able to work with my Unity package without issues.
+
+### Build
+First you have to build the native binaries, they are [unity_code_native](https://github.com/hackerzhuli/unity_code_native) and [UnityCodeSharp](https://github.com/hackerzhuli/UnityCodeSharp).
+
+Once you have built them, copy them(just the executables are enough) into the platform specific folder in bin directory. And proceed to build the extension.
+
+``` bash
+# Build the extension, TODO: show I include the command to install vsce?
+npm install
+npm run build
+```
