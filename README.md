@@ -1,9 +1,9 @@
 ## Motivation
-Why create my own Unity extension when there is an official Unity extension? Because we are not allowed to use Unity extension and C# Dev Kit (which Unity extension depends on) outside of VS Code according to their license or terms of use. That is why I decided to build Unity Code. So I can develop Unity games in Cursor, Windsurf and Trae with ease. So can you, it's totally free and open source!
+Why create my own extension when there is an official Unity extension? Because we can't use Unity extension and C# Dev Kit (which Unity extension depends on) outside of VS Code. That is why I decided to build Unity Code. So I can develop Unity games in whichever VS Code fork I like with ease. So can you, it's totally free and open source!
 
 ## Description
 
-Unity Code is a Visual Studio Code extension that enhances Unity development experience in Cursor, Windsurf and Trae with Unity Tests, Unity Debugger, and other useful features for Unity game development.
+Unity Code is a Visual Studio Code extension that enables good Unity development experience in Cursor, Windsurf and Trae with Unity Tests, Unity Debugger, and other useful features for Unity game development.
 
 ## Features
 
