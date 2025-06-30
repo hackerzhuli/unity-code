@@ -70,7 +70,7 @@ All available message types:
 | `TestFinished` | 21 | Notification that a test has finished | Check specific section below for details |
 | `TestListRetrieved` | 22 | Notification that test list has been retrieved | Check specific section below for details |
 | `RetrieveTestList` | 23 | Request to retrieve list of available tests | Check specific section below for details |
-| `ExecuteTests` | 24 | Request to execute specific tests | Check specific section below for details |
+| `ExecuteTests` | 24 | Request to execute specific tests | Check specific section below for details / Response is empty string|
 | `ShowUsage` | 25 | Show usage information | JSON serialized FileUsage object |
 | `CompilationFinished` | 100 | Notification that compilation has finished | Empty string |
 | `PackageName` | 101 | Request/response for package name | Empty string (request) / Package name string (response) |
@@ -113,6 +113,9 @@ Detailed value formats for some of the types:
 - **Format**: `TestMode:FullTestName`
 - **Example**: `"EditMode:MyNamespace.MyTestClass.MyTestMethod"`
 - **Description**: Executes a specific test identified by its full name in the specified test mode
+
+Response:
+- A response that is empty is sent to the original client to confirm that the message is received and already processed.
 
 #### TestStarted (Value: 20)
 - **Format**: JSON serialized TestAdaptorContainer

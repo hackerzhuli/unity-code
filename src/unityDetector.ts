@@ -261,7 +261,7 @@ export class UnityDetector {
      * Clean up all pending requests
      */
     private cleanupPendingRequests(): void {
-        for (const [requestId, pendingRequest] of this.pendingRequests) {
+        for (const [_requestId, pendingRequest] of this.pendingRequests) {
             clearTimeout(pendingRequest.timeout);
             pendingRequest.resolve(null);
         }

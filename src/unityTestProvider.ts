@@ -21,7 +21,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private currentTestRun: vscode.TestRun | null = null;
     private isRunning: boolean = false;
     private testStartTimeout: NodeJS.Timeout | null = null;
-    private expectedTestName: string | null = null;
     
     // Code lens related properties
     private allTests: TestAdaptor[] = [];
@@ -97,9 +96,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         });
 
         this.messagingClient.onMessage(MessageType.RunStarted, () => {
-            // Test run started in Unity - clear the timeout since test actually started
+            // Test run started in Unity
             console.log('UnityCode: Test run started in Unity');
-            this.clearTestTimeout();
             this.setRunningState(true);
         });
 
@@ -110,11 +108,12 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 this.currentTestRun = null;
             }
             this.setRunningState(false);
-            this.clearTestTimeout();
         });
 
-        this.messagingClient.onMessage(MessageType.Pong, () => {
-            // Unity is responding, connection is alive
+        this.messagingClient.onMessage(MessageType.ExecuteTests, () => {
+            // Unity confirmed it received and processed the ExecuteTests request
+            console.log('UnityCode: Unity confirmed test execution request received');
+            this.clearTestTimeout();
         });
 
         this.messagingClient.onMessage(MessageType.CompilationFinished, async () => {
@@ -455,8 +454,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 this.currentTestRun = this.testController.createTestRun(new vscode.TestRunRequest([testToRun]));
                 this.currentTestRun.started(testToRun);
                 
-                // Set up timeout to detect if test actually starts
-                this.expectedTestName = testData.fullName;
+                // Set up timeout to detect if execute tests is actually received
                 this.testStartTimeout = setTimeout(() => {
                     console.error(`UnityCode: Test ${testData.fullName} did not start within 5 seconds, ending test run`);
                     if (this.currentTestRun) {
@@ -514,16 +512,16 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             return;
         }
         try {
-            let testContainer = JSON.parse(value) as TestAdaptorContainer;
+            const testContainer = JSON.parse(value) as TestAdaptorContainer;
 
             for (const test of testContainer.TestAdaptors) {
-                let testName = test.FullName;
+                const testName = test.FullName;
 
                 const testItem = this.findTestByFullName(testName);
                 if (testItem) {
                     // Check if this is a child test by verifying it's different from the main test we're running
                     const testData = this.testData.get(testItem);
-                    if (testData && testData.fullName !== this.expectedTestName) {
+                    if (testData) {
                         console.log(`UnityCode: Child test started: ${testName}`);
                         this.currentTestRun.started(testItem);
                     }
@@ -543,7 +541,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             clearTimeout(this.testStartTimeout);
             this.testStartTimeout = null;
         }
-        this.expectedTestName = null;
     }
 
     /**
