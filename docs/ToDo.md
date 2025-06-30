@@ -16,4 +16,4 @@
 - [x] 16. Now when we get tests, both edit mode and play mode will be blocked because of rate limits.
 - [x] 17. We should refresh tests when Unity finised compilation(and we don't need a setting for it), not when user get back to VS Code
 - [ ] 18. We should refresh unity packages here when finished compilation, or extension activation, other refreshes are not needed.
-- [ ] 19. Double click on the run button beside tests in Testing window will result in individual tests appearing running forever after the whole test run finished.
+- [x] 19. Double click on the run button beside tests in Testing window will result in individual tests appearing running forever after the whole test run finished.
