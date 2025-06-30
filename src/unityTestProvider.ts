@@ -20,6 +20,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private debugProfile: vscode.TestRunProfile;
     private currentTestRun: vscode.TestRun | null = null;
     private isRunning: boolean = false;
+    private testStartTimeout: NodeJS.Timeout | null = null;
+    private expectedTestName: string | null = null;
     
     // Code lens related properties
     private allTests: TestAdaptor[] = [];
@@ -90,6 +92,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             this.handleTestStarted(message.value);
         });
 
+        // Subscribe to TestStarted events from the messaging client
+        this.messagingClient.onTestStarted.subscribe((testName) => {
+            this.handleTestStartedEvent(testName);
+        });
+
         this.messagingClient.onMessage(MessageType.TestFinished, async (message) => {
             await this.handleTestFinished(message.value);
         });
@@ -106,6 +113,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 this.currentTestRun = null;
             }
             this.setRunningState(false);
+            this.clearTestTimeout();
         });
 
         this.messagingClient.onMessage(MessageType.Pong, () => {
@@ -449,6 +457,19 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 this.setRunningState(true);
                 this.currentTestRun = this.testController.createTestRun(new vscode.TestRunRequest([testToRun]));
                 this.currentTestRun.started(testToRun);
+                
+                // Set up timeout to detect if test actually starts
+                this.expectedTestName = testData.fullName;
+                this.testStartTimeout = setTimeout(() => {
+                    console.error(`UnityCode: Test ${testData.fullName} did not start within 5 seconds, ending test run`);
+                    if (this.currentTestRun) {
+                        this.currentTestRun.errored(testToRun, new vscode.TestMessage('Test did not start within 5 seconds. The test may not be running in Unity Editor.'));
+                        this.currentTestRun.end();
+                        this.currentTestRun = null;
+                    }
+                    this.setRunningState(false);
+                    this.clearTestTimeout();
+                }, 5000);
             }
         } catch (error) {
             console.error('UnityCode: Error running tests:', error);
@@ -461,6 +482,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                     this.currentTestRun.end();
                     this.currentTestRun = null;
                 }
+                this.clearTestTimeout();
             }
         }
     }
@@ -498,6 +520,43 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         } catch (error) {
             console.error('UnityCode: Error parsing test started message:', error);
         }
+    }
+
+    /**
+     * Handle test started event from Unity messaging client
+     */
+    private handleTestStartedEvent(testName: string): void {
+        //console.log(`UnityCode: Received TestStarted event for: ${testName}`);
+        
+        // Check if this is the test we're expecting for comfirming the test run
+        if (this.expectedTestName && testName === this.expectedTestName) {
+            console.log(`UnityCode: Test ${this.expectedTestName} started successfully`);
+            this.clearTestTimeout();
+        }
+
+        // Set individual tests (tests that is a child test of our running test) to started
+        if (this.currentTestRun) {
+            const testItem = this.findTestByFullName(testName);
+            if (testItem) {
+                // Check if this is a child test by verifying it's different from the main test we're running
+                const testData = this.testData.get(testItem);
+                if (testData && testData.fullName !== this.expectedTestName) {
+                    console.log(`UnityCode: Child test started: ${testName}`);
+                    this.currentTestRun.started(testItem);
+                }
+            }
+        }
+    }
+
+    /**
+     * Clear the test start timeout
+     */
+    private clearTestTimeout(): void {
+        if (this.testStartTimeout) {
+            clearTimeout(this.testStartTimeout);
+            this.testStartTimeout = null;
+        }
+        this.expectedTestName = null;
     }
 
     /**
