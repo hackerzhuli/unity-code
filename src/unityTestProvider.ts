@@ -92,11 +92,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             this.handleTestStarted(message.value);
         });
 
-        // Subscribe to TestStarted events from the messaging client
-        this.messagingClient.onTestStarted.subscribe((testName) => {
-            this.handleTestStartedEvent(testName);
-        });
-
         this.messagingClient.onMessage(MessageType.TestFinished, async (message) => {
             await this.handleTestFinished(message.value);
         });
@@ -513,38 +508,28 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
      * Handle test started message from Unity
      */
     private handleTestStarted(value: string): void {
+        if (!this.currentTestRun) {
+            return;
+        }
         try {
-            JSON.parse(value) as TestAdaptorContainer;
-            // Unity sends test started notifications
-            // We can use this to update test status if needed
-        } catch (error) {
-            console.error('UnityCode: Error parsing test started message:', error);
-        }
-    }
+            let testContainer = JSON.parse(value) as TestAdaptorContainer;
 
-    /**
-     * Handle test started event from Unity messaging client
-     */
-    private handleTestStartedEvent(testName: string): void {
-        //console.log(`UnityCode: Received TestStarted event for: ${testName}`);
-        
-        // Check if this is the test we're expecting for comfirming the test run
-        if (this.expectedTestName && testName === this.expectedTestName) {
-            console.log(`UnityCode: Test ${this.expectedTestName} started successfully`);
-            this.clearTestTimeout();
-        }
+            for (const test of testContainer.TestAdaptors) {
+                let testName = test.FullName;
 
-        // Set individual tests (tests that is a child test of our running test) to started
-        if (this.currentTestRun) {
-            const testItem = this.findTestByFullName(testName);
-            if (testItem) {
-                // Check if this is a child test by verifying it's different from the main test we're running
-                const testData = this.testData.get(testItem);
-                if (testData && testData.fullName !== this.expectedTestName) {
-                    console.log(`UnityCode: Child test started: ${testName}`);
-                    this.currentTestRun.started(testItem);
+                const testItem = this.findTestByFullName(testName);
+                if (testItem) {
+                    // Check if this is a child test by verifying it's different from the main test we're running
+                    const testData = this.testData.get(testItem);
+                    if (testData && testData.fullName !== this.expectedTestName) {
+                        console.log(`UnityCode: Child test started: ${testName}`);
+                        this.currentTestRun.started(testItem);
+                    }
                 }
             }
+
+        } catch (error) {
+            console.error('UnityCode: Error parsing test started message:', error);
         }
     }
 

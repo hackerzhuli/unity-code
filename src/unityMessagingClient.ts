@@ -311,14 +311,6 @@ export class UnityMessagingClient {
      */
     public readonly onErrorMessage = new EventEmitter<string>();
 
-    /**
-     * Event emitter for Unity test started messages
-     * Emits the test full name when a test starts
-     * It will be emitted for individual tests (methods) as well as test suites(classes, namespaces, etc.)
-     * @public
-     */
-    public readonly onTestStarted = new EventEmitter<string>();
-
     constructor(unityDetector: UnityDetector) {
         this.unityDetector = unityDetector;
         this.setupSocket();
@@ -657,21 +649,6 @@ export class UnityMessagingClient {
             console.log(`UnityMessagingClient: Unity play mode changed - IsPlaying: ${isPlaying}`);
             this.isUnityEditorPlaying = isPlaying;
             this.onPlayStatus.emit(isPlaying);
-        } else if (message.type === MessageType.TestStarted) {
-            messageHandledInternally = true;
-            try {
-                const testContainer: TestAdaptorContainer = JSON.parse(message.value);
-                // Only emit for top-level tests (tests with no parent, Parent === -1)
-                const topLevelTests = testContainer.TestAdaptors.filter(test => test.Parent === -1);
-                topLevelTests.forEach(test => {
-                    //console.log(`UnityMessagingClient: test started - ${test.FullName}`);
-                    this.onTestStarted.emit(test.FullName);
-                });
-            } catch (error) {
-                console.error('UnityMessagingClient: Failed to parse TestStarted message:', error);
-                // Fallback to original behavior if parsing fails
-                this.onTestStarted.emit(message.value);
-            }
         } else if (message.type === MessageType.Tcp) {
             messageHandledInternally = true;
             this.handleTcpMessage(message);
