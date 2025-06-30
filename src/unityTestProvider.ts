@@ -101,7 +101,12 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             this.setRunningState(true);
         });
 
-        this.messagingClient.onMessage(MessageType.RunFinished, () => {
+        this.messagingClient.onMessage(MessageType.RunFinished, async () => {
+            console.log("Unity Code: Test run finished");
+
+            // wait a bit because we may have some test results not received yet
+            await wait(500);
+
             // Test run finished in Unity
             if (this.currentTestRun) {
                 this.currentTestRun.end();
@@ -354,6 +359,10 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
      * Set the running state and update run profile availability
      */
     private setRunningState(running: boolean): void {
+        if(this.isRunning === running){
+            return;
+        }
+
         this.isRunning = running;
 
         // Dispose existing profiles
@@ -780,7 +789,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 document.uri
             );
 
-            console.log('Document symbols result:', symbols ? symbols.length : 'undefined');
+            //console.log('Document symbols result:', symbols ? symbols.length : 'undefined');
 
             if (!symbols || symbols.length === 0) {
                 return [];
