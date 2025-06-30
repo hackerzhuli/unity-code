@@ -17,7 +17,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private projectManager: UnityProjectManager;
     private testData = new WeakMap<vscode.TestItem, { uniqueName: string; fullName: string; testMode: 'EditMode' | 'PlayMode'; sourceLocation?: string }>();
     private runProfile: vscode.TestRunProfile;
-    private debugProfile: vscode.TestRunProfile;
     private currentTestRun: vscode.TestRun | null = null;
     private isRunning: boolean = false;
     private testStartTimeout: NodeJS.Timeout | null = null;
@@ -47,17 +46,10 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         context.subscriptions.push(this.codeLensProvider);
         context.subscriptions.push(this.onDidChangeCodeLensesEmitter);
 
-        // Create run profiles
+        // Create run profile
         this.runProfile = this.testController.createRunProfile(
             'Run Unity Tests',
             vscode.TestRunProfileKind.Run,
-            (request, token) => this.runTests(request, token),
-            true
-        );
-
-        this.debugProfile = this.testController.createRunProfile(
-            'Debug Unity Tests',
-            vscode.TestRunProfileKind.Debug,
             (request, token) => this.runTests(request, token),
             true
         );
@@ -363,23 +355,17 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             return;
         }
 
+        console.log(`UnityCode: Setting running state to ${running}`);
+
         this.isRunning = running;
 
-        // Dispose existing profiles
+        // Dispose existing profile
         this.runProfile.dispose();
-        this.debugProfile.dispose();
 
-        // Recreate profiles with updated availability
+        // Recreate profile with updated availability
         this.runProfile = this.testController.createRunProfile(
             'Run Unity Tests',
             vscode.TestRunProfileKind.Run,
-            (request, token) => this.runTests(request, token),
-            !running // Disable when running
-        );
-
-        this.debugProfile = this.testController.createRunProfile(
-            'Debug Unity Tests',
-            vscode.TestRunProfileKind.Debug,
             (request, token) => this.runTests(request, token),
             !running // Disable when running
         );
