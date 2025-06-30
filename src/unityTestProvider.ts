@@ -5,6 +5,7 @@ import { logWithLimit } from './utils.js';
 import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown } from './stackTraceUtils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
 import { UnityProjectManager } from './unityProjectManager.js';
+import { wait } from './asyncUtils.js';
 
 /**
  * Unity Test Provider for VS Code Testing API
@@ -111,7 +112,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             // Unity is responding, connection is alive
         });
 
-        this.messagingClient.onMessage(MessageType.CompilationFinished, () => {
+        this.messagingClient.onMessage(MessageType.CompilationFinished, async () => {
             // Check if compilation refresh is enabled
             const config = vscode.workspace.getConfiguration('unity-code');
             const refreshOnCompilationEnabled = config.get<boolean>('refreshTestsOnCompilation', true);
@@ -125,6 +126,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 console.log('UnityCode: Compilation finished, but tests are running. Skipping test refresh.');
                 return;
             }
+
+            // Wait a bit, because usually domain reload will happen right after compilation
+            // So we need to wait so that the message of Unity offline is received before we send the request
+            // Otherwise we will probably fail to refresh tests
+            await wait(1500);
             
             // Unity compilation finished, refresh tests automatically
             console.log('UnityCode: Compilation finished, refreshing tests...');
