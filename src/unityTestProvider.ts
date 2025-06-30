@@ -161,15 +161,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 }
                 return;
             }
-            
-            console.log('UnityCode: Connected to Unity, proceeding with test discovery...');
 
             // Request test lists for both modes
-            console.log('UnityCode: Requesting EditMode test list...');
+            console.log('UnityCode: Requesting test lists...');
             await this.messagingClient.requestTestList('EditMode');
-            console.log('UnityCode: Requesting PlayMode test list...');
             await this.messagingClient.requestTestList('PlayMode');
-            console.log('UnityCode: Test list requests sent, waiting for responses...');
             
         } catch (error) {
             console.error('UnityCode: Error discovering tests:', error);
