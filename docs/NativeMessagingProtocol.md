@@ -1,20 +1,23 @@
 # Messaging Protocol
 
-## base configuration
+## About the Server
+The server is implemented in rust, so the following types or structs are rust types or structs.
+
+## Base configuration
 We communicate through udp socket.
 
-port: 50000 + (pid % 1000)
+Port: 50000 + (pid % 1000)
 
-drops the client if no message is sent for 30 seconds.
+Drops the client if no message is sent for 30 seconds.
 
-## message format
-a byte for message type, 4 bytes (little endian) for payload length, the rest is a utf8 string, that is serialized json from struct, can be empty.
+## Message format
+A u8 for message type, an u32 for request id(0 if no request), an u32 for payload length, the rest is a utf8 string, which is serialized json from corresponding struct(can be empty if there is no struct for that message type). Note that multibyte integers are little endian in the message.
 
-### message table
-| message type | name | payload | description |
-| --- | --- | --- |
-| 0 | None | empty| does nothing, but can be used to keep the connection alive
-| 1 | GetUnityState | request is empty, response is ProcessState |
+### Message table
+| Message type | Name | Payload | Description |
+| --- | --- | --- | --- |
+| 0 | None | Empty | Does nothing(no response), but can be used to keep the connection alive |
+| 1 | GetUnityState | Request is empty, response is ProcessState | Get the current state of Unity process, including whether Hot Reload is enabled.
 
 ``` rust
 pub enum MessageType{
@@ -29,6 +32,6 @@ pub struct ProcessState {
 ```
 
 Notes for GetUnityState:
-- Even if there is no request, if Unity state change is detected, the client will get the message.
-- If client needs to know if Hot Reload for Unity is enabled, client must send the request
-- Checking process state can be slow, expect it to take 100ms
+- Even if there is no request, if Unity state change is detected, the client will still get the message, note that whether Hot Reload is enabled is not reliable, because a new Hot Reload for Unity process will not be detected unless requested (for performance reasons)
+- If a client wants to know whether Hot Reload is enabled for sure, it must send the request.
+- Detecting processes can be slow, it can take up to 100ms.

@@ -42,6 +42,8 @@ export class UnityDetector {
     private currentState: ProcessState = { UnityProcessId: 0, IsHotReloadEnabled: false };
     private projectPath: string;
     private nativeBinaryLocator: NativeBinaryLocator;
+    private nextRequestId: number = 1;
+    private pendingRequests: Map<number, { resolve: (value: ProcessState | null) => void; timeout: NodeJS.Timeout }> = new Map();
     
     /**
      * Constructor
@@ -115,6 +117,7 @@ export class UnityDetector {
         console.log('UnityDetector: Stopping Unity detection...');
         
         this.stopKeepAlive();
+        this.cleanupPendingRequests();
         this.closeUdp();
         this.stopNativeBinary();
         
@@ -123,13 +126,34 @@ export class UnityDetector {
     
     /**
      * Request current Unity state from native binary
+     * @param timeoutMs Timeout in milliseconds (default: 1000ms)
+     * @returns Promise that resolves to ProcessState or null if timeout
      */
-    public async requestUnityState(): Promise<void> {
+    public async requestUnityState(timeoutMs: number = 1000): Promise<ProcessState | null> {
         if (!this.isConnected) {
             throw new Error('Not connected to native binary');
         }
         
-        await this.sendMessage(MessageType.GetUnityState, '');
+        const requestId = this.nextRequestId++;
+        
+        return new Promise<ProcessState | null>((resolve) => {
+            // Set up timeout
+            const timeout = setTimeout(() => {
+                this.pendingRequests.delete(requestId);
+                resolve(null);
+            }, timeoutMs);
+            
+            // Store the pending request
+            this.pendingRequests.set(requestId, { resolve, timeout });
+            
+            // Send the request
+            this.sendMessage(MessageType.GetUnityState, '', requestId).catch(() => {
+                // If sending fails, clean up and resolve with null
+                this.pendingRequests.delete(requestId);
+                clearTimeout(timeout);
+                resolve(null);
+            });
+        });
     }
     
     /**
@@ -234,20 +258,32 @@ export class UnityDetector {
     }
     
     /**
+     * Clean up all pending requests
+     */
+    private cleanupPendingRequests(): void {
+        for (const [requestId, pendingRequest] of this.pendingRequests) {
+            clearTimeout(pendingRequest.timeout);
+            pendingRequest.resolve(null);
+        }
+        this.pendingRequests.clear();
+    }
+    
+    /**
      * Send message to native binary
      */
-    private async sendMessage(messageType: MessageType, payload: string): Promise<void> {
+    private async sendMessage(messageType: MessageType, payload: string, requestId: number = 0): Promise<void> {
         if (!this.udpClient || !this.isConnected) {
             throw new Error('UDP client not connected');
         }
         
         const payloadBuffer = Buffer.from(payload, 'utf8');
-        const messageBuffer = Buffer.allocUnsafe(5 + payloadBuffer.length);
+        const messageBuffer = Buffer.allocUnsafe(9 + payloadBuffer.length);
         
-        // Message format: 1 byte type + 4 bytes length (little endian) + payload
+        // Message format: 1 byte type + 4 bytes request id + 4 bytes length (little endian) + payload
         messageBuffer.writeUInt8(messageType, 0);
-        messageBuffer.writeUInt32LE(payloadBuffer.length, 1);
-        payloadBuffer.copy(messageBuffer, 5);
+        messageBuffer.writeUInt32LE(requestId, 1);
+        messageBuffer.writeUInt32LE(payloadBuffer.length, 5);
+        payloadBuffer.copy(messageBuffer, 9);
         
         return new Promise((resolve, reject) => {
             this.udpClient!.send(messageBuffer, this.port, 'localhost', (error) => {
@@ -264,26 +300,27 @@ export class UnityDetector {
      * Handle incoming message from native binary
      */
     private handleMessage(buffer: Buffer): void {
-        if (buffer.length < 5) {
+        if (buffer.length < 9) {
             console.error('UnityDetector: Invalid message length');
             return;
         }
         
         const messageType = buffer.readUInt8(0);
-        const payloadLength = buffer.readUInt32LE(1);
+        const requestId = buffer.readUInt32LE(1);
+        const payloadLength = buffer.readUInt32LE(5);
         
-        if (buffer.length < 5 + payloadLength) {
+        if (buffer.length < 9 + payloadLength) {
             console.error('UnityDetector: Message payload length mismatch');
             return;
         }
         
-        const payload = buffer.subarray(5, 5 + payloadLength).toString('utf8');
+        const payload = buffer.subarray(9, 9 + payloadLength).toString('utf8');
         
-        console.log(`UnityDetector: Received message type ${messageType} with payload: ${payload}`);
+        console.log(`UnityDetector: Received message type ${messageType}, request ID ${requestId} with payload: ${payload}`);
 
         switch (messageType) {
             case MessageType.GetUnityState:
-                this.handleUnityStateMessage(payload);
+                this.handleUnityStateMessage(payload, requestId);
                 break;
             case MessageType.None:
                 // Keep-alive response, no action needed
@@ -296,11 +333,19 @@ export class UnityDetector {
     /**
      * Handle Unity state message
      */
-    private handleUnityStateMessage(payload: string): void {
+    private handleUnityStateMessage(payload: string, requestId: number): void {
         try {
             const newState: ProcessState = JSON.parse(payload);
             const previousState = { ...this.currentState };
             this.currentState = newState;
+            
+            // If this is a response to a pending request, resolve it
+            if (requestId > 0 && this.pendingRequests.has(requestId)) {
+                const pendingRequest = this.pendingRequests.get(requestId)!;
+                clearTimeout(pendingRequest.timeout);
+                this.pendingRequests.delete(requestId);
+                pendingRequest.resolve(newState);
+            }
             
             // Check if state changed
             const stateChanged = 
@@ -320,6 +365,14 @@ export class UnityDetector {
             }
         } catch (error) {
             console.error('UnityDetector: Failed to parse Unity state message:', error);
+            
+            // If this was a response to a pending request, resolve with null
+            if (requestId > 0 && this.pendingRequests.has(requestId)) {
+                const pendingRequest = this.pendingRequests.get(requestId)!;
+                clearTimeout(pendingRequest.timeout);
+                this.pendingRequests.delete(requestId);
+                pendingRequest.resolve(null);
+            }
         }
     }
 }

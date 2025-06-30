@@ -906,9 +906,6 @@ export class UnityMessagingClient {
             // we need to know if Hot Reload for Unity is Enabled, if so, we dont want a Refresh
             await this.unityDetector?.requestUnityState();
 
-            // wait for 100 ms to allow receive Unity state
-            await wait(100);
-
             if (!this.unityDetector.isHotReloadEnabled) {
                 const success = await this.sendMessage(MessageType.Refresh, '');
                 if (success) {
