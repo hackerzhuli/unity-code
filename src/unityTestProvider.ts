@@ -393,7 +393,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         token: vscode.CancellationToken
     ): Promise<void> {
         if (this.isRunning) {
-            console.warn('UnityCode: Tests are already running. Please wait for the current test run to complete.');
+            vscode.window.showErrorMessage('UnityCode: Tests are already running. Please wait for the current test run to complete.');
             return;
         }
 
@@ -403,7 +403,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         }
 
         if (this.messagingClient.unityPlaying) {
-            console.warn('UnityCode: Cannot run tests while Unity is in Play Mode. Please stop Play Mode first.');
+            vscode.window.showErrorMessage('UnityCode: Cannot run tests while Unity is in Play Mode. Please stop Play Mode first.');
             return;
         }
 

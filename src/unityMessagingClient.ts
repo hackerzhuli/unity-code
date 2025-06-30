@@ -34,8 +34,9 @@ export enum MessageType {
     ShowUsage = 25,
     CompilationFinished = 100,
     PackageName = 101,
-    OnLine = 102,
-    OffLine = 103
+    Online = 102,
+    Offline = 103,
+    IsPlaying = 104
 }
 
 export interface UnityMessage {
@@ -605,14 +606,14 @@ export class UnityMessagingClient {
         // Handle Unity online/offline state changes
         let messageHandledInternally = false;
 
-        if (message.type === MessageType.OnLine) {
+        if (message.type === MessageType.Online) {
             messageHandledInternally = true;
             console.log('UnityMessagingClient: Unity online');
             this.isUnityOnline = true;
             this.onOnlineStatus.emit(true);
 
             this.handleFirstResponse();
-        } else if (message.type === MessageType.OffLine) {
+        } else if (message.type === MessageType.Offline) {
             messageHandledInternally = true;
             console.log('UnityMessagingClient: Unity went offline');
             this.isUnityOnline = false;
@@ -642,16 +643,12 @@ export class UnityMessagingClient {
         } else if (message.type === MessageType.Error) {
             messageHandledInternally = true;
             this.onErrorMessage.emit(message.value);
-        } else if (message.type === MessageType.Play) {
+        } else if (message.type === MessageType.IsPlaying) {
             messageHandledInternally = true;
-            console.log('UnityMessagingClient: Unity started playing');
-            this.isUnityEditorPlaying = true;
-            this.onPlayStatus.emit(true);
-        } else if (message.type === MessageType.Stop) {
-            messageHandledInternally = true;
-            console.log('UnityMessagingClient: Unity stopped playing');
-            this.isUnityEditorPlaying = false;
-            this.onPlayStatus.emit(false);
+            const isPlaying = message.value === 'true';
+            console.log(`UnityMessagingClient: Unity play mode changed - IsPlaying: ${isPlaying}`);
+            this.isUnityEditorPlaying = isPlaying;
+            this.onPlayStatus.emit(isPlaying);
         } else if (message.type === MessageType.Tcp) {
             messageHandledInternally = true;
             this.handleTcpMessage(message);
