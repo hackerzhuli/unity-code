@@ -16,7 +16,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     public messagingClient: UnityMessagingClient; // Made public for auto-refresh access
     private projectManager: UnityProjectManager;
     private testData = new WeakMap<vscode.TestItem, { uniqueName: string; fullName: string; testMode: 'EditMode' | 'PlayMode'; sourceLocation?: string }>();
-    private runProfile: vscode.TestRunProfile;
+    private runProfile: vscode.TestRunProfile | null = null;
     private currentTestRun: vscode.TestRun | null = null;
     private isRunning: boolean = false;
     private testStartTimeout: NodeJS.Timeout | null = null;
@@ -47,12 +47,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         context.subscriptions.push(this.onDidChangeCodeLensesEmitter);
 
         // Create run profile
-        this.runProfile = this.testController.createRunProfile(
-            'Run Unity Tests',
-            vscode.TestRunProfileKind.Run,
-            (request, token) => this.runTests(request, token),
-            true
-        );
+        this.createRunProfile();
 
         // Setup refresh handler
         this.testController.refreshHandler = () => this.discoverTests();
@@ -69,6 +64,22 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 console.log('UnityCode: Unity disconnected');
             }
         });
+    }
+
+    private createRunProfile() {
+        this.runProfile = this.testController.createRunProfile(
+            'Run Unity Tests',
+            vscode.TestRunProfileKind.Run,
+            (request, token) => this.runTests(request, token),
+            true
+        );
+    }
+
+    private removeRunProfile() {
+        if (this.runProfile) {
+            this.runProfile.dispose();
+            this.runProfile = null;
+        }
     }
 
     /**
@@ -358,6 +369,16 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         console.log(`UnityCode: Setting running state to ${running}`);
 
         this.isRunning = running;
+
+        if(running){
+            // remove the run profile so user can't click on run test button when test is running
+            // this prevents the issue where VS Code UI can't correctly display running state of tests
+            // when user clicks on the run test button when test is already running
+            this.removeRunProfile();
+        }else{
+            // restore the profile so that user can click on run test button again
+            this.createRunProfile();
+        }
 
         // Force immediate code lens refresh for running state changes
         this.forceCodeLensRefresh();
