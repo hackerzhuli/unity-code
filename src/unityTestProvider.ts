@@ -456,15 +456,16 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
 
                 // Set up timeout to detect if execute tests is actually received
                 this.testStartTimeout = setTimeout(() => {
-                    console.error(`UnityCode: Test ${testData.fullName} did not start within 5 seconds, ending test run`);
+                    vscode.window.showErrorMessage(`UnityCode: Failed to run tests, please try again`);
+                    console.error(`UnityCode: Test ${testData.fullName} did not start within 3 seconds, ending test run`);
                     if (this.currentTestRun) {
-                        this.currentTestRun.errored(testToRun, new vscode.TestMessage('Test did not start within 5 seconds. The test may not be running in Unity Editor.'));
+                        this.currentTestRun.errored(testToRun, new vscode.TestMessage('Test did not start within 3 seconds. Unity Editor may not have received the ExecuteTests message.'));
                         this.currentTestRun.end();
                         this.currentTestRun = null;
                     }
                     this.setRunningState(false);
                     this.clearTestTimeout();
-                }, 5000);
+                }, 3000);
             }
         } catch (error) {
             console.error('UnityCode: Error running tests:', error);
@@ -515,19 +516,22 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             const testContainer = JSON.parse(value) as TestAdaptorContainer;
 
             for (const test of testContainer.TestAdaptors) {
+                // we only care about the test at the root level, child test may not actually have started yet
+                if(test.Parent !== -1){
+                    continue;
+                }
+                
                 let testName = test.FullName;
 
                 const testItem = this.findTestByFullName(testName);
                 if (testItem) {
-                    // Check if this is a child test by verifying it's different from the main test we're running
                     const testData = this.testData.get(testItem);
                     if (testData) {
-                        console.log(`UnityCode: Child test started: ${testName}`);
+                        //console.log(`UnityCode: Child test started: ${testName}`);
                         this.currentTestRun.started(testItem);
                     }
                 }
             }
-
         } catch (error) {
             console.error('UnityCode: Error parsing test started message:', error);
         }
