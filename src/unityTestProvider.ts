@@ -401,7 +401,10 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     }
 
     /**
-     * Run tests(only support running one test at a time, due to limitation from Unity)
+     * Start running tests
+     * Only supports running one test at a time, due to limitation from Unity
+     * Do nothing if tests are already running or other cases where we should not run tests
+     * This only starts the test run by sending a message to Unity, it does not wait for tests to complete
      */
     public async runTests(
         request: vscode.TestRunRequest,
