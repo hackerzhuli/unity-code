@@ -56,6 +56,7 @@ export interface TestAdaptor {
     SourceLocation: string;
     IsHaveUnityTestAttribute: boolean;
     UniqueName: string;
+    IsTestAssembly: boolean;
 }
 
 export interface TestAdaptorContainer {

@@ -15,7 +15,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private testController: vscode.TestController;
     public messagingClient: UnityMessagingClient; // Made public for auto-refresh access
     private projectManager: UnityProjectManager;
-    private testData = new WeakMap<vscode.TestItem, { uniqueName: string; fullName: string; testMode: 'EditMode' | 'PlayMode'; sourceLocation?: string }>();
+    private testData = new WeakMap<vscode.TestItem, { uniqueName: string; fullName: string; isTestAssembly: boolean; testMode: 'EditMode' | 'PlayMode'; sourceLocation?: string }>();
     private runProfile: vscode.TestRunProfile | null = null;
     private currentTestRun: vscode.TestRun | null = null;
     private isRunning: boolean = false;
@@ -275,9 +275,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                     // Use the path as-is (either absolute or no project path available)
                     fileUri = vscode.Uri.file(filePath);
                 }
-            } else if (test.Assembly) {
-                // Fallback to Assembly field
-                fileUri = vscode.Uri.file(test.Assembly);
             }
 
             const testItem = this.testController.createTestItem(
@@ -307,8 +304,9 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             this.testData.set(testItem, {
                 uniqueName: test.UniqueName,
                 fullName: test.FullName,
+                isTestAssembly: test.IsTestAssembly,
                 testMode: testMode,
-                sourceLocation: test.SourceLocation
+                sourceLocation: test.SourceLocation,
             });
 
             testItems.set(index, testItem);
@@ -456,7 +454,10 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         try {
             // set running state before any await to prevent problems
             this.setRunningState(true);
-            const success = await this.messagingClient.executeTests(testData.testMode, testData.fullName);
+            // if it is an assembly we need to extract the file name
+            const filter = testData.isTestAssembly? path.basename(testData.fullName): testData.fullName;
+            //console.log(`UnityCode: Sending test execution message for ${testToRun.label}, filter is ${filter}`);
+            const success = await this.messagingClient.executeTests(testData.testMode, filter);
             if (!success) {
                 console.error(`UnityCode: Failed to send test execution message for ${testData.fullName}`);
                 this.setRunningState(false);

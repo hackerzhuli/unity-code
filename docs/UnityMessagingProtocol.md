@@ -181,6 +181,11 @@ internal class TestAdaptor
   /// A unique generated name for the test node. E.g., Tests.dll/MyNamespace/MyTestClass/[Tests][MyNamespace.MyTestClass.MyTest].
   /// </summary>
   public string UniqueName;
+
+  /// <summary>
+  /// Returns true if the node represents a test assembly, false otherwise.
+  /// </summary>
+  public bool IsTestAssembly;
 }
 ```
 
