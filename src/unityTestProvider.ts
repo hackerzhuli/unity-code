@@ -97,7 +97,9 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         });
 
         this.messagingClient.onMessage(MessageType.RunStarted, () => {
-            // Test run started in Unity
+            // Test run started in Unity - clear the timeout since test actually started
+            console.log('UnityCode: Test run started in Unity');
+            this.clearTestTimeout();
             this.setRunningState(true);
         });
 
