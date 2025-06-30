@@ -138,17 +138,12 @@ internal class TestAdaptorContainer
 internal class TestAdaptor
 {
   /// <summary>
-  /// The ID of the test tree node. The ID can change if you add new tests to the suite. Use UniqueName, if you want to have a more permanent point of reference.
-  /// </summary>
-  public string Id;
-  
-  /// <summary>
   /// The name of the test node.
-  /// </summary>
+  /// </summary>a
   public string Name;
   
   /// <summary>
-  /// The full name of the test including namespace and class.
+  /// The full name of the test including namespace and class, for assembly, the path of the assembly
   /// </summary>
   public string FullName;
 
@@ -158,14 +153,19 @@ internal class TestAdaptor
   public string Type;
   
   /// <summary>
-  /// The name of the test method.
+  /// The name of the test method, if it is not a method, empty
   /// </summary>
   public string Method;
 
   /// <summary>
-  /// The location of the assembly containing the test.
+  /// The name of the assembly containing the test(eg. MyNamespace.MyAssembly), if it is an assembly or not in an assembly, empty string
   /// </summary>
   public string Assembly;
+
+  /// <summary>
+  /// The mode of the test("PlayMode" or "EditMode")
+  /// </summary>
+  public string Mode;
   
   /// <summary>
   /// Index of parent in TestAdaptors array, -1 for root.
@@ -177,21 +177,6 @@ internal class TestAdaptor
   /// Only populated for methods and types, null for namespaces or assemblies or other things
   /// </summary>
   public string SourceLocation;
-
-  /// <summary>
-  /// Indicates if the test has the UnityTest attribute(if it is a method).
-  /// </summary>
-  public bool IsHaveUnityTestAttribute;
-
-  /// <summary>
-  /// A unique generated name for the test node. E.g., Tests.dll/MyNamespace/MyTestClass/[Tests][MyNamespace.MyTestClass.MyTest].
-  /// </summary>
-  public string UniqueName;
-
-  /// <summary>
-  /// Returns true if the node represents a test assembly, false otherwise.
-  /// </summary>
-  public bool IsTestAssembly;
 }
 ```
 
@@ -222,6 +207,16 @@ internal class TestResultAdaptor
   /// Gets the full name of the test result.
   /// </summary>
   public string FullName;
+
+  /// <summary>
+  /// Same as <see cref="TestAdaptor.Assembly"/>
+  /// </summary>
+  public string Assembly;
+
+  /// <summary>
+  /// Same as <see cref="TestAdaptor.Mode"/>
+  /// </summary>
+  public string Mode;
 
   /// <summary>
   /// The number of test cases that passed when running the test and all its children.

@@ -401,7 +401,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     });
 
     // Register the command to run tests from code lens
-    const runTestsDisposable = vscode.commands.registerCommand('unity-code.runTests', async function (testFullName: string) {
+    const runTestsDisposable = vscode.commands.registerCommand('unity-code.runTests', async function (testId: string) {
         if (!globalTestProvider) {
             vscode.window.showWarningMessage('Unity Code: Test provider not available');
             return;
@@ -412,14 +412,14 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
             return;
         }
 
-        if (!testFullName) {
+        if (!testId) {
             vscode.window.showWarningMessage('Unity Code: No test specified to run');
             return;
         }
 
         try {
             // Find test item by its full name
-            const testItem = globalTestProvider.findTestByFullName(testFullName);
+            const testItem = globalTestProvider.getTestItem(testId);
             if (!testItem) {
                 vscode.window.showWarningMessage('Unity Code: Could not find test item to run');
                 return;

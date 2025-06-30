@@ -46,7 +46,6 @@ export interface UnityMessage {
 }
 
 export interface TestAdaptor {
-    Id: string;
     Name: string;
     FullName: string;
     Type: string;
@@ -54,9 +53,7 @@ export interface TestAdaptor {
     Assembly: string;
     Parent: number;
     SourceLocation: string;
-    IsHaveUnityTestAttribute: boolean;
-    UniqueName: string;
-    IsTestAssembly: boolean;
+    Mode: string;
 }
 
 export interface TestAdaptorContainer {
@@ -73,6 +70,8 @@ export enum TestStatusAdaptor {
 export interface TestResultAdaptor {
     Name: string;
     FullName: string;
+    Assembly: string;
+    Mode: string;
     PassCount: number;
     FailCount: number;
     InconclusiveCount: number;
@@ -600,8 +599,9 @@ export class UnityMessagingClient {
         if (message.type !== MessageType.Ping && message.type !== MessageType.Pong &&
             message.type !== MessageType.Info && message.type !== MessageType.Warning && message.type !== MessageType.Error) {
             //logWithLimit(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
-            if (message.type === MessageType.TestListRetrieved)
+            if (message.type === MessageType.TestListRetrieved || message.type === MessageType.TestFinished) {
                 console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}"`);
+            }
         }
 
         // Handle Unity online/offline state changes
@@ -679,6 +679,7 @@ export class UnityMessagingClient {
 
             const tcpMessage = await this.receiveTcpMessage(port, length);
             if (tcpMessage) {
+                console.log(`receive tcp message success, length: ${length}, type: ${tcpMessage.type}`);
                 this.handleMessage(tcpMessage);
             }
         } catch (error) {

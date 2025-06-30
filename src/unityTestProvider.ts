@@ -11,6 +11,9 @@ interface TestData {
     fullName: string;
     testMode: 'EditMode' | 'PlayMode';
     sourceLocation?: string;
+    isType:boolean,
+    status:TestStatusAdaptor,
+    testItem:vscode.TestItem
 }
 
 /**
@@ -28,8 +31,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private testStartTimeout: NodeJS.Timeout | null = null;
 
     // Code lens related properties
-    private allTests: TestAdaptor[] = [];
-    private testResults = new Map<string, TestStatusAdaptor>();
+    //private allTests: TestAdaptor[] = [];
+    //private testResults = new Map<string, TestStatusAdaptor>();
     private codeLensProvider: vscode.Disposable | undefined;
     private symbolsInitialized: boolean = false;
     private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
@@ -247,14 +250,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             return;
         }
 
-        // Store tests for code lens functionality
-        // Remove existing tests for this mode and add new ones
-        this.allTests = this.allTests.filter(test => {
-            // Keep tests that don't match the current test mode by checking if any test in current container has same FullName
-            return !testContainer.TestAdaptors.some(newTest => newTest.FullName === test.FullName);
-        });
-        this.allTests.push(...testContainer.TestAdaptors);
-
         // Refresh code lenses
         this.onDidChangeCodeLensesEmitter.fire();
 
@@ -284,12 +279,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             }
 
             const testItem = this.testController.createTestItem(
-                `${testMode}_${test.UniqueName}`,
+                this.getIdForTest(test),
                 test.Name,
                 fileUri
             );
 
-            testItem.description = test.FullName;
             testItem.canResolveChildren = false;
 
             // Set range if we have source location with line number (only for methods, not types)
@@ -306,11 +300,16 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 }
             }
 
+            const oldTestData = this.testData.get(testItem.id);
+
             // Store test data
             this.testData.set(testItem.id, {
                 fullName: test.FullName,
                 testMode: testMode,
                 sourceLocation: test.SourceLocation,
+                isType: test.Type && !test.Method? true: false,
+                status: oldTestData?.status ?? TestStatusAdaptor.Inconclusive, // try to preserve test status(for code lens)
+                testItem:testItem
             });
 
             testItems.set(index, testItem);
@@ -338,6 +337,12 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             }
         });
 
+        // Add description to each test item
+        for(const testItem of testItems.values()){
+            const count = this.countLeafTest(testItem);
+            testItem.description = count > 1? count + " tests": "";
+        }
+
         // now we need to add the tests to our mode item
         // note that since root level test is always one item, it is unneeded
         // so we just add all children of root test to our mode item
@@ -345,11 +350,62 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         if(rootTest){
             const nonNullRootTest = rootTest as vscode.TestItem;
             this.testData.set(modeItem.id, this.testData.get(nonNullRootTest.id)!);
+            modeItem.description = nonNullRootTest.description;
+            
             for(const child of nonNullRootTest.children){
                 modeItem.children.add(child[1]);
             }
         }else{
             console.error("UnityCode: No root test found, this is not expected");
+        }
+    }
+
+    /**
+     * Count the number of leaf tests inside of this test, including itself
+     */
+    private countLeafTest(test:vscode.TestItem):number{
+        let count = 0;
+        if(test.children.size === 0){
+            return 1;
+        }
+        for(const child of test.children){
+            count += this.countLeafTest(child[1]);
+        }
+        return count;
+    }
+
+    /**
+     * Get all test id of this test, including itself
+     */
+    private getAllTestId(test:vscode.TestItem):string[]{
+        const ids:string[] = [];
+        ids.push(test.id);        
+        for(const [_id, child] of test.children){
+            ids.push(...this.getAllTestId(child));
+        }
+        return ids;
+    }
+
+    private getIdForTest(test: TestAdaptor): string {
+        return this.createTestId(test.Mode, test.Assembly, test.FullName);
+    }
+
+    private getIdForTestResult(test: TestResultAdaptor): string {
+        return this.createTestId(test.Mode, test.Assembly, test.FullName);
+    }
+
+    private createTestId(mode: string, assembly: string, fullName: string): string {
+        // this makes sure test id will persist
+        // unless assembly, namespace, class, method name are changed
+        // in which case user should expect test result will be lost
+        if(assembly){
+            return `${mode}.${assembly}.${fullName}`;
+        }else if (fullName.endsWith(".dll")) {
+            // for assembly, just the name is fine
+            return `${mode}.${path.basename(fullName)}`;
+        }else{
+            // above assembly is mode itself(for the current structure of our tests)
+            return mode;
         }
     }
 
@@ -378,6 +434,15 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
      */
     public isTestsRunning(): boolean {
         return this.isRunning;
+    }
+
+    /**
+     * Get the test item by its ID
+     * @param testId The ID of the test item
+     * @returns The test item or undefined if not found
+     */
+    public getTestItem(testId: string): vscode.TestItem | undefined {
+        return this.testData.get(testId)?.testItem;
     }
 
     /**
@@ -572,15 +637,12 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                     continue;
                 }
                 
-                const testName = test.FullName;
-
-                const testItem = this.findTestByFullName(testName);
+                const testId = this.getIdForTest(test);
+                const testItem = this.getTestItem(testId);
                 if (testItem) {
-                    const testData = this.testData.get(testItem.id);
-                    if (testData) {
-                        //console.log(`UnityCode: Child test started: ${testName}`);
-                        this.currentTestRun.started(testItem);
-                    }
+                    this.currentTestRun.started(testItem);
+                }else{
+                    console.warn(`UnityCode: Could not find test item for ${test.FullName}, id is ${testId}`);
                 }
             }
         } catch (error) {
@@ -714,20 +776,29 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
      * Update test result in VS Code
      */
     private async updateTestResult(result: TestResultAdaptor): Promise<void> {
-        // Store test result for code lens
-        this.testResults.set(result.FullName, result.TestStatus);
+        const testId = this.getIdForTestResult(result);
 
-        // Force immediate code lens refresh to show updated status
-        this.forceCodeLensRefresh();
+        // Store test result for code lens
+        const testData = this.testData.get(testId);
+        if(!testData){
+            return;
+        }
+
+        testData.status = result.TestStatus;
 
         if (!this.currentTestRun) {
             return;
         }
 
+        // Force immediate code lens refresh to show updated status
+        if(testData.isType){
+            this.forceCodeLensRefresh();
+        }
+
         // Find the test item by full name
-        const testItem = this.findTestByFullName(result.FullName);
+        const testItem = testData.testItem;
         if (!testItem) {
-            console.warn(`UnityCode: Could not find test item for ${result.FullName}`);
+            console.warn(`UnityCode: Could not find test item for ${result.FullName}, id is ${testId}`);
             return;
         }
 
@@ -782,29 +853,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     }
 
     /**
-     * Find test item by full name
-     */
-    public findTestByFullName(fullName: string): vscode.TestItem | null {
-        const findInCollection = (collection: vscode.TestItemCollection): vscode.TestItem | null => {
-            for (const [, item] of collection) {
-                const testData = this.testData.get(item.id);
-                if (testData && testData.fullName === fullName) {
-                    return item;
-                }
-
-                // Search in children
-                const found = findInCollection(item.children);
-                if (found) {
-                    return found;
-                }
-            }
-            return null;
-        };
-
-        return findInCollection(this.testController.items);
-    }
-
-    /**
      * Manually refresh tests from Unity
      */
     async refreshTests(): Promise<void> {
@@ -816,7 +864,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
      * Provide code lenses for C# test methods and classes
      */
     async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<vscode.CodeLens[]> {
-        if (token.isCancellationRequested || this.allTests.length === 0) {
+        if (token.isCancellationRequested) {
             return [];
         }
 
@@ -835,15 +883,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
 
             if (!symbols || symbols.length === 0) {
                 return [];
-            }
-
-            // Debug: Log available tests
-            console.log(`Available tests count: ${this.allTests.length}`);
-            if (this.allTests.length > 0) {
-                console.log(`Sample test data:`);
-                this.allTests.slice(0, 5).forEach((test, i) => {
-                    console.log(`  Test ${i}: Name="${test.Name}", FullName="${test.FullName}", Type="${test.Type}", Method="${test.Method}", Parent=${test.Parent}`);
-                });
             }
 
             // Detect language server once at entry point for optimization
@@ -871,23 +910,21 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         languageServerInfo: LanguageServerInfo
     ): Promise<void> {
         // Create one code lens for each unique test class
-        for (const test of this.allTests) {
-            // make sure test is a class, not method/or namespace/or other things
-            if (!test.Type) {
-                continue;
-            }
-
-            if (test.Method) {
-                continue;
-            }
-
-            const classSymbol = findSymbolByPath(symbols, test.FullName, languageServerInfo);
-            if (classSymbol && (classSymbol.kind === vscode.SymbolKind.Class || classSymbol.kind === vscode.SymbolKind.Struct)) {
-                console.log(`Found class symbol for test class: ${test.FullName}`);
-
-                const codeLen = this.createCodeLens(classSymbol, test, document);
-                if (codeLen) {
-                    codeLenses.push(codeLen);
+        for (const [_, topLevelTestItem] of this.testController.items) {
+            for (const testId of this.getAllTestId(topLevelTestItem)) {
+                const testData = this.testData.get(testId);
+                if (!testData) {
+                    continue;
+                }
+                if (!testData.isType) {
+                    continue;
+                }
+                const classSymbol = findSymbolByPath(symbols, testData.fullName, languageServerInfo);
+                if (classSymbol && (classSymbol.kind === vscode.SymbolKind.Class || classSymbol.kind === vscode.SymbolKind.Struct)) {
+                    const codeLen = this.createCodeLens(classSymbol, testData, document);
+                    if (codeLen) {
+                        codeLenses.push(codeLen);
+                    }
                 }
             }
         }
@@ -896,16 +933,16 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     /**
      * Create a code lens for the given symbol and test
      */
-    private createCodeLens(symbol: vscode.DocumentSymbol, test: TestAdaptor, _document: vscode.TextDocument): vscode.CodeLens | null {
+    private createCodeLens(symbol: vscode.DocumentSymbol, testData: TestData, _document: vscode.TextDocument): vscode.CodeLens | null {
         // Use the symbol's selection range for better positioning
         const range = symbol.selectionRange;
 
         // Create code lens with test information
         const codeLens = new vscode.CodeLens(range);
         codeLens.command = {
-            title: this.getCodeLensTitle(test),
+            title: this.getCodeLensTitle(testData),
             command: 'unity-code.runTests',
-            arguments: [test.FullName]
+            arguments: [testData.testItem.id]
         };
 
         return codeLens;
@@ -914,8 +951,9 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     /**
      * Get the title for the code lens based on test result
      */
-    private getCodeLensTitle(test: TestAdaptor): string {
-        const result = this.testResults.get(test.FullName);
+    private getCodeLensTitle(testData: TestData): string {
+
+        const result = testData.status;
 
         let statusIcon = '⚪'; // Default for no result
         if (result !== undefined) {
@@ -935,12 +973,16 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             }
         }
 
+        const testCount = this.countLeafTest(testData.testItem);
+
+        const name = testCount > 1? `${testCount} tests`: "class tests";
+
         // Show running indicator when tests are executing
         if (this.isRunning) {
-            return `⏳ Running class tests ${statusIcon}`;
+            return `⏳ Running ${name} ${statusIcon}`;
         }
 
-        return `▶️ Run class tests ${statusIcon}`;
+        return `▶️ Run ${name} ${statusIcon}`;
     }
 
     /**
