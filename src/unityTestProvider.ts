@@ -359,17 +359,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
 
         this.isRunning = running;
 
-        // Dispose existing profile
-        this.runProfile.dispose();
-
-        // Recreate profile with updated availability
-        this.runProfile = this.testController.createRunProfile(
-            'Run Unity Tests',
-            vscode.TestRunProfileKind.Run,
-            (request, token) => this.runTests(request, token),
-            !running // Disable when running
-        );
-
         // Force immediate code lens refresh for running state changes
         this.forceCodeLensRefresh();
     }
@@ -441,11 +430,13 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         }
 
         try {
+            // set running state before any await to prevent problems
+            this.setRunningState(true);
             const success = await this.messagingClient.executeTests(testData.testMode, testData.fullName);
             if (!success) {
                 console.error(`UnityCode: Failed to send test execution message for ${testData.fullName}`);
+                this.setRunningState(false);
             } else {
-                this.setRunningState(true);
                 this.currentTestRun = this.testController.createTestRun(new vscode.TestRunRequest([testToRun]));
                 this.currentTestRun.started(testToRun);
 

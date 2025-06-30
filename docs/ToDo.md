@@ -12,7 +12,8 @@
 - [x] 12. Automatic Rename/Remove .meta file should check for Assets folder and Packages folder, or that the file is an asset
 - [x] 13. Make the log details panel down at the bottom not in the right side in Unity Console, because sometimes we have stack trace file path that can be long, better show them in one line.
 - [x] 14. Don't run tests when Unity is in Play Mode.
-- [ ] 15. Sometimes (in rare cases) tests didn't run in Unity and we didn't detect that, resulting in test appears running for ever in VS Code.
+- [x] 15. Sometimes (in rare cases) tests didn't run in Unity and we didn't detect that, resulting in test appears running for ever in VS Code.
 - [x] 16. Now when we get tests, both edit mode and play mode will be blocked because of rate limits.
 - [x] 17. We should refresh tests when Unity finised compilation(and we don't need a setting for it), not when user get back to VS Code
 - [ ] 18. We should refresh unity packages here when finished compilation, or extension activation, other refreshes are not needed.
+- [ ] 19. Double click on the run button beside tests in Testing window will result in individual tests appearing running forever after the whole test run finished.
