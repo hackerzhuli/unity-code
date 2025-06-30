@@ -1,0 +1,95 @@
+{
+    "TestAdaptors": [
+        {
+            "Id": "1067",
+            "Name": "TestUnityCode",
+            "FullName": "TestUnityCode",
+            "Type": "",
+            "Method": "",
+            "Assembly": "",
+            "Parent": -1,
+            "SourceLocation": "",
+            "IsHaveUnityTestAttribute": true,
+            "UniqueName": "[TestUnityCode][suite]",
+            "IsTestAssembly": false
+        },
+        {
+            "Id": "1073",
+            "Name": "RealPlayModeTests.dll",
+            "FullName": "F:/projects/unity/TestUnityCode/Library/ScriptAssemblies/RealPlayModeTests.dll",
+            "Type": "",
+            "Method": "",
+            "Assembly": "",
+            "Parent": 0,
+            "SourceLocation": "",
+            "IsHaveUnityTestAttribute": true,
+            "UniqueName": "[RealPlayModeTests][F:/projects/unity/TestUnityCode/Library/ScriptAssemblies/RealPlayModeTests.dll][suite]",
+            "IsTestAssembly": true
+        },
+        {
+            "Id": "1068",
+            "Name": "RealPlayModeTest",
+            "FullName": "RealPlayModeTest",
+            "Type": "RealPlayModeTest",
+            "Method": "",
+            "Assembly": "",
+            "Parent": 1,
+            "SourceLocation": "Assets/RealPlayModeTests/RealPlayModeTest.cs:1",
+            "IsHaveUnityTestAttribute": true,
+            "UniqueName": "RealPlayModeTests.dll/[RealPlayModeTests][RealPlayModeTest][suite]",
+            "IsTestAssembly": false
+        },
+        {
+            "Id": "1069",
+            "Name": "RealPlayModeTestSimplePasses",
+            "FullName": "RealPlayModeTest.RealPlayModeTestSimplePasses",
+            "Type": "RealPlayModeTest",
+            "Method": "RealPlayModeTestSimplePasses",
+            "Assembly": "",
+            "Parent": 2,
+            "SourceLocation": "Assets/RealPlayModeTests/RealPlayModeTest.cs:13",
+            "IsHaveUnityTestAttribute": false,
+            "UniqueName": "RealPlayModeTests.dll/RealPlayModeTest/[RealPlayModeTests][RealPlayModeTest.RealPlayModeTestSimplePasses]",
+            "IsTestAssembly": false
+        },
+        {
+            "Id": "1070",
+            "Name": "RealPlayModeTestWithEnumeratorPasses",
+            "FullName": "RealPlayModeTest.RealPlayModeTestWithEnumeratorPasses",
+            "Type": "RealPlayModeTest",
+            "Method": "RealPlayModeTestWithEnumeratorPasses",
+            "Assembly": "",
+            "Parent": 2,
+            "SourceLocation": "Assets/RealPlayModeTests/RealPlayModeTest.cs:23",
+            "IsHaveUnityTestAttribute": true,
+            "UniqueName": "RealPlayModeTests.dll/RealPlayModeTest/[RealPlayModeTests][RealPlayModeTest.RealPlayModeTestWithEnumeratorPasses]",
+            "IsTestAssembly": false
+        },
+        {
+            "Id": "1071",
+            "Name": "RealPlayModeTestWithEnumeratorPasses2",
+            "FullName": "RealPlayModeTest.RealPlayModeTestWithEnumeratorPasses2",
+            "Type": "RealPlayModeTest",
+            "Method": "RealPlayModeTestWithEnumeratorPasses2",
+            "Assembly": "",
+            "Parent": 2,
+            "SourceLocation": "Assets/RealPlayModeTests/RealPlayModeTest.cs:32",
+            "IsHaveUnityTestAttribute": true,
+            "UniqueName": "RealPlayModeTests.dll/RealPlayModeTest/[RealPlayModeTests][RealPlayModeTest.RealPlayModeTestWithEnumeratorPasses2]",
+            "IsTestAssembly": false
+        },
+        {
+            "Id": "1072",
+            "Name": "RealPlayModeTestWithEnumeratorPasses3",
+            "FullName": "RealPlayModeTest.RealPlayModeTestWithEnumeratorPasses3",
+            "Type": "RealPlayModeTest",
+            "Method": "RealPlayModeTestWithEnumeratorPasses3",
+            "Assembly": "",
+            "Parent": 2,
+            "SourceLocation": "Assets/RealPlayModeTests/RealPlayModeTest.cs:41",
+            "IsHaveUnityTestAttribute": true,
+            "UniqueName": "RealPlayModeTests.dll/RealPlayModeTest/[RealPlayModeTests][RealPlayModeTest.RealPlayModeTestWithEnumeratorPasses3]",
+            "IsTestAssembly": false
+        }
+    ]
+}

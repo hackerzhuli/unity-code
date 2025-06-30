@@ -7,6 +7,12 @@ import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './la
 import { UnityProjectManager } from './unityProjectManager.js';
 import { wait } from './asyncUtils.js';
 
+interface TestData {
+    fullName: string;
+    testMode: 'EditMode' | 'PlayMode';
+    sourceLocation?: string;
+}
+
 /**
  * Unity Test Provider for VS Code Testing API
  * Manages test discovery, execution, and result reporting
@@ -15,7 +21,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private testController: vscode.TestController;
     public messagingClient: UnityMessagingClient; // Made public for auto-refresh access
     private projectManager: UnityProjectManager;
-    private testData = new WeakMap<vscode.TestItem, { uniqueName: string; fullName: string; isTestAssembly: boolean; testMode: 'EditMode' | 'PlayMode'; sourceLocation?: string }>();
+    private testData = new Map<string, TestData>();
     private runProfile: vscode.TestRunProfile | null = null;
     private currentTestRun: vscode.TestRun | null = null;
     private isRunning: boolean = false;
@@ -301,10 +307,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             }
 
             // Store test data
-            this.testData.set(testItem, {
-                uniqueName: test.UniqueName,
+            this.testData.set(testItem.id, {
                 fullName: test.FullName,
-                isTestAssembly: test.IsTestAssembly,
                 testMode: testMode,
                 sourceLocation: test.SourceLocation,
             });
@@ -313,12 +317,18 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         });
 
         // Second pass: build hierarchy
+        let rootTest:vscode.TestItem | null = null;
         testContainer.TestAdaptors.forEach((test, index) => {
             const testItem = testItems.get(index)!;
 
+            // root test
+            // currently, Unity gives us one root test for each mode
             if (test.Parent === -1) {
-                // Root level test - add to mode item
-                modeItem.children.add(testItem);
+                if(!rootTest){
+                    rootTest = testItem;
+                }else{
+                    console.error("UnityCode: Multiple root tests found, this is not expected");
+                }
             } else {
                 // Child test - add to parent
                 const parentItem = testItems.get(test.Parent);
@@ -327,6 +337,20 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 }
             }
         });
+
+        // now we need to add the tests to our mode item
+        // note that since root level test is always one item, it is unneeded
+        // so we just add all children of root test to our mode item
+        // gives user less hierachy, which is simpler
+        if(rootTest){
+            const nonNullRootTest = rootTest as vscode.TestItem;
+            this.testData.set(modeItem.id, this.testData.get(nonNullRootTest.id)!);
+            for(const child of nonNullRootTest.children){
+                modeItem.children.add(child[1]);
+            }
+        }else{
+            console.error("UnityCode: No root test found, this is not expected");
+        }
     }
 
     /**
@@ -442,7 +466,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             return;
         }
 
-        const testData = this.testData.get(testToRun);
+        const testData = this.testData.get(testToRun.id);
         if (!testData) {
             console.error(`UnityCode: Test data not found for ${testToRun}`);
             return;
@@ -455,7 +479,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             // set running state before any await to prevent problems
             this.setRunningState(true);
             // if it is an assembly we need to extract the file name
-            const filter = testData.isTestAssembly? path.basename(testData.fullName): testData.fullName;
+            const filter = this.getTestFilter(testToRun, testData);
             //console.log(`UnityCode: Sending test execution message for ${testToRun.label}, filter is ${filter}`);
             const success = await this.messagingClient.executeTests(testData.testMode, filter);
             if (!success) {
@@ -495,13 +519,29 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     }
 
     /**
+     * Get the test filter for a test item to send to Unity
+     * @param testItem The test item to get the filter for
+     * @param testData The test data for the test item
+     * @returns The test filter for the test item
+     */
+    private getTestFilter(testItem: vscode.TestItem, testData: TestData) {
+        // Top Level is the mode, which means run all tests or no filter at all
+        if(!testItem.parent){
+            return "";
+        }
+
+        // for assembly, we need to send the file name, not the full name
+        return testData.fullName.endsWith(".dll") ? path.basename(testData.fullName) : testData.fullName;
+    }
+
+    /**
      * Get all test items
      */
     private getAllTests(): vscode.TestItem[] {
         const tests: vscode.TestItem[] = [];
 
         const collectTests = (item: vscode.TestItem) => {
-            if (this.testData.has(item)) {
+            if (this.testData.has(item.id)) {
                 tests.push(item);
             }
             for (const [, child] of item.children) {
@@ -532,11 +572,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                     continue;
                 }
                 
-                let testName = test.FullName;
+                const testName = test.FullName;
 
                 const testItem = this.findTestByFullName(testName);
                 if (testItem) {
-                    const testData = this.testData.get(testItem);
+                    const testData = this.testData.get(testItem.id);
                     if (testData) {
                         //console.log(`UnityCode: Child test started: ${testName}`);
                         this.currentTestRun.started(testItem);
@@ -747,7 +787,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     public findTestByFullName(fullName: string): vscode.TestItem | null {
         const findInCollection = (collection: vscode.TestItemCollection): vscode.TestItem | null => {
             for (const [, item] of collection) {
-                const testData = this.testData.get(item);
+                const testData = this.testData.get(item.id);
                 if (testData && testData.fullName === fullName) {
                     return item;
                 }

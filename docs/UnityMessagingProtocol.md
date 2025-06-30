@@ -110,9 +110,15 @@ Detailed value formats for some of the types:
 - **Description**: Requests the list of available tests for the specified test mode
 
 #### ExecuteTests (Value: 24)
-- **Format**: `TestMode:FullTestName`
-- **Example**: `"EditMode:MyNamespace.MyTestClass.MyTestMethod"`
-- **Description**: Executes a specific test identified by its full name in the specified test mode
+- **Format**: Supports multiple formats:
+  - `TestMode` - Execute all tests in the specified mode
+  - `TestMode:AssemblyName.dll` - Execute all tests in the specified assembly
+  - `TestMode:FullTestName` - Execute a specific test by its full name
+- **Examples**: 
+  - `"EditMode"` - Run all edit mode tests
+  - `"PlayMode:MyTests.dll"` - Run all tests in MyTests assembly
+  - `"EditMode:MyNamespace.MyTestClass.MyTestMethod"` - Run specific test method
+- **Description**: Executes tests based on the specified filter. The filter can target all tests in a mode, all tests in an assembly, or a specific test by name.
 
 Response:
 - A response that is empty is sent to the original client to confirm that the message is received and already processed.
