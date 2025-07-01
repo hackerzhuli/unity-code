@@ -600,8 +600,8 @@ export class UnityMessagingClient {
      * Handle incoming message
      */
     private handleMessage(message: UnityMessage): void {
-        // log messages that needs debug for the moment
-        if (message.type === MessageType.TestListRetrieved) {
+        // log messages that needs debug for the moment(None if no need)
+        if (message.type === MessageType.None) {
             console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), payload is ${message.value}`);
         }
         // Skip logging for ping/pong, which is not useful to sett
