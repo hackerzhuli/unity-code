@@ -18,4 +18,5 @@
 - [ ] 18. We should refresh unity packages here when finished compilation, or extension activation, other refreshes are not needed.
 - [x] 19. Double click on the run button beside tests in Testing window will result in individual tests appearing running forever after the whole test run finished.
 - [x] 20. Running higher level tests doesn't actually run tests, the level above the assembly(the project level), and the mode level, eg. "Play Mode", running these tests, it appears in Unity Editor that the test run started, but no leaf tests are actually run. However in Unity Editor we can actually run the the project level tests, which runs all tests in all assemblies.
-- [ ] 21. Create/Delete a .cs asset file (for the case of create, file must be already saved to disk, if not then do nothing) should also trigger a refresh of asset database.
+- [ ] 21. Create/Delete/Paste a .cs asset file (for the case of create, file must be already saved to disk, and not empty, if not then do nothing) should also trigger a refresh of asset database.
+- [ ] 22. We shouldn't try to manage .meta files when user delete files, Unity will handle that, so no need for us to do anything
