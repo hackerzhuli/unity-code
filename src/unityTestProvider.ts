@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor } from './unityMessagingClient.js';
+import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor, TestNodeType } from './unityMessagingClient.js';
 import { logWithLimit } from './utils.js';
 import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown } from './stackTraceUtils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
@@ -11,9 +11,9 @@ interface TestData {
     fullName: string;
     testMode: 'EditMode' | 'PlayMode';
     sourceLocation?: string;
-    isType:boolean,
-    status:TestStatusAdaptor,
-    testItem:vscode.TestItem
+    nodeType: TestNodeType;
+    status: TestStatusAdaptor;
+    testItem: vscode.TestItem;
 }
 
 /**
@@ -258,13 +258,13 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
 
         // First pass: create all test items
         testContainer.TestAdaptors.forEach((test, index) => {
-            // Use SourceLocation if available, fallback to Assembly
+            // Use Source if available for methods
             let fileUri: vscode.Uri | undefined;
-            if (test.SourceLocation) {
-                // SourceLocation format: "Assets/Path/File.cs:LineNumber"
+            if (test.Source) {
+                // Source format: "Assets/Path/File.cs:LineNumber"
                 // Extract just the file path part (remove line number)
-                const colonIndex = test.SourceLocation.lastIndexOf(':');
-                const filePath = colonIndex > 0 ? test.SourceLocation.substring(0, colonIndex) : test.SourceLocation;
+                const colonIndex = test.Source.lastIndexOf(':');
+                const filePath = colonIndex > 0 ? test.Source.substring(0, colonIndex) : test.Source;
 
                 // Convert to absolute path if it's a relative path
                 const projectPath = this.projectManager.getUnityProjectPath();
@@ -279,18 +279,18 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             }
 
             const testItem = this.testController.createTestItem(
-                this.getIdForTest(test),
+                test.Id,
                 test.Name,
                 fileUri
             );
 
             testItem.canResolveChildren = false;
 
-            // Set range if we have source location with line number (only for methods, not types)
-            if (test.SourceLocation && test.Method) {
-                const colonIndex = test.SourceLocation.lastIndexOf(':');
+            // Set range if we have source location with line number (only for methods)
+            if (test.Source && test.Type === TestNodeType.Method) {
+                const colonIndex = test.Source.lastIndexOf(':');
                 if (colonIndex > 0) {
-                    const lineNumberStr = test.SourceLocation.substring(colonIndex + 1);
+                    const lineNumberStr = test.Source.substring(colonIndex + 1);
                     const lineNumber = parseInt(lineNumberStr, 10);
                     if (!isNaN(lineNumber) && lineNumber > 0) {
                         // VS Code uses 0-based line numbers
@@ -306,10 +306,10 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             this.testData.set(testItem.id, {
                 fullName: test.FullName,
                 testMode: testMode,
-                sourceLocation: test.SourceLocation,
-                isType: test.Type && !test.Method? true: false,
+                sourceLocation: test.Source,
+                nodeType: test.Type,
                 status: oldTestData?.status ?? TestStatusAdaptor.Inconclusive, // try to preserve test status(for code lens)
-                testItem:testItem
+                testItem: testItem
             });
 
             testItems.set(index, testItem);
@@ -344,12 +344,16 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         }
 
         // now we need to add the tests to our mode item
-        // note that since root level test is always one item, it is unneeded
+        // note that since root level test is always one item, it is unnecessay to add it to our mode item
         // so we just add all children of root test to our mode item
-        // gives user less hierachy, which is simpler
+        // gives user less hierachy, which is better
         if(rootTest){
+            // for both id(modeItem or the root item we received) we will get the same test data, which all points to mode item
+            // think of modeItem have 2 id, when we receive a test message, so we can get the mode item with the id from Unity side
             const nonNullRootTest = rootTest as vscode.TestItem;
-            this.testData.set(modeItem.id, this.testData.get(nonNullRootTest.id)!);
+            const data = this.testData.get(nonNullRootTest.id)!;
+            data.testItem = modeItem;
+            this.testData.set(modeItem.id, data);
             modeItem.description = nonNullRootTest.description;
             
             for(const child of nonNullRootTest.children){
@@ -384,29 +388,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             ids.push(...this.getAllTestId(child));
         }
         return ids;
-    }
-
-    private getIdForTest(test: TestAdaptor): string {
-        return this.createTestId(test.Mode, test.Assembly, test.FullName);
-    }
-
-    private getIdForTestResult(test: TestResultAdaptor): string {
-        return this.createTestId(test.Mode, test.Assembly, test.FullName);
-    }
-
-    private createTestId(mode: string, assembly: string, fullName: string): string {
-        // this makes sure test id will persist
-        // unless assembly, namespace, class, method name are changed
-        // in which case user should expect test result will be lost
-        if(assembly){
-            return `${mode}.${assembly}.${fullName}`;
-        }else if (fullName.endsWith(".dll")) {
-            // for assembly, just the name is fine
-            return `${mode}.${path.basename(fullName)}`;
-        }else{
-            // above assembly is mode itself(for the current structure of our tests)
-            return mode;
-        }
     }
 
     /**
@@ -637,7 +618,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                     continue;
                 }
                 
-                const testId = this.getIdForTest(test);
+                const testId = test.Id;
                 const testItem = this.getTestItem(testId);
                 if (testItem) {
                     this.currentTestRun.started(testItem);
@@ -776,7 +757,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
      * Update test result in VS Code
      */
     private async updateTestResult(result: TestResultAdaptor): Promise<void> {
-        const testId = this.getIdForTestResult(result);
+        const testId = result.TestId;
 
         // Store test result for code lens
         const testData = this.testData.get(testId);
@@ -791,14 +772,14 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         }
 
         // Force immediate code lens refresh to show updated status
-        if(testData.isType){
+        if(testData.nodeType !== TestNodeType.Method){
             this.forceCodeLensRefresh();
         }
 
         // Find the test item by full name
         const testItem = testData.testItem;
         if (!testItem) {
-            console.warn(`UnityCode: Could not find test item for ${result.FullName}, id is ${testId}`);
+            console.warn(`UnityCode: Could not find test item for ${result.TestId}`);
             return;
         }
 
@@ -916,7 +897,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 if (!testData) {
                     continue;
                 }
-                if (!testData.isType) {
+                if (testData.nodeType === TestNodeType.Method) {
                     continue;
                 }
                 const classSymbol = findSymbolByPath(symbols, testData.fullName, languageServerInfo);

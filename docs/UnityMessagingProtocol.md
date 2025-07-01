@@ -128,6 +128,14 @@ Response:
 - **C# Structure**:
   
 ```csharp
+public enum TestNodeType{
+  Solution,
+  Assembly,
+  Namespace,
+  Class,
+  Method,
+}
+
 [Serializable]
 internal class TestAdaptorContainer
 {
@@ -138,8 +146,13 @@ internal class TestAdaptorContainer
 internal class TestAdaptor
 {
   /// <summary>
+  /// Unique identifier for the test node, persisted (as much as possible) across compiles, will not conflict accross test modes
+  /// </summary>
+  public string Id;
+
+  /// <summary>
   /// The name of the test node.
-  /// </summary>a
+  /// </summary>
   public string Name;
   
   /// <summary>
@@ -148,24 +161,9 @@ internal class TestAdaptor
   public string FullName;
 
   /// <summary>
-  /// The full name of the type containing the test method.
+  /// The type of the test node.
   /// </summary>
-  public string Type;
-  
-  /// <summary>
-  /// The name of the test method, if it is not a method, empty
-  /// </summary>
-  public string Method;
-
-  /// <summary>
-  /// The name of the assembly containing the test(eg. MyNamespace.MyAssembly), if it is an assembly or not in an assembly, empty string
-  /// </summary>
-  public string Assembly;
-
-  /// <summary>
-  /// The mode of the test("PlayMode" or "EditMode")
-  /// </summary>
-  public string Mode;
+  public TestNodeType Type;
   
   /// <summary>
   /// Index of parent in TestAdaptors array, -1 for root.
@@ -174,9 +172,9 @@ internal class TestAdaptor
 
   /// <summary>
   /// Source location of the test in format "Assets/Path/File.cs:LineNumber".
-  /// Only populated for methods and types, null for namespaces or assemblies or other things
+  /// Only populated for methods, null for other nodes
   /// </summary>
-  public string SourceLocation;
+  public string Source;
 }
 ```
 
@@ -199,24 +197,9 @@ internal class TestResultAdaptorContainer
 internal class TestResultAdaptor
 {
   /// <summary>
-  /// The name of the test node.
+  /// The unique identifier for the test this result is for.
   /// </summary>
-  public string Name;
-  
-  /// <summary>
-  /// Gets the full name of the test result.
-  /// </summary>
-  public string FullName;
-
-  /// <summary>
-  /// Same as <see cref="TestAdaptor.Assembly"/>
-  /// </summary>
-  public string Assembly;
-
-  /// <summary>
-  /// Same as <see cref="TestAdaptor.Mode"/>
-  /// </summary>
-  public string Mode;
+  public string TestId;
 
   /// <summary>
   /// The number of test cases that passed when running the test and all its children.

@@ -45,15 +45,21 @@ export interface UnityMessage {
     origin?: string;
 }
 
+export enum TestNodeType {
+    Solution = 0,
+    Assembly = 1,
+    Namespace = 2,
+    Class = 3,
+    Method = 4
+}
+
 export interface TestAdaptor {
+    Id: string;
     Name: string;
     FullName: string;
-    Type: string;
-    Method: string;
-    Assembly: string;
+    Type: TestNodeType;
     Parent: number;
-    SourceLocation: string;
-    Mode: string;
+    Source: string;
 }
 
 export interface TestAdaptorContainer {
@@ -68,10 +74,7 @@ export enum TestStatusAdaptor {
 }
 
 export interface TestResultAdaptor {
-    Name: string;
-    FullName: string;
-    Assembly: string;
-    Mode: string;
+    TestId: string;
     PassCount: number;
     FailCount: number;
     InconclusiveCount: number;
