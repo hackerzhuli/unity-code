@@ -33,6 +33,15 @@ describe('Stack Trace Utils Unit Tests', () => {
                 assert.strictEqual(result!.filePath, 'C:\\Unity\\Projects\\MyProject\\Assets\\Tests\\TestScript.cs');
                 assert.strictEqual(result!.lineNumber, 15);
             });
+
+            it('should handle relative path', () => {
+                const stackTrace = 'at Hackerzhuli.Code.Editor.Testing.TestAdaptorUtilsTests.GetNodeType_ConcreteTestNodes_ValidateSpecificExamples () [0x0000f] in .\\Packages\\Code\\Editor\\Testing\\TestAdaptorUtilsTests.cs:132';
+                const result = parseUnityTestStackTraceSourceLocation(stackTrace);
+                
+                assert.notStrictEqual(result, null);
+                assert.strictEqual(result!.filePath, '.\\Packages\\Code\\Editor\\Testing\\TestAdaptorUtilsTests.cs');
+                assert.strictEqual(result!.lineNumber, 132);
+            });
         });
         
         describe('macOS platform stack traces', () => {
@@ -245,6 +254,15 @@ describe('Stack Trace Utils Unit Tests', () => {
             const stackTrace = 'Some log message without source location';
             const result = await processTestStackTraceToMarkdown(stackTrace, testProjectPath);
             assert.strictEqual(result, stackTrace);
+        });
+
+        it('should handle stack trace with relative path with leading dot (Windows)', async () => {
+            const stackTrace = `at Hackerzhuli.Code.Editor.Testing.TestAdaptorUtilsTests.GetNodeType_ConcreteTestNodes_ValidateSpecificExamples () [0x0000f] in .\\Packages\\Code\\Editor\\Testing\\TestAdaptorUtilsTests.cs:132`;
+            const result = await processTestStackTraceToMarkdown(stackTrace, testProjectPath);
+            
+            // Should contain markdown link with relative path
+            assert.strictEqual(result.includes('[Packages/Code/Editor/Testing/TestAdaptorUtilsTests.cs:132]'), true);
+            assert.strictEqual(result.includes('file:///'), true);
         });
         
         it('should handle multiple lines in stack trace', async () => {

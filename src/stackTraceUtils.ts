@@ -16,6 +16,17 @@ export interface StackTraceSourceLocation {
 }
 
 /**
+ * Checks if a given stack trace is a Unity Test Runner stack trace.
+ * 
+ * @param stackTrace A stack trace
+ * @returns whether this is a stack trace from Unity Tests Runner's format
+ */
+export function isUnityTestStackTrace(stackTrace: string): boolean {
+    // Unity sometimes includes leading whitespace before 'at' in test stack traces
+    return stackTrace.trim().startsWith('at ');
+}
+
+/**
  * Parses a Unity Test Runner stack trace line to identify the source location part.
  * Supports stack trace formats from Windows, macOS, and Linux platforms.
  * 

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestNodeType, TestAdaptor } from './unityMessagingClient.js';
-import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown } from './stackTraceUtils.js';
+import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown, isUnityTestStackTrace } from './stackTraceUtils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
 import { UnityProjectManager } from './unityProjectManager.js';
 import { wait } from './asyncUtils.js';
@@ -707,7 +707,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             const projectPath = this.projectManager.getUnityProjectPath();
 
             let processedStackTrace: string;
-            if (result.StackTrace.startsWith('at ')) {
+            if (isUnityTestStackTrace(result.StackTrace)) {
                 // Normal stack trace format (starts with "at ")
                 processedStackTrace = await processTestStackTraceToMarkdown(result.StackTrace, projectPath || '');
             } else {
