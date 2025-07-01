@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestAdaptor, TestNodeType } from './unityMessagingClient.js';
-import { logWithLimit } from './utils.js';
+import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestNodeType, TestAdaptor } from './unityMessagingClient.js';
 import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown } from './stackTraceUtils.js';
 import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
 import { UnityProjectManager } from './unityProjectManager.js';
@@ -14,6 +13,7 @@ interface TestData {
     nodeType: TestNodeType;
     status: TestStatusAdaptor;
     testItem: vscode.TestItem;
+    testCount: number;
 }
 
 /**
@@ -31,8 +31,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private testStartTimeout: NodeJS.Timeout | null = null;
 
     // Code lens related properties
-    //private allTests: TestAdaptor[] = [];
-    //private testResults = new Map<string, TestStatusAdaptor>();
     private codeLensProvider: vscode.Disposable | undefined;
     private symbolsInitialized: boolean = false;
     private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
@@ -207,7 +205,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
      */
     private handleTestListRetrieved(value: string): void {
         try {
-            logWithLimit(`UnityCode: Received test list data: ${value}`);
+            //logWithLimit(`UnityCode: Received test list data: ${value}`);
 
             const colonIndex = value.indexOf(':');
             if (colonIndex === -1) {
@@ -219,17 +217,17 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             const testMode = value.substring(0, colonIndex) as 'EditMode' | 'PlayMode';
             const jsonData = value.substring(colonIndex + 1);
 
-            console.log(`UnityCode: Test mode: ${testMode}`);
-            logWithLimit(`UnityCode: JSON data: ${jsonData}`);
+            //console.log(`UnityCode: Test mode: ${testMode}`);
+            //logWithLimit(`UnityCode: JSON data: ${jsonData}`);
 
             if (!jsonData) {
-                console.log(`UnityCode: No tests found for ${testMode}`);
+                console.error(`UnityCode: No tests found for ${testMode}`);
                 return;
             }
 
             const testContainer: TestAdaptorContainer = JSON.parse(jsonData);
-            console.log(`UnityCode: Parsed test container:`, testContainer);
-            console.log(`UnityCode: Number of tests found: ${testContainer.TestAdaptors?.length || 0}`);
+            //console.log(`UnityCode: Parsed test container:`, testContainer);
+            //console.log(`UnityCode: Number of tests found: ${testContainer.TestAdaptors?.length || 0}`);
 
             this.buildTestTree(testContainer, testMode);
 
@@ -281,23 +279,14 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             const testItem = this.testController.createTestItem(
                 test.Id,
                 test.Name,
-                fileUri
+                fileUri,
             );
-
+            
+            testItem.description = test.TestCount > 1 ? test.TestCount + " tests" : "";
             testItem.canResolveChildren = false;
-
-            // Set range if we have source location with line number (only for methods)
+                        // Set range if we have source location with line number (only for methods)
             if (test.Source && test.Type === TestNodeType.Method) {
-                const colonIndex = test.Source.lastIndexOf(':');
-                if (colonIndex > 0) {
-                    const lineNumberStr = test.Source.substring(colonIndex + 1);
-                    const lineNumber = parseInt(lineNumberStr, 10);
-                    if (!isNaN(lineNumber) && lineNumber > 0) {
-                        // VS Code uses 0-based line numbers
-                        const line = lineNumber - 1;
-                        testItem.range = new vscode.Range(line, 0, line, 0);
-                    }
-                }
+                testItem.range = this.getTestSourceRange(test);
             }
 
             const oldTestData = this.testData.get(testItem.id);
@@ -309,7 +298,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 sourceLocation: test.Source,
                 nodeType: test.Type,
                 status: oldTestData?.status ?? TestStatusAdaptor.Inconclusive, // try to preserve test status(for code lens)
-                testItem: testItem
+                testItem: testItem,
+                testCount: test.TestCount,
             });
 
             testItems.set(index, testItem);
@@ -337,12 +327,6 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             }
         });
 
-        // Add description to each test item
-        for(const testItem of testItems.values()){
-            const count = this.countLeafTest(testItem);
-            testItem.description = count > 1? count + " tests": "";
-        }
-
         // now we need to add the tests to our mode item
         // note that since root level test is always one item, it is unnecessay to add it to our mode item
         // so we just add all children of root test to our mode item
@@ -364,18 +348,22 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
         }
     }
 
-    /**
-     * Count the number of leaf tests inside of this test, including itself
-     */
-    private countLeafTest(test:vscode.TestItem):number{
-        let count = 0;
-        if(test.children.size === 0){
-            return 1;
+    private getTestSourceRange(test: TestAdaptor):vscode.Range | undefined {
+        if(!test.Source){
+            return undefined;
         }
-        for(const child of test.children){
-            count += this.countLeafTest(child[1]);
+        const colonIndex = test.Source.lastIndexOf(':');
+        if (colonIndex > 0) {
+            const lineNumberStr = test.Source.substring(colonIndex + 1);
+            const lineNumber = parseInt(lineNumberStr, 10);
+            if (!isNaN(lineNumber) && lineNumber > 0) {
+                // VS Code uses 0-based line numbers
+                const line = lineNumber - 1;
+                return new vscode.Range(line, 0, line, 0);
+            }
         }
-        return count;
+
+        return undefined;
     }
 
     /**
@@ -794,7 +782,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 // For passing tests, generate plain text output directly if there's relevant information
                 const plainTextOutput = this.buildOutputForTerminal(result);
                 if (plainTextOutput && this.currentTestRun) {
-                    console.log(`UnityTestProvider: plainTextOutput = ${plainTextOutput}`)
+                    //console.log(`UnityTestProvider: plainTextOutput = ${plainTextOutput}`)
                     this.currentTestRun.appendOutput(plainTextOutput + '\r\n', undefined, testItem);
                 }
                 if (this.currentTestRun) {
@@ -954,7 +942,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             }
         }
 
-        const testCount = this.countLeafTest(testData.testItem);
+        const testCount = testData.testCount;
 
         const name = testCount > 1? `${testCount} tests`: "class tests";
 

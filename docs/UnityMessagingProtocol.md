@@ -134,6 +134,10 @@ public enum TestNodeType{
   Namespace,
   Class,
   Method,
+  /// <summary>
+  /// Test case of a parameterized test method
+  /// </summary>
+  TestCase,
 }
 
 [Serializable]
@@ -145,36 +149,41 @@ internal class TestAdaptorContainer
 [Serializable]
 internal class TestAdaptor
 {
-  /// <summary>
-  /// Unique identifier for the test node, persisted (as much as possible) across compiles, will not conflict accross test modes
-  /// </summary>
-  public string Id;
+        /// <summary>
+        /// Unique identifier for the test node, persisted (as much as possible) across compiles, will not conflict accross test modes
+        /// </summary>
+        public string Id;
 
-  /// <summary>
-  /// The name of the test node.
-  /// </summary>
-  public string Name;
-  
-  /// <summary>
-  /// The full name of the test including namespace and class, for assembly, the path of the assembly
-  /// </summary>
-  public string FullName;
+		/// <summary>
+		/// The name of the test node.
+		/// </summary>
+		public string Name;
+		
+		/// <summary>
+		/// The full name of the test including namespace and class, for assembly, the path of the assembly
+		/// </summary>
+		public string FullName;
 
-  /// <summary>
-  /// The type of the test node.
-  /// </summary>
-  public TestNodeType Type;
-  
-  /// <summary>
-  /// Index of parent in TestAdaptors array, -1 for root.
-  /// </summary>
-  public int Parent;
+		/// <summary>
+		/// The type of the test node.
+		/// </summary>
+		public TestNodeType Type;
+		
+		/// <summary>
+		/// Index of parent in TestAdaptors array, -1 for root.
+		/// </summary>
+		public int Parent;
 
-  /// <summary>
-  /// Source location of the test in format "Assets/Path/File.cs:LineNumber".
-  /// Only populated for methods, null for other nodes
-  /// </summary>
-  public string Source;
+		/// <summary>
+		/// Source location of the test in format "Assets/Path/File.cs:LineNumber".
+		/// Only populated for methods, null for other nodes
+		/// </summary>
+		public string Source;
+
+		/// <summary>
+		/// Number of leaf tests in this test node and its children
+		/// </summary>
+		public int TestCount;
 }
 ```
 

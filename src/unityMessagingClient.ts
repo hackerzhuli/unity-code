@@ -50,7 +50,8 @@ export enum TestNodeType {
     Assembly = 1,
     Namespace = 2,
     Class = 3,
-    Method = 4
+    Method = 4,
+    TestCase = 5
 }
 
 export interface TestAdaptor {
@@ -60,6 +61,7 @@ export interface TestAdaptor {
     Type: TestNodeType;
     Parent: number;
     Source: string;
+    TestCount: number;
 }
 
 export interface TestAdaptorContainer {
@@ -598,13 +600,21 @@ export class UnityMessagingClient {
      * Handle incoming message
      */
     private handleMessage(message: UnityMessage): void {
-        // Skip logging for ping/pong and log messages to reduce console noise
-        if (message.type !== MessageType.Ping && message.type !== MessageType.Pong &&
-            message.type !== MessageType.Info && message.type !== MessageType.Warning && message.type !== MessageType.Error) {
-            //logWithLimit(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}", Origin: ${message.origin || 'unknown'}`);
-            if (message.type === MessageType.TestListRetrieved || message.type === MessageType.TestFinished) {
-                console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), Value: "${message.value}"`);
-            }
+        // log messages that needs debug for the moment
+        if (message.type === MessageType.TestListRetrieved) {
+            console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), payload is ${message.value}`);
+        }
+        // Skip logging for ping/pong, which is not useful to sett
+        // skip log messages(which can be way higher frequency than ping/pong)
+        // skip test started/finised(there can be many tests in a test run, too much logs)        
+        else if (message.type !== MessageType.Ping && message.type !== MessageType.Pong &&
+            message.type !== MessageType.Info && message.type !== MessageType.Warning && message.type !== MessageType.Error &&
+            message.type !== MessageType.TestStarted && message.type !== MessageType.TestFinished
+        ) {
+            console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), payload is ${message.value.length} bytes`);
+        }else if(message.value.length > this.UDP_BUFFER_SIZE && message.type !== MessageType.Info && message.type !== MessageType.Warning && message.type !== MessageType.Error){
+            // log large messages for debug
+            console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), payload is ${message.value}`);
         }
 
         // Handle Unity online/offline state changes
@@ -809,7 +819,7 @@ export class UnityMessagingClient {
         const buffer = this.serializeMessage({ type, value });
         // Skip logging for ping/pong messages to reduce console noise
         if (type !== MessageType.Ping && type !== MessageType.Pong) {
-            logWithLimit(`UnityMessagingClient: Sending message - Type: ${type} (${MessageType[type]}), Value: "${value}", Size: ${buffer.length} bytes, Target: ${this.unityAddress}:${this.unityPort}`);
+            logWithLimit(`UnityMessagingClient: Sending message - Type: ${type} (${MessageType[type]}), Value: "${value}", Size: ${buffer.length} bytes`);
         }
 
         // Check if message is too large for UDP
@@ -831,8 +841,6 @@ export class UnityMessagingClient {
             });
         });
     }
-
-
 
     /**
      * Serialize message to binary format

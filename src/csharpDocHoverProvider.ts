@@ -113,7 +113,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 position
             );
 
-            console.log(`there are ${definitions.length} definitions found for word: ${word}`);
+            // console.log(`there are ${definitions.length} definitions found for word: ${word}`);
 
             if (definitions && definitions.length > 0) {
                 // Convert LocationLink to Location if needed
@@ -122,7 +122,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                     // Analyze the definition to extract symbol information
                     const symbolInfo = await this.analyzeDefinition(location, word, document);
                     if (symbolInfo) {
-                        console.log(`Symbol found via definition: ${symbolInfo.type}`);
+                        // console.log(`Symbol found via definition: ${symbolInfo.type}`);
                         return symbolInfo;
                     }
                 }
@@ -142,11 +142,11 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     private extractLocationFromDefinition(definition: vscode.Location | vscode.LocationLink): vscode.Location | undefined {
         if ('uri' in definition && 'range' in definition) {
             // It's a Location
-            console.log('it is a Location');
+            // console.log('it is a Location');
             return definition as vscode.Location;
         } else if ('targetUri' in definition && 'targetRange' in definition) {
             // It's a LocationLink
-            console.log('it is a LocationLink');
+            // console.log('it is a LocationLink');
             const locationLink = definition as vscode.LocationLink;
             return new vscode.Location(locationLink.targetUri, locationLink.targetRange);
         }
@@ -173,12 +173,12 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
 
             // Detect language server type
             const languageServerInfo = detectLanguageServer(symbols);
-            console.log(`Detected language server: ${languageServerInfo.type}`);
+            // console.log(`Detected language server: ${languageServerInfo.type}`);
             
             let symbolInfo: SymbolInfo | undefined;
             
             if(definition.range.isEmpty){
-                console.log('Definition range is empty, trying fallback to single top-level type.');
+                // console.log('Definition range is empty, trying fallback to single top-level type.');
                 // Fallback: if range is empty, try to find a single top-level type in the file
                 symbolInfo = await this.getSymbolInfoForEmptyRange(definitionDocument, word, languageServerInfo);
             } else {
@@ -246,7 +246,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             const qualifiedTypeName = getQualifiedTypeName(typeSymbol, topLevelTypePath);
               // Extract XML documentation for the symbol
             const xmlDocs = extractXmlDocumentation(document, typeSymbol);
-            console.log(`abc [findTopLevelType] Extracted XML docs for ${typeSymbol.name}: "${xmlDocs}"`);
+            // console.log(`abc [findTopLevelType] Extracted XML docs for ${typeSymbol.name}: "${xmlDocs}"`);
             
             return {
                 name: typeSymbol.name,
@@ -278,7 +278,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             const topLevelType = this.findTopLevelType(symbols, languageServerInfo, document);
             
             if (!topLevelType) {
-                console.log('Cannot determine symbol for empty range - multiple or no top-level types found.');
+                // console.log('Cannot determine symbol for empty range - multiple or no top-level types found.');
             }
             
             return topLevelType;
@@ -354,7 +354,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                     : updatedTopLevelTypePath;
                   // Extract XML documentation for the symbol
                 const xmlDocs = extractXmlDocumentation(document, symbol);
-                console.log(`abc [findSymbolAtPosition] Extracted XML docs for ${symbol.name}: "${xmlDocs}"`);
+                // console.log(`abc [findSymbolAtPosition] Extracted XML docs for ${symbol.name}: "${xmlDocs}"`);
                 
                 return {
                     name: symbol.name,
@@ -459,7 +459,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 return this.generateUnityPackageLinksFromDocUrl(typeName, packageInfo);
             } else {
                 // Non-Unity package with documentationUrl - only provide package link, no class-specific API link
-                console.log(`Using documentationUrl for package ${packageInfo.name}: ${packageInfo.documentationUrl}`);
+                // console.log(`Using documentationUrl for package ${packageInfo.name}: ${packageInfo.documentationUrl}`);
                 return {
                     apiUrl: undefined, // No class-specific API link for non-Unity packages
                     manualUrl: packageInfo.documentationUrl!,
@@ -482,7 +482,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         // Example: Newtonsoft.Json, NUnit, etc.
         // For now, return undefined to fall back to standard documentation
         
-        console.log(`No specific documentation handler for package: ${packageInfo.name}`);
+        // console.log(`No specific documentation handler for package: ${packageInfo.name}`);
         return undefined;
     }
 
@@ -517,8 +517,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         // Format: https://docs.unity3d.com/Packages/com.unity.localization@1.5/manual/index.html
         const manualUrl = `https://docs.unity3d.com/Packages/${packageInfo.name}@${cleanVersion}/manual/index.html`;
         
-        console.log(`Generated Unity package API URL: ${apiUrl}`);
-        console.log(`Generated Unity package manual URL: ${manualUrl}`);
+        // console.log(`Generated Unity package API URL: ${apiUrl}`);
+        // console.log(`Generated Unity package manual URL: ${manualUrl}`);
         
         return {
             apiUrl,
@@ -545,8 +545,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             // Generate API URL using extracted info
             const apiUrl = `https://docs.unity3d.com/Packages/${packageName}@${version}/api/${typeName}.html`;
             
-            console.log(`Generated Unity package API URL from documentationUrl: ${apiUrl}`);
-            console.log(`Using provided manual URL: ${packageInfo.documentationUrl}`);
+            // console.log(`Generated Unity package API URL from documentationUrl: ${apiUrl}`);
+            // console.log(`Using provided manual URL: ${packageInfo.documentationUrl}`);
             
             return {
                 apiUrl,
@@ -610,17 +610,17 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     private createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo?: DocLinkInfo): vscode.Hover {
         const hoverContent = new vscode.MarkdownString();        // Show XML documentation if available (at the top)
         if (symbolInfo.xmlDocs && symbolInfo.xmlDocs.trim().length > 0) {
-            console.log(`abc Adding XML docs for symbol: ${symbolInfo.name}, docs is: ${symbolInfo.xmlDocs}`);
-            console.log(`abc XML docs length: ${symbolInfo.xmlDocs.length}, trimmed length: ${symbolInfo.xmlDocs.trim().length}`);
+            // console.log(`abc Adding XML docs for symbol: ${symbolInfo.name}, docs is: ${symbolInfo.xmlDocs}`);
+            // console.log(`abc XML docs length: ${symbolInfo.xmlDocs.length}, trimmed length: ${symbolInfo.xmlDocs.trim().length}`);
             
             // Convert XML docs to Markdown format
             const markdownDocs = xmlToMarkdown(symbolInfo.xmlDocs);
-            console.log(`abc Converted to markdown: ${markdownDocs}`);
+            // console.log(`abc Converted to markdown: ${markdownDocs}`);
             
             hoverContent.appendMarkdown(markdownDocs);
             hoverContent.appendMarkdown('\n\n---\n\n'); // Add a separator
         } else {
-            console.log(`abc No XML docs found for symbol: ${symbolInfo.name}, xmlDocs value:`, symbolInfo.xmlDocs);
+            // console.log(`abc No XML docs found for symbol: ${symbolInfo.name}, xmlDocs value:`, symbolInfo.xmlDocs);
         }
         
         // Only show documentation link information if available
