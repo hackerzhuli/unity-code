@@ -214,18 +214,18 @@ export class UnityProjectManager {
         }
 
         // Check if any deleted files were .cs assets
-        let hasCsAssets = false;
+        let triggerFilePath: string | null = null;
         for (const deletedUri of event.files) {
             const deletedFilePath = deletedUri.fsPath;
             if (deletedFilePath.endsWith('.cs') && await this.isAsset(deletedFilePath)) {
-                hasCsAssets = true;
+                triggerFilePath = deletedFilePath;
                 break;
             }
         }
 
         // Refresh asset database once if any .cs assets were deleted
-        if (hasCsAssets) {
-            await this.refreshAssetDatabaseIfNeeded('batch delete', 'deleted', this.messagingClient);
+        if (triggerFilePath) {
+            await this.refreshAssetDatabaseIfNeeded(triggerFilePath, 'deleted', this.messagingClient);
         }
     }
 
@@ -239,7 +239,7 @@ export class UnityProjectManager {
         }
 
         // Check if any created files are valid .cs files that should trigger refresh
-        let hasValidCsFiles = false;
+        let triggerFilePath: string | null = null;
         for (const createdUri of event.files) {
             const filePath = createdUri.fsPath;
             
@@ -250,7 +250,7 @@ export class UnityProjectManager {
                     // Check if file exists and is not empty
                     const stats = await fs.promises.stat(filePath);
                     if (stats.size > 0) {
-                        hasValidCsFiles = true;
+                        triggerFilePath = filePath;
                         break;
                     } else {
                         console.log(`UnityProjectManager: Skipping asset database refresh for empty .cs file: ${filePath}`);
@@ -261,14 +261,14 @@ export class UnityProjectManager {
                 }
             } else {
                 // For non-.cs files, always consider them valid for refresh
-                hasValidCsFiles = true;
+                triggerFilePath = filePath;
                 break;
             }
         }
 
         // Refresh asset database once if any valid files were created
-        if (hasValidCsFiles) {
-            await this.refreshAssetDatabaseIfNeeded('batch create', 'created', this.messagingClient);
+        if (triggerFilePath) {
+            await this.refreshAssetDatabaseIfNeeded(triggerFilePath, 'created', this.messagingClient);
         }
     }
 
