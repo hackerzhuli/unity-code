@@ -23,6 +23,29 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "iconThemes": [
+      {
+        "id": "unity-code-icons",
+        "label": "Unity Code Icons",
+        "path": "./assets/unity-code-icon-theme.json"
+      }
+    ],
+    "icons": {
+      "unity-cube": {
+        "description": "Unity Cube Icon",
+        "default": {
+          "fontPath": "./assets/icons.woff",
+          "fontCharacter": "\ue900"
+        }
+      },
+      "hot-reload": {
+        "description": "Hot Reload Icon",
+        "default": {
+          "fontPath": "./assets/icons.woff",
+          "fontCharacter": "\ue901"
+        }
+      }
+    },
     "commands": [
       {
         "command": "unity-code.refreshTests",
@@ -42,7 +65,7 @@
         {
           "id": "unityConsoleContainer",
           "title": "Unity Console",
-          "icon": "$(console)"
+          "icon": "$(unity-cube)"
         }
       ]
     },

@@ -4,8 +4,8 @@
 - [x] 4. Test Unity Project in a path with space and Chinese characters
 - [x] 5. Add a setting and also a button(that show enable/disable state like other buttons) in Unity Console to ignore duplicate logs(don't store at all if it is enabled, because sometimes logs can come from Update and there can be hundreds of same logs in one second)(logs that have exactly the same content including stack trace)(true by default)
 - [x] 6. Add a debug feature to attach to Unity Editor
-- [ ] 7. Add 1 button in editor actions to enter/exit play mode according to state of Unity Editor
-- [ ] 8. Add a drop down (down arrow) beside the button metioned above that shows a boolean setting whether to start/stop Hot Reload for Unity(disabled if Hot Reload for Unity package is not installed in the project) 
+- [x] 7. ~~Add 1 button in editor actions to enter/exit play mode according to state of Unity Editor~~
+- [x] 8. ~~Add a drop down (down arrow) beside the button metioned above that shows a boolean setting whether to start/stop Hot Reload for Unity(disabled if Hot Reload for Unity package is not installed in the project)~~ 
 - [ ] 9. Add a status bar item right beside Unity to show the state of Hot Reload for Unity(if it is installed as a project package)
 - [x] 10. Clicking on a test in Testing window (on the left side) goes to the compiled .dll not to the source file, fix it so that it goes to the source file
 - [x] 11. Remove a file or folder should also remove it's meta file
@@ -20,3 +20,5 @@
 - [x] 20. Running higher level tests doesn't actually run tests, the level above the assembly(the project level), and the mode level, eg. "Play Mode", running these tests, it appears in Unity Editor that the test run started, but no leaf tests are actually run. However in Unity Editor we can actually run the the project level tests, which runs all tests in all assemblies.
 - [ ] 21. Create/Delete/Paste a .cs asset file (for the case of create, file must be already saved to disk, and not empty, if not then do nothing) should also trigger a refresh of asset database.
 - [ ] 22. We shouldn't try to manage .meta files when user delete files, Unity will handle that, so no need for us to do anything
+- [ ] 23. Debugger should find user assemblies in a more precise way(looking at project files)
+- [ ] 24. Unity package should generate launch.json settings for our debugger

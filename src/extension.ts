@@ -1,27 +1,22 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
+import { UnityDetector } from './unityDetector.js';
 import { UnityTestProvider } from './unityTestProvider.js';
+import { UnityMessagingClient } from './unityMessagingClient.js';
 import { UnityPackageHelper } from './unityPackageHelper.js';
 import { UnityProjectManager } from './unityProjectManager.js';
-import { UnityMessagingClient } from './unityMessagingClient.js';
-import { UnityDetector } from './unityDetector.js';
 import { UnityConsoleManager } from './unityConsole.js';
 import { NativeBinaryLocator } from './nativeBinaryLocator.js';
 import { UnityDebuggerManager } from './debugger.js';
+import { StatusBar } from './statusBar.js';
 
-// Global reference to test provider for auto-refresh functionality
-let globalTestProvider: UnityTestProvider | null = null;
-// Global reference to package helper for package information
-let globalPackageHelper: UnityPackageHelper | null = null;
-// Global reference to Unity project manager
-let globalUnityProjectManager: UnityProjectManager | null = null;
-// Global reference to Unity status bar item
-let globalUnityStatusBarItem: vscode.StatusBarItem | null = null;
-let globalUnityMessagingClient: UnityMessagingClient | null = null;
+// Global variables for Unity services
 let globalUnityDetector: UnityDetector | null = null;
-
-// Global reference to Unity Console manager
+let globalUnityTestProvider: UnityTestProvider | null = null;
+let globalUnityMessagingClient: UnityMessagingClient | null = null;
+let globalUnityPackageHelper: UnityPackageHelper | null = null;
+let globalUnityProjectManager: UnityProjectManager | null = null;
 let globalUnityConsoleManager: UnityConsoleManager | null = null;
 
 // Global reference to Native Binary Locator
@@ -29,7 +24,8 @@ let globalNativeBinaryLocator: NativeBinaryLocator | null = null;
 // Global reference to Unity Debugger Manager
 let globalUnityDebuggerManager: UnityDebuggerManager | null = null;
 
-
+// Global status bar manager
+let globalStatusBar: StatusBar | null = null;
 
 /**
  * Handle renaming of a single file and its corresponding meta file
@@ -41,15 +37,15 @@ async function handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise
     if (!globalUnityProjectManager || !globalUnityProjectManager.isWorkingWithUnityProject()) {
         return;
     }
-    
+
     // Check if the new new path is an asset of the Unity project
     // The old file don't exist any more, so we can't check it
     const isAsset = await globalUnityProjectManager.isAsset(newUri.fsPath);
-    
+
     if (!isAsset) {
         return;
     }
-    
+
     await renameMetaFile(oldUri.fsPath, newUri.fsPath);
 }
 
@@ -61,7 +57,7 @@ async function handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise
 async function renameMetaFile(oldFilePath: string, newFilePath: string): Promise<void> {
     const oldMetaPath = `${oldFilePath}.meta`;
     const newMetaPath = `${newFilePath}.meta`;
-    
+
     // Check if the meta file exists
     if (fs.existsSync(oldMetaPath)) {
         try {
@@ -83,7 +79,7 @@ async function onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
     if (!workspaceFolders || workspaceFolders.length === 0) {
         return;
     }
-    
+
     // Process each renamed file
     for (const file of event.files) {
         await handleFileRename(file.oldUri, file.newUri);
@@ -103,7 +99,7 @@ async function refreshAssetDatabaseIfNeeded(filePath: string, action: string): P
     // Check if auto-refresh is enabled
     const config = vscode.workspace.getConfiguration('unity-code');
     const autoRefreshEnabled = config.get<boolean>('autoRefreshUnity', true);
-    
+
     if (!autoRefreshEnabled) {
         return;
     }
@@ -112,21 +108,21 @@ async function refreshAssetDatabaseIfNeeded(filePath: string, action: string): P
     if (!globalUnityProjectManager.isWorkingWithUnityProject()) {
         return;
     }
-    
+
     // Check if the file is an asset (not a .meta file and either exists as an asset or has a corresponding .meta file)
     if (filePath.endsWith('.meta')) {
         return;
     }
-    
+
     const isAsset = globalUnityProjectManager.isAsset(filePath);
     const hasMetaFile = fs.existsSync(`${filePath}.meta`);
-    
+
     if (!isAsset && !hasMetaFile) {
         return;
     }
 
     // Skip asset database refresh if tests are currently running
-    if (globalTestProvider && globalTestProvider.isTestsRunning()) {
+    if (globalUnityTestProvider && globalUnityTestProvider.isTestsRunning()) {
         console.log(`UnityCode: Tests are running, skipping asset database refresh for ${filePath} (${action})`);
         return;
     }
@@ -148,18 +144,18 @@ async function handleFileDelete(deletedUri: vscode.Uri): Promise<void> {
     if (!globalUnityProjectManager || !globalUnityProjectManager.isWorkingWithUnityProject()) {
         return;
     }
-    
+
     const deletedFilePath = deletedUri.fsPath;
     const metaPath = `${deletedFilePath}.meta`;
-    
+
     // Check if this was a .cs file with a corresponding meta file (indicating it was a Unity asset)
     const wasCsAsset = deletedFilePath.endsWith('.cs') && fs.existsSync(metaPath);
-    
+
     // If it was a C# asset file, refresh the asset database before deleting the meta file
     if (wasCsAsset) {
         await refreshAssetDatabaseIfNeeded(deletedFilePath, 'deleted');
     }
-    
+
     // Delete the meta file if it exists
     await deleteMetaFile(deletedFilePath);
 }
@@ -170,7 +166,7 @@ async function handleFileDelete(deletedUri: vscode.Uri): Promise<void> {
  */
 async function deleteMetaFile(deletedFilePath: string): Promise<void> {
     const metaPath = `${deletedFilePath}.meta`;
-    
+
     // Check if the meta file exists and delete it
     if (fs.existsSync(metaPath)) {
         try {
@@ -191,7 +187,7 @@ async function onDidDeleteFiles(event: vscode.FileDeleteEvent): Promise<void> {
     if (!workspaceFolders || workspaceFolders.length === 0) {
         return;
     }
-    
+
     // Process each deleted file
     for (const deletedUri of event.files) {
         await handleFileDelete(deletedUri);
@@ -222,7 +218,7 @@ async function onDidCreateFiles(event: vscode.FileCreateEvent): Promise<void> {
     if (!workspaceFolders || workspaceFolders.length === 0) {
         return;
     }
-    
+
     // Process each created file
     for (const createdUri of event.files) {
         await handleFileCreate(createdUri);
@@ -233,54 +229,19 @@ async function onDidCreateFiles(event: vscode.FileCreateEvent): Promise<void> {
  * Handle Unity compilation finished events for auto-refresh
  */
 function setupCompilationFinishedRefresh(): void {
-    if (!globalTestProvider) {
-        return;
-    }
-
-    // Check if compilation refresh is enabled
     const config = vscode.workspace.getConfiguration('unity-code');
-    const refreshOnCompilationEnabled = config.get<boolean>('refreshTestsOnCompilation', true);
-    
-    if (!refreshOnCompilationEnabled) {
+    const refreshEnabled = config.get<boolean>('refreshTestsOnCompilation', true);
+
+    if (!refreshEnabled) {
+        console.log('UnityCode: Compilation finished refresh is disabled');
         return;
     }
 
-    // The CompilationFinished message handler is already set up in UnityTestProvider
-    // This function just ensures the configuration is respected
-    console.log('UnityCode: Compilation-based test refresh is enabled');
-}
-
-/**
- * Create and initialize the Unity status bar item
- */
-function createUnityStatusBarItem(): vscode.StatusBarItem {
-    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    statusBarItem.command = 'unity-code.showConnectionStatus';
-    updateUnityStatusBarItem(statusBarItem, false, false);
-    statusBarItem.show();
-    return statusBarItem;
-}
-
-/**
- * Update the Unity status bar item based on connection status
- * @param statusBarItem The status bar item to update
- * @param connected Whether Unity process is detected and connected
- * @param online Whether Unity is online and responding to messages
- */
-function updateUnityStatusBarItem(statusBarItem: vscode.StatusBarItem, connected: boolean, online: boolean): void {
-    if (online) {
-        statusBarItem.text = '$(check)Unity';
-        statusBarItem.tooltip = 'Unity Editor is connected';
-        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
-    } else if (connected) {
-        statusBarItem.text = '$(clock)Unity';
-        statusBarItem.tooltip = 'Unity Editor is detected but not connected';
-        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-    } else {
-        statusBarItem.text = '$(x)Unity';
-        statusBarItem.tooltip = 'Unity Editor is not detected';
-        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.offlineBackground');
+    if (!globalUnityTestProvider || !globalUnityProjectManager?.isWorkingWithUnityProject()) {
+        return;
     }
+
+    console.log('UnityCode: Setting up compilation finished refresh');
 }
 
 /**
@@ -294,7 +255,7 @@ function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
     // Check if Unity log forwarding is enabled
     const config = vscode.workspace.getConfiguration('unity-code');
     const showUnityLogs = config.get<boolean>('showUnityLogs', true);
-    
+
     if (!showUnityLogs) {
         console.log('UnityCode: Unity log forwarding is disabled in settings');
         return;
@@ -323,52 +284,22 @@ function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Start monitoring Unity connection status and update status bar using events
- */
-function startUnityStatusMonitoring(): void {
-    if (!globalUnityMessagingClient || !globalUnityStatusBarItem) {
-        return;
-    }
-
-    // Update status bar immediately with current state
-    const connected = globalUnityMessagingClient.connected;
-    const online = globalUnityMessagingClient.unityOnline;
-    updateUnityStatusBarItem(globalUnityStatusBarItem, connected, online);
-
-    // Subscribe to connection status changes for immediate updates
-    globalUnityMessagingClient.onConnectionStatus.subscribe((isConnected) => {
-        if (globalUnityStatusBarItem) {
-            const currentOnline = globalTestProvider?.messagingClient.unityOnline || false;
-            updateUnityStatusBarItem(globalUnityStatusBarItem, isConnected, currentOnline);
-        }
-    });
-
-    // Subscribe to online status changes for immediate updates
-    globalUnityMessagingClient.onOnlineStatus.subscribe((isOnline) => {
-        if (globalUnityStatusBarItem) {
-            const currentConnected = globalTestProvider?.messagingClient.connected || false;
-            updateUnityStatusBarItem(globalUnityStatusBarItem, currentConnected, isOnline);
-        }
-    });
-}
-
-/**
  * Register all event listeners and commands
  * @param context The extension context
  */
-function registerEventListeners(context: vscode.ExtensionContext): void {
+async function registerEventListeners(context: vscode.ExtensionContext): Promise<void> {
     // Register the command to manually refresh tests
     const refreshTestsDisposable = vscode.commands.registerCommand('unity-code.refreshTests', async function () {
-        if (globalTestProvider) {
+        if (globalUnityTestProvider) {
             // Check if tests are currently running
-            if (globalTestProvider.isTestsRunning()) {
+            if (globalUnityTestProvider.isTestsRunning()) {
                 vscode.window.showWarningMessage('Unity Code: Tests are currently running. Please wait for tests to complete before refreshing.');
                 return;
             }
-            
+
             vscode.window.showInformationMessage('Unity Code: Refreshing tests...');
             try {
-                await globalTestProvider.refreshTests();
+                await globalUnityTestProvider.refreshTests();
                 vscode.window.showInformationMessage('Unity Code: Tests refreshed successfully');
             } catch (error) {
                 vscode.window.showErrorMessage(`Unity Code: Failed to refresh tests: ${error instanceof Error ? error.message : String(error)}`);
@@ -378,13 +309,36 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         }
     });
 
+    // Register the command to show Hot Reload status
+    const showHotReloadStatusDisposable = vscode.commands.registerCommand('unity-code.showHotReloadStatus', function () {
+        if (globalUnityDetector && globalUnityPackageHelper) {
+            const isHotReloadInstalled = globalUnityPackageHelper.getPackageByName('com.singularitygroup.hotreload') !== undefined;
+            const isHotReloadRunning = globalUnityDetector.isHotReloadEnabled;
+
+            let statusMessage = '';
+            if (isHotReloadInstalled) {
+                if (isHotReloadRunning) {
+                    statusMessage = 'Hot Reload for Unity is installed and running';
+                } else {
+                    statusMessage = 'Hot Reload for Unity is installed but not running';
+                }
+            } else {
+                statusMessage = 'Hot Reload for Unity is not installed';
+            }
+
+            vscode.window.showInformationMessage(`Hot Reload Status: ${statusMessage}`);
+        } else {
+            vscode.window.showWarningMessage('Hot Reload Status: Not available (no Unity project detected)');
+        }
+    });
+
     // Register the command to show Unity connection status
     const showConnectionStatusDisposable = vscode.commands.registerCommand('unity-code.showConnectionStatus', function () {
-        if (globalTestProvider) {
-            const connected = globalTestProvider.messagingClient.connected;
-            const online = globalTestProvider.messagingClient.unityOnline;
-            const processId = globalTestProvider.messagingClient.connectedUnityProcessId;
-            
+        if (globalUnityTestProvider) {
+            const connected = globalUnityTestProvider.messagingClient.connected;
+            const online = globalUnityTestProvider.messagingClient.unityOnline;
+            const processId = globalUnityTestProvider.messagingClient.connectedUnityProcessId;
+
             let statusMessage = '';
             if (online) {
                 statusMessage = `Unity Editor is online and ready (Process ID: ${processId || 'Unknown'})`;
@@ -393,7 +347,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
             } else {
                 statusMessage = 'Unity Editor is not connected. Make sure Unity is running with your project open.';
             }
-            
+
             vscode.window.showInformationMessage(`Unity Code Connection Status: ${statusMessage}`);
         } else {
             vscode.window.showWarningMessage('Unity Code: Not available (no Unity project detected)');
@@ -402,12 +356,12 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
 
     // Register the command to run tests from code lens
     const runTestsDisposable = vscode.commands.registerCommand('unity-code.runTests', async function (testId: string) {
-        if (!globalTestProvider) {
+        if (!globalUnityTestProvider) {
             vscode.window.showWarningMessage('Unity Code: Test provider not available');
             return;
         }
 
-        if (!globalTestProvider.messagingClient.connected) {
+        if (!globalUnityTestProvider.messagingClient.connected) {
             vscode.window.showErrorMessage('Unity Code: Not connected to Unity Editor. Make sure Unity is running.');
             return;
         }
@@ -419,7 +373,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
 
         try {
             // Find test item by its full name
-            const testItem = globalTestProvider.getTestItem(testId);
+            const testItem = globalUnityTestProvider.getTestItem(testId);
             if (!testItem) {
                 vscode.window.showWarningMessage('Unity Code: Could not find test item to run');
                 return;
@@ -427,8 +381,8 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
 
             // Create and execute test run request
             const request = new vscode.TestRunRequest([testItem]);
-            await globalTestProvider.runTests(request, new vscode.CancellationTokenSource().token);
-            
+            await globalUnityTestProvider.runTests(request, new vscode.CancellationTokenSource().token);
+
         } catch (error) {
             vscode.window.showErrorMessage(`Unity Code: Failed to run tests: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -446,13 +400,16 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
     // Listen for file save events for auto-refresh
     const saveDisposable = vscode.workspace.onDidSaveTextDocument(onDidSaveDocument);
 
-    // Create Unity status bar item for Unity projects
+    // Initialize status bar for Unity projects
     if (globalUnityProjectManager && globalUnityProjectManager.isWorkingWithUnityProject()) {
-        globalUnityStatusBarItem = createUnityStatusBarItem();
+        globalStatusBar = new StatusBar(context);
+        globalStatusBar.createUnityStatusBar();
+        globalStatusBar.checkAndCreateHotReloadStatusBar();
     }
 
     context.subscriptions.push(
         refreshTestsDisposable,
+        showHotReloadStatusDisposable,
         showConnectionStatusDisposable,
         runTestsDisposable,
         renameDisposable,
@@ -460,25 +417,20 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         createDisposable,
         saveDisposable
     );
-    
-    // Add status bar item to subscriptions for proper cleanup
-    if (globalUnityStatusBarItem) {
-        context.subscriptions.push(globalUnityStatusBarItem);
-    }
 }
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('UnityCode extension is now active!');
-    
+	console.log('UnityCode extension is now active!');
+
     // Initialize Native Binary Locator
     globalNativeBinaryLocator = new NativeBinaryLocator(context.extensionPath);
     if (!globalNativeBinaryLocator) {
         console.warn('Failed to initialize NativeBinaryLocator: unsupported platform or architecture');
     }
-    
+
     // Initialize Unity Debugger Manager
     globalUnityDebuggerManager = new UnityDebuggerManager(context);
     globalUnityDebuggerManager.activate(context);
@@ -487,9 +439,9 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize Unity project manager with current workspace folders
     globalUnityProjectManager = new UnityProjectManager();
     await globalUnityProjectManager.init(vscode.workspace.workspaceFolders);
-    
-    registerEventListeners(context);
-    
+
+    await registerEventListeners(context);
+
     // Initialize Unity test provider only for Unity projects
     await initializeUnityServices(context);
 }
@@ -516,34 +468,40 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     }
 
     globalUnityDetector = new UnityDetector(unityProjectPath, globalNativeBinaryLocator);
-    
+
     globalUnityMessagingClient = new UnityMessagingClient(globalUnityDetector);
 
     // Initialize test provider for Unity projects
-    globalTestProvider = new UnityTestProvider(context, globalUnityMessagingClient, globalUnityProjectManager!);
-    
+    globalUnityTestProvider = new UnityTestProvider(context, globalUnityMessagingClient, globalUnityProjectManager!);
+
     // Setup compilation-based test refresh
     setupCompilationFinishedRefresh();
-    
+
     // Initialize package helper for Unity projects
     const packageHelper = new UnityPackageHelper(unityProjectPath);
-    globalPackageHelper = packageHelper;
-    
+    globalUnityPackageHelper = packageHelper;
+
     console.log('UnityCode: Package helper initialized (packages will be loaded lazily when needed)');
-    
+
     // Register C# documentation hover provider with the initialized package helper
     registerHoverProvider(context, packageHelper);
-    
+
     await globalUnityDetector.start();
 
-    // Start Unity status monitoring if status bar item exists
-    if (globalUnityStatusBarItem) {
-        startUnityStatusMonitoring();
+    // Initialize and start status bar monitoring
+    if (globalStatusBar) {
+        globalStatusBar.initialize(
+            globalUnityPackageHelper,
+            globalUnityDetector,
+            globalUnityMessagingClient,
+            globalUnityProjectManager
+        );
+        globalStatusBar.startMonitoring();
     }
-    
+
     // Register Unity log message handlers
     registerUnityLogHandlers(context);
-    
+
     context.subscriptions.push({
         dispose: () => {
             cleanup();
@@ -552,18 +510,19 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
 }
 
 function cleanup() {
-    globalTestProvider?.dispose();
+    globalUnityTestProvider?.dispose();
     globalUnityDetector?.stop();
     globalUnityMessagingClient?.dispose();
     globalUnityConsoleManager?.dispose();
     globalUnityDebuggerManager?.deactivate();
+    globalStatusBar?.dispose();
     globalUnityDetector = null;
     globalUnityMessagingClient = null;
-    globalTestProvider = null;
-    globalPackageHelper = null;
-    globalUnityStatusBarItem = null;
+    globalUnityTestProvider = null;
+    globalUnityPackageHelper = null;
     globalUnityDebuggerManager = null;
     globalUnityConsoleManager = null;
+    globalStatusBar = null;
 }
 
 /**
@@ -577,7 +536,7 @@ function registerHoverProvider(context: vscode.ExtensionContext, packageHelper?:
         { scheme: 'file', language: 'csharp' },
         hoverProvider
     );
-    
+
     context.subscriptions.push(hoverDisposable);
 }
 
@@ -586,7 +545,7 @@ function registerHoverProvider(context: vscode.ExtensionContext, packageHelper?:
  * @returns UnityPackageHelper instance or null if not initialized
  */
 export function getPackageHelper(): UnityPackageHelper | null {
-    return globalPackageHelper;
+    return globalUnityPackageHelper;
 }
 
 export function deactivate() {

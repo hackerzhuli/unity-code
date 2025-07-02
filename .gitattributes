@@ -18,6 +18,7 @@
 
 # Fonts
 *.woff2 filter=lfs diff=lfs merge=lfs -text
+*.woff filter=lfs diff=lfs merge=lfs -text
 
 # Other
 *.exe filter=lfs diff=lfs merge=lfs -text
