@@ -193,24 +193,34 @@ export class UnityProjectManager {
             return;
         }
 
-        // Process each renamed file
-        for (const file of event.files) {
-            // Check if the new path is an asset of the Unity project
-            // The old file doesn't exist anymore, so we can't check it
-            const isAsset = await this.isAsset(file.newUri.fsPath);
-
-            if (isAsset) {
-                await this.renameMetaFile(file.oldUri.fsPath, file.newUri.fsPath);
-            }
-        }
-
         // Moving scripts may or may not need a recompile
         // We'll let Unity decide
         if (this.messagingClient) {
-            const triggerFilePath = await this.findScriptNeedRefresh(event.files.map(f => f.newUri), true);
-            if (triggerFilePath) {
-                await this.refreshAssetDatabaseIfNeeded(triggerFilePath, 'deleted', this.messagingClient);
+            // Both could the old path or the new path could trigger a refresh
+            // So we find a script in both, the old is like a delete the new is like a create
+            let triggerFilePath = await this.findScriptNeedRefresh(event.files.map(f => f.oldUri), true);
+            if(!triggerFilePath)
+            {
+                triggerFilePath = await this.findScriptNeedRefresh(event.files.map(f => f.newUri), false);
             }
+            if (triggerFilePath) {
+                console.log(`UnityProjectManager: cs file moved: ${triggerFilePath}, need to refresh asset database`);
+                await this.refreshAssetDatabaseIfNeeded(triggerFilePath, 'moved', this.messagingClient);
+            }else{
+                console.log(`UnityProjectManager: cs file moved, but no need to refresh asset database`);
+            }
+        }
+
+        // Process each renamed file
+        // We need to rename meta files after checking whether we need asset database refresh
+        // Because meta files are needed for validation
+        for (const file of event.files) {
+            // Even if the new path may not be an asset path like Assets/Packages, or even out of the Unity project
+            // But there is no reason to leave that .meta file hanging there
+            // The user can be accidentally moving the file into a non asset folder
+            // We should move the .meta file also so that if user decide to move the file back, the .meta file will be back
+            // So we always rename the .mete file with the file, no matter what
+            await this.renameMetaFile(file.oldUri.fsPath, file.newUri.fsPath);
         }
     }
 
