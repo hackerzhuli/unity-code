@@ -13,6 +13,7 @@ export class StatusBar {
     private packageHelper: UnityPackageHelper | null = null;
     private unityDetector: UnityDetector | null = null;
     private messagingClient: UnityMessagingClient | null = null;
+    private hotReloadPollingTimer: NodeJS.Timeout | null = null;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
@@ -211,6 +212,9 @@ export class StatusBar {
                     
                     // Update immediately with current state
                     this.updateHotReloadStatus(this.unityDetector.isHotReloadEnabled);
+                    
+                    // Start polling for hot reload status every 3 seconds
+                    this.startHotReloadPolling();
                 } else {
                     console.log('Status Bar: No Unity detector available for Hot Reload monitoring');
                 }
@@ -219,6 +223,7 @@ export class StatusBar {
             } else if (!isInstalled && hasStatusBar) {
                 // Package was uninstalled, remove status bar
                 console.log('Status Bar: Removing Hot Reload status bar (package uninstalled)');
+                this.stopHotReloadPolling();
                 this.hotReloadStatusBarItem?.dispose();
                 this.hotReloadStatusBarItem = null;
                 console.log('Status Bar: Hot Reload package uninstalled, status bar removed');
@@ -242,9 +247,49 @@ export class StatusBar {
     }
 
     /**
+     * Start polling for hot reload status every 3 seconds
+     */
+    private startHotReloadPolling(): void {
+        if (this.hotReloadPollingTimer) {
+            return; // Already polling
+        }
+        
+        console.log('Status Bar: Starting hot reload status polling (every 3 seconds)');
+        
+        this.hotReloadPollingTimer = setInterval(async () => {
+            if (!this.unityDetector || !this.hotReloadStatusBarItem) {
+                return;
+            }
+            
+            try {
+                const state = await this.unityDetector.requestUnityState(1000);
+                if (state) {
+                    console.log(`Status Bar: Polled hot reload status - Running: ${state.IsHotReloadEnabled}`);
+                    this.updateHotReloadStatus(state.IsHotReloadEnabled);
+                }
+            } catch (error) {
+                console.error('Status Bar: Error polling hot reload status:', error);
+            }
+        }, 3000); // Poll every 3 seconds
+    }
+    
+    /**
+     * Stop polling for hot reload status
+     */
+    private stopHotReloadPolling(): void {
+        if (this.hotReloadPollingTimer) {
+            console.log('Status Bar: Stopping hot reload status polling');
+            clearInterval(this.hotReloadPollingTimer);
+            this.hotReloadPollingTimer = null;
+        }
+    }
+
+    /**
      * Dispose of all status bar items
      */
     public dispose(): void {
+        this.stopHotReloadPolling();
+        
         if (this.unityStatusBarItem) {
             this.unityStatusBarItem.dispose();
             this.unityStatusBarItem = null;
