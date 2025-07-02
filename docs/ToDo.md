@@ -6,7 +6,7 @@
 - [x] 6. Add a debug feature to attach to Unity Editor
 - [x] 7. ~~Add 1 button in editor actions to enter/exit play mode according to state of Unity Editor~~
 - [x] 8. ~~Add a drop down (down arrow) beside the button metioned above that shows a boolean setting whether to start/stop Hot Reload for Unity(disabled if Hot Reload for Unity package is not installed in the project)~~ 
-- [ ] 9. Add a status bar item right beside Unity to show the state of Hot Reload for Unity(if it is installed as a project package)
+- [x] 9. Add a status bar item right beside Unity to show the state of Hot Reload for Unity(if it is installed as a project package)
 - [x] 10. Clicking on a test in Testing window (on the left side) goes to the compiled .dll not to the source file, fix it so that it goes to the source file
 - [x] 11. Remove a file or folder should also remove it's meta file
 - [x] 12. Automatic Rename/Remove .meta file should check for Assets folder and Packages folder, or that the file is an asset
