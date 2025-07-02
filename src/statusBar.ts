@@ -25,7 +25,7 @@ export class StatusBar {
         this.packageHelper = packageHelper;
         this.unityDetector = unityDetector;
         this.messagingClient = messagingClient;
-        
+
         // Subscribe to package updates to handle Hot Reload status bar changes
         if (this.packageHelper) {
             console.log('Status Bar: StatusBar subscribing to package updates');
@@ -54,10 +54,10 @@ export class StatusBar {
         this.unityStatusBarItem.command = 'unity-code.showConnectionStatus';
         this.updateUnityStatus(false, false);
         this.unityStatusBarItem.show();
-        
+
         // Add to subscriptions for proper cleanup
         this.context.subscriptions.push(this.unityStatusBarItem);
-        
+
         console.log('Status Bar: Unity status bar created');
     }
 
@@ -73,10 +73,10 @@ export class StatusBar {
         this.hotReloadStatusBarItem.command = 'unity-code.showHotReloadStatus';
         this.updateHotReloadStatus(false);
         this.hotReloadStatusBarItem.show();
-        
+
         // Add to subscriptions for proper cleanup
         this.context.subscriptions.push(this.hotReloadStatusBarItem);
-        
+
         console.log('Status Bar: Hot Reload status bar created');
     }
 
@@ -165,7 +165,7 @@ export class StatusBar {
                     this.updateHotReloadStatus(event.isHotReloadEnabled || false);
                 }
             });
-            
+
             // Update Hot Reload status bar immediately with current state
             this.updateHotReloadStatus(this.unityDetector.isHotReloadEnabled);
         }
@@ -185,57 +185,53 @@ export class StatusBar {
             // Check if Hot Reload package is installed
             const hotReloadPackage = this.packageHelper.getPackageByName('com.singularitygroup.hotreload');
             const isInstalled = hotReloadPackage !== undefined;
-            
+
             // Check current status bar state
             const hasStatusBar = this.hotReloadStatusBarItem !== null;
-            
+
             console.log('Status Bar: Package update check - isInstalled:', isInstalled, 'hasStatusBar:', hasStatusBar);
-            
-            if (isInstalled && !hasStatusBar) {
-                // Package was installed, create status bar
-                console.log('Status Bar: Creating Hot Reload status bar (package installed, no status bar)');
-                this.createHotReloadStatusBar();
-                
-                // Start monitoring if Unity detector is available
-                if (this.unityDetector) {
-                    console.log('Status Bar: Setting up Unity detector monitoring for Hot Reload');
-                    this.unityDetector.onUnityStateChanged.subscribe((event) => {
-                        if (this.hotReloadStatusBarItem) {
-                            this.updateHotReloadStatus(event.isHotReloadEnabled || false);
-                        }
-                    });
-                    
-                    // Update immediately with current state
-                    this.updateHotReloadStatus(this.unityDetector.isHotReloadEnabled);
-                    
-                    // Start polling for hot reload status every 3 seconds
-                    this.startHotReloadPolling();
+
+            if (isInstalled != hasStatusBar) {
+                // Package is installed
+                if (isInstalled) {
+                    // Package was installed, create status bar
+                    console.log('Status Bar: Creating Hot Reload status bar (package installed, no status bar)');
+                    this.createHotReloadStatusBar();
+
+                    // Start monitoring if Unity detector is available
+                    if (this.unityDetector) {
+                        console.log('Status Bar: Setting up Unity detector monitoring for Hot Reload');
+                        this.unityDetector.onUnityStateChanged.subscribe((event) => {
+                            if (this.hotReloadStatusBarItem) {
+                                this.updateHotReloadStatus(event.isHotReloadEnabled || false);
+                            }
+                        });
+
+                        // Update immediately with current state
+                        this.updateHotReloadStatus(this.unityDetector.isHotReloadEnabled);
+
+                        // Start polling for hot reload status every 3 seconds
+                        this.startHotReloadPolling();
+                    } else {
+                        console.log('Status Bar: No Unity detector available for Hot Reload monitoring');
+                    }
+
+                    console.log('Status Bar: Hot Reload package installed, status bar created');
                 } else {
-                    console.log('Status Bar: No Unity detector available for Hot Reload monitoring');
+                    // Package was uninstalled, remove status bar
+                    console.log('Status Bar: Removing Hot Reload status bar (package uninstalled)');
+                    this.stopHotReloadPolling();
+                    this.hotReloadStatusBarItem?.dispose();
+                    this.hotReloadStatusBarItem = null;
+                    console.log('Status Bar: Hot Reload package uninstalled, status bar removed');
                 }
-                
-                console.log('Status Bar: Hot Reload package installed, status bar created');
-            } else if (!isInstalled && hasStatusBar) {
-                // Package was uninstalled, remove status bar
-                console.log('Status Bar: Removing Hot Reload status bar (package uninstalled)');
-                this.stopHotReloadPolling();
-                this.hotReloadStatusBarItem?.dispose();
-                this.hotReloadStatusBarItem = null;
-                console.log('Status Bar: Hot Reload package uninstalled, status bar removed');
-            } else if (isInstalled && hasStatusBar) {
-                console.log('Status Bar: Hot Reload package and status bar both exist, updating status');
-            } else {
-                console.log('Status Bar: Hot Reload package not installed, no action needed');
-                // Log available packages for debugging
-                const allPackages = this.packageHelper.getAllPackages();
-                console.log('Status Bar: Available packages in handlePackagesUpdated:', allPackages.map(p => p.name));
             }
-            
+
             // If package is installed and status bar exists, just update the status
             if (isInstalled && hasStatusBar && this.unityDetector) {
                 this.updateHotReloadStatus(this.unityDetector.isHotReloadEnabled);
             }
-            
+
         } catch (error) {
             console.error('Status Bar: Error handling packages updated event:', error);
         }
@@ -248,14 +244,14 @@ export class StatusBar {
         if (this.hotReloadPollingTimer) {
             return; // Already polling
         }
-        
+
         console.log('Status Bar: Starting hot reload status polling (every 3 seconds)');
-        
+
         this.hotReloadPollingTimer = setInterval(async () => {
             if (!this.unityDetector || !this.hotReloadStatusBarItem) {
                 return;
             }
-            
+
             try {
                 const state = await this.unityDetector.requestUnityState(1000);
                 if (state) {
@@ -267,7 +263,7 @@ export class StatusBar {
             }
         }, 3000); // Poll every 3 seconds
     }
-    
+
     /**
      * Stop polling for hot reload status
      */
@@ -284,12 +280,12 @@ export class StatusBar {
      */
     public dispose(): void {
         this.stopHotReloadPolling();
-        
+
         if (this.unityStatusBarItem) {
             this.unityStatusBarItem.dispose();
             this.unityStatusBarItem = null;
         }
-        
+
         if (this.hotReloadStatusBarItem) {
             this.hotReloadStatusBarItem.dispose();
             this.hotReloadStatusBarItem = null;
