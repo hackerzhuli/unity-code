@@ -84,11 +84,11 @@ export class StatusBar {
 
         if (online) {
             this.unityStatusBarItem.text = '$(check)$(unity-cube)';
-            this.unityStatusBarItem.tooltip = 'Unity Editor is connected';
+            this.unityStatusBarItem.tooltip = 'We are connected to Unity Editor';
             this.unityStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
         } else if (connected) {
             this.unityStatusBarItem.text = '$(clock)$(unity-cube)';
-            this.unityStatusBarItem.tooltip = 'Unity Editor is detected but not connected';
+            this.unityStatusBarItem.tooltip = 'Unity Editor is detected but we are not connected to it';
             this.unityStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
         } else {
             this.unityStatusBarItem.text = '$(x)$(unity-cube)';
