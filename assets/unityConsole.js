@@ -3,6 +3,7 @@ let logs = [];
 let activeFilters = new Set(['info', 'warning', 'error']);
 let selectedLogId = null;
 let ignoreDuplicateLogs = true; // Default to true
+let searchText = ''; // Current search filter text
 
 // Virtual scrolling variables
 let visibleStartIndex = 0;
@@ -62,6 +63,22 @@ function getFirstLine(text) {
 }
 
 /**
+ * Checks if a log matches the current search criteria
+ * @param {Object} log - The log object to check
+ * @returns {boolean} True if the log matches the search criteria
+ */
+function matchesSearch(log) {
+    if (!searchText) {
+        return true; // No search filter, show all
+    }
+    
+    const searchLower = searchText.toLowerCase();
+    const fullLogText = (log.message + (log.stackTrace ? '\n' + log.stackTrace : '')).toLowerCase();
+    
+    return fullLogText.includes(searchLower);
+}
+
+/**
  * Creates a DOM element for displaying a log entry
  * @param {Object} log - The log object
  * @param {string} log.id - Unique identifier for the log
@@ -108,7 +125,7 @@ function addLog(log) {
     
     // If user was at bottom, keep them at bottom after new log
     if (wasAtBottom) {
-        const filteredLogs = logs.filter(l => activeFilters.has(l.type));
+        const filteredLogs = logs.filter(l => activeFilters.has(l.type) && matchesSearch(l));
         const totalLogs = filteredLogs.length;
         const visibleItems = calculateVisibleItems();
         visibleStartIndex = Math.max(0, totalLogs - visibleItems);
@@ -180,11 +197,11 @@ function renderVisibleLogs() {
         return;
     }
     
-    // Filter logs based on active filters
-    const filteredLogs = logs.filter(log => activeFilters.has(log.type));
+    // Filter logs based on active filters and search text
+    const filteredLogs = logs.filter(log => activeFilters.has(log.type) && matchesSearch(log));
     
     if (filteredLogs.length === 0) {
-        selectedLogId = null;
+        // Don't clear selectedLogId when filtering - preserve selection even if not visible
         if (!noLogs) {
             noLogs = document.createElement('div');
             noLogs.className = 'no-logs';
@@ -193,6 +210,9 @@ function renderVisibleLogs() {
         }
         logList.appendChild(noLogs);
         noLogs.style.display = 'flex';
+        
+        // Update details panel based on current selection
+        updateDetailsPanel();
         return;
     }
     
@@ -228,13 +248,16 @@ function renderVisibleLogs() {
         logList.appendChild(bottomSpacer);
     }
     
-    // Handle selection
+    // Handle selection - only highlight if the selected log is currently visible
     if (selectedLogId) {
         const selectedElement = logList.querySelector(`[data-id="${selectedLogId}"]`);
         if (selectedElement) {
             selectedElement.classList.add('selected');
         }
     }
+    
+    // Update details panel based on current selection
+    updateDetailsPanel();
     
     // Restore scroll position to prevent jumping
     logList.scrollTop = currentScrollTop;
@@ -291,10 +314,29 @@ function selectLog(logId) {
         });
     }
     
-    // Find the log and display details
-    const log = logs.find(l => l.id === logId);
+    // Update details panel
+    updateDetailsPanel();
+}
+
+/**
+ * Updates the details panel based on current selection
+ */
+function updateDetailsPanel() {
+    const container = document.getElementById('detailsContent');
+    
+    if (!selectedLogId) {
+        // No selection - show default message
+        container.textContent = 'Select a log entry to view details';
+        return;
+    }
+    
+    // Find the selected log
+    const log = logs.find(l => l.id === selectedLogId);
     if (log) {
         showLogDetails(log);
+    } else {
+        // Selected log not found (might be filtered out)
+        container.textContent = 'Select a log entry to view details';
     }
 }
 
@@ -473,16 +515,12 @@ function processStackTrace(text) {
 }
 
 /**
- * Updates the visibility of log items based on active filters
+ * Updates the visibility of log items based on active filters and search text
  * Now optimized to trigger a re-render instead of manipulating individual items
  */
 function updateLogVisibility() {
-    // Reset visible range to show latest logs
-    const filteredLogs = logs.filter(log => activeFilters.has(log.type));
-    const totalLogs = filteredLogs.length;
-    
-    // Show the most recent logs by default
-    visibleStartIndex = Math.max(0, totalLogs - calculateVisibleItems());
+    // Reset visible range to start from the beginning when search/filter changes
+    visibleStartIndex = 0;
     
     scheduleRender();
 }
@@ -547,17 +585,19 @@ function updateFilterButtons() {
 }
 
 /**
- * Renders all logs in the log list and handles selection
+ * Renders all logs in the log list
  * @param {string|null} targetSelectedLogId - The ID of the log to select after rendering
  */
 function renderAllLogs(targetSelectedLogId) {
-    selectedLogId = targetSelectedLogId;
+    if (targetSelectedLogId !== undefined) {
+        selectedLogId = targetSelectedLogId;
+    }
     
     // Reset to show latest logs only if user is at bottom
     const logList = document.getElementById('logList');
     const wasAtBottom = logList ? (logList.scrollTop + logList.clientHeight >= logList.scrollHeight - 5) : true;
     
-    const filteredLogs = logs.filter(log => activeFilters.has(log.type));
+    const filteredLogs = logs.filter(log => activeFilters.has(log.type) && matchesSearch(log));
     const totalLogs = filteredLogs.length;
     const visibleItems = calculateVisibleItems();
     
@@ -576,32 +616,7 @@ function renderAllLogs(targetSelectedLogId) {
     }
 }
 
-/**
- * Handles log selection logic, including auto-selection of visible logs
- * @param {string|null} targetSelectedLogId - The ID of the log to select, or null for auto-selection
- */
-function _handleLogSelection(targetSelectedLogId) {
-    const visibleLogItems = Array.from(document.querySelectorAll('.log-item'));
-    
-    if (visibleLogItems.length === 0) {
-        selectedLogId = null;
-        return;
-    }
-    
-    let logToSelect = null;
-    
-    if (targetSelectedLogId) {
-        logToSelect = visibleLogItems.find(item => item.dataset.id === targetSelectedLogId);
-    }
-    
-    if (!logToSelect) {
-        logToSelect = visibleLogItems[0];
-    }
-    
-    if (logToSelect) {
-        selectLog(logToSelect.dataset.id);
-    }
-}
+
 
 /**
  * Toggles the ignore duplicates setting
@@ -624,6 +639,42 @@ function updateIgnoreDuplicatesButton() {
     if (button) {
         button.classList.toggle('active', ignoreDuplicateLogs);
     }
+}
+
+/**
+ * Handles search input changes
+ * @param {string} newSearchText - The new search text
+ */
+function handleSearchInput(newSearchText) {
+    searchText = newSearchText.trim();
+    
+    // Show/hide clear button based on search text
+    const clearButton = document.getElementById('searchClearButton');
+    if (clearButton) {
+        clearButton.style.display = searchText ? 'block' : 'none';
+    }
+    
+    // Update log visibility based on new search criteria
+    updateLogVisibility();
+}
+
+/**
+ * Clears the search input and resets search filtering
+ */
+function clearSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const clearButton = document.getElementById('searchClearButton');
+    
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    
+    if (clearButton) {
+        clearButton.style.display = 'none';
+    }
+    
+    searchText = '';
+    updateLogVisibility();
 }
 
 /**
@@ -676,20 +727,6 @@ window.addEventListener('message', event => {
     }
 });
 
-// Send ready message on load
-document.addEventListener('DOMContentLoaded', () => {
-    updateIgnoreDuplicatesButton(); // Initialize button state
-    sendWebviewReady();
-});
-
-// Also send ready message when page becomes visible (for cases where DOMContentLoaded already fired)
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-        console.log("UnityConsole: page became visible, sending webviewReady");
-        sendWebviewReady();
-    }
-});
-
 /**
  * Handle scroll events to update visible logs
  */
@@ -725,6 +762,24 @@ function handleResize() {
 // Initialize when DOM is loaded
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+        updateIgnoreDuplicatesButton(); // Initialize button state
+        updateFilterButtons(); // Initialize filter button states
+        updateDetailsPanel(); // Initialize details panel with default message
+        
+        // Add search event listeners
+        const searchInput = document.getElementById('searchInput');
+        const searchClearButton = document.getElementById('searchClearButton');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                handleSearchInput(e.target.value);
+            });
+        }
+        
+        if (searchClearButton) {
+            searchClearButton.addEventListener('click', clearSearch);
+        }
+        
         sendWebviewReady();
         
         // Add scroll and resize event listeners
@@ -735,6 +790,24 @@ if (document.readyState === 'loading') {
         window.addEventListener('resize', handleResize);
     });
 } else {
+    updateIgnoreDuplicatesButton(); // Initialize button state
+    updateFilterButtons(); // Initialize filter button states
+    updateDetailsPanel(); // Initialize details panel with default message
+    
+    // Add search event listeners
+    const searchInput = document.getElementById('searchInput');
+    const searchClearButton = document.getElementById('searchClearButton');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            handleSearchInput(e.target.value);
+        });
+    }
+    
+    if (searchClearButton) {
+        searchClearButton.addEventListener('click', clearSearch);
+    }
+    
     sendWebviewReady();
     
     // Add scroll and resize event listeners
@@ -744,3 +817,11 @@ if (document.readyState === 'loading') {
     }
     window.addEventListener('resize', handleResize);
 }
+
+// Also send ready message when page becomes visible (for cases where DOMContentLoaded already fired)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        console.log("UnityConsole: page became visible, sending webviewReady");
+        sendWebviewReady();
+    }
+});

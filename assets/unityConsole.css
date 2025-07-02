@@ -19,6 +19,50 @@ body {
     gap: 8px;
 }
 
+.search-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-right: 8px;
+}
+
+.search-input {
+    padding: 4px 24px 4px 8px;
+    border: 1px solid var(--vscode-input-border);
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border-radius: 3px;
+    font-size: 12px;
+    width: 200px;
+    outline: none;
+}
+
+.search-input:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.search-input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+.search-clear-button {
+    position: absolute;
+    right: 4px;
+    background: none;
+    border: none;
+    color: var(--vscode-input-foreground);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px;
+    border-radius: 2px;
+    opacity: 0.7;
+}
+
+.search-clear-button:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+    opacity: 1;
+}
+
 .filter-button {
     padding: 4px 8px;
     border: 1px solid var(--vscode-button-border);

@@ -4,6 +4,8 @@ We have a dedicated custom WebView window that user can open to see Unity Consol
 ## Toolbar
 can toggle whether error/warning/info log will be shown(also these toggle will display a number that shows how many logs are shown of that type). There is also a button to clear the logs.
 
+A search bar to filter logs according to text content.
+
 ## Content section
 Each log just shows the first line of the log and an icon on the left to identify whether it is error/warning/info.
 
@@ -23,3 +25,6 @@ Script:Awake () (at Assets/Scripts/Script.cs:8)
 ```
 
 In the example, you can see that we should create links for both source lines, because the file exists(the path shown in log is relative path in a Unity project).
+
+## Auto Selection
+Auto selection is not implemented to avoid complexity, since we have filtering, which can make things complex. User can always select manually.
