@@ -203,6 +203,54 @@ export class UnityProjectManager {
                 await this.renameMetaFile(file.oldUri.fsPath, file.newUri.fsPath);
             }
         }
+
+        // Moving scripts may or may not need a recompile
+        // We'll let Unity decide
+        if (this.messagingClient) {
+            const triggerFilePath = await this.findScriptNeedRefresh(event.files.map(f => f.newUri), true);
+            if (triggerFilePath) {
+                await this.refreshAssetDatabaseIfNeeded(triggerFilePath, 'deleted', this.messagingClient);
+            }
+        }
+    }
+
+    /**
+     * Find the first .cs file that should trigger an asset database refresh
+     * @param files Array of file URIs to check
+     * @param isDeleteEvent Whether this is for a delete event (affects validation logic)
+     * @returns The file path that should trigger refresh, or null if none found
+     */
+    private async findScriptNeedRefresh(files: readonly vscode.Uri[], isDeleteEvent: boolean): Promise<string | null> {
+        for (const fileUri of files) {
+            const filePath = fileUri.fsPath;
+            
+            if (filePath.endsWith('.cs')) {
+                if (isDeleteEvent) {
+                    // For deleted files, check if it had a .meta file (indicating it was an asset)
+                    const metaFilePath = `${filePath}.meta`;
+                    if (await this.isAsset(metaFilePath, true)) {
+                        return filePath;
+                    }
+                } else {
+                    // For created files, check if file is saved to disk and not empty
+                    console.log(`UnityProjectManager: cs file created: ${filePath}`);
+                    try {
+                        const stats = await fs.promises.stat(filePath);
+                        if (stats.size > 0) {
+                            return filePath;
+                        } else {
+                            console.log(`UnityProjectManager: Skipping asset database refresh for empty .cs file: ${filePath}`);
+                        }
+                    } catch (_error) {
+                        console.log(`UnityProjectManager: Skipping asset database refresh for .cs file not saved to disk: ${filePath}`);
+                    }
+                }
+            } else if (!isDeleteEvent) {
+                // For non-.cs files in create events, always consider them valid for refresh
+                return filePath;
+            }
+        }
+        return null;
     }
 
     /**
@@ -214,21 +262,7 @@ export class UnityProjectManager {
             return;
         }
 
-        // Check if any deleted files were .cs assets
-        let triggerFilePath: string | null = null;
-        for (const deletedUri of event.files) {
-            const deletedFilePath = deletedUri.fsPath;
-            if (deletedFilePath.endsWith('.cs')) {
-                // Since the file is deleted, check if it had a .meta file (indicating it was an asset)
-                const metaFilePath = `${deletedFilePath}.meta`;
-                if (await this.isAsset(metaFilePath, true)) {
-                    triggerFilePath = deletedFilePath;
-                    break;
-                }
-            }
-        }
-
-        // Refresh asset database once if any .cs assets were deleted
+        const triggerFilePath = await this.findScriptNeedRefresh(event.files, true);
         if (triggerFilePath) {
             await this.refreshAssetDatabaseIfNeeded(triggerFilePath, 'deleted', this.messagingClient);
         }
@@ -243,35 +277,7 @@ export class UnityProjectManager {
             return;
         }
 
-        // Check if any created files are valid .cs files that should trigger refresh
-        let triggerFilePath: string | null = null;
-        for (const createdUri of event.files) {
-            const filePath = createdUri.fsPath;
-            
-            // For .cs files, check if file is saved to disk and not empty
-            if (filePath.endsWith('.cs')) {
-                console.log(`UnityProjectManager: cs file created: ${filePath}`);
-                try {
-                    // Check if file exists and is not empty
-                    const stats = await fs.promises.stat(filePath);
-                    if (stats.size > 0) {
-                        triggerFilePath = filePath;
-                        break;
-                    } else {
-                        console.log(`UnityProjectManager: Skipping asset database refresh for empty .cs file: ${filePath}`);
-                    }
-                } catch (_error) {
-                    // File doesn't exist or can't be accessed, skip refresh
-                    console.log(`UnityProjectManager: Skipping asset database refresh for .cs file not saved to disk: ${filePath}`);
-                }
-            } else {
-                // For non-.cs files, always consider them valid for refresh
-                triggerFilePath = filePath;
-                break;
-            }
-        }
-
-        // Refresh asset database once if any valid files were created
+        const triggerFilePath = await this.findScriptNeedRefresh(event.files, false);
         if (triggerFilePath) {
             await this.refreshAssetDatabaseIfNeeded(triggerFilePath, 'created', this.messagingClient);
         }
