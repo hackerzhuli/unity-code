@@ -34,14 +34,14 @@
         "description": "Unity Cube Icon",
         "default": {
           "fontPath": "./assets/icons.woff",
-          "fontCharacter": "\ue900"
+          "fontCharacter": ""
         }
       },
       "hot-reload": {
         "description": "Hot Reload Icon",
         "default": {
           "fontPath": "./assets/icons.woff",
-          "fontCharacter": "\ue901"
+          "fontCharacter": ""
         }
       }
     },
@@ -179,7 +179,7 @@
     "test": "npm run compile && npx mocha out/test/suite/*.test.js",
     "compile": "tsc",
     "watch": "tsc -watch -p ./",
-    "clean": "powershell -Command \"if (Test-Path 'out') { Remove-Item -Recurse -Force 'out' }\"",
+    "clean": "rimraf out",
     "build": "npm run clean && npm run compile && vsce package"
   },
   "dependencies": {
@@ -197,8 +197,8 @@
     "esmock": "^2.7.0",
     "globals": "^16.2.0",
     "mocha": "^11.7.0",
+    "rimraf": "^6.0.1",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.34.1",
-    "@vscode/vsce": "^3.2.0"
+    "typescript-eslint": "^8.34.1"
   }
 }
