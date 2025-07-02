@@ -1,4 +1,4 @@
-import { EventEmitter, VoidEventEmitter } from '../eventEmitter.js';
+import { EventEmitter, VoidEventEmitter } from '../eventEmitter';
 import * as assert from 'assert';
 
 describe('EventEmitter', () => {

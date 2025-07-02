@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { DecompiledFileHelper } from '../../decompiledFileHelper.js';
+import { DecompiledFileHelper } from '../../decompiledFileHelper';
 
 describe('DecompiledFileHelper Unit Tests', () => {
     describe('analyzeContent', () => {

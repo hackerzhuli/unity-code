@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { isInsideDirectory as isInDirectory, normalizePath } from './utils.js';
-import { UnityMessagingClient } from './unityMessagingClient.js';
-import { UnityTestProvider } from './unityTestProvider.js';
-import { UnityDetector } from './unityDetector.js';
+import { isInsideDirectory as isInDirectory, normalizePath } from './utils';
+import { UnityMessagingClient } from './unityMessagingClient';
+import { UnityTestProvider } from './unityTestProvider';
+import { UnityDetector } from './unityDetector';
 
 /**
  * Unity Project Manager class for centralized Unity project detection and management

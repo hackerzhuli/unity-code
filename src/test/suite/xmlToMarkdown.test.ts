@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { xmlToMarkdown } from '../../xmlToMarkdown.js';
+import { xmlToMarkdown } from '../../xmlToMarkdown';
 
 /**
  * Test suite for xmlToMarkdown function using real C# XML documentation examples

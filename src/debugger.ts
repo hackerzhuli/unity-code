@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { NativeBinaryLocator } from './nativeBinaryLocator.js';
-import { logWithLimit } from './utils.js';
+import { NativeBinaryLocator } from './nativeBinaryLocator';
+import { logWithLimit } from './utils';
 
 /**
  * Debug configuration provider for Unity projects

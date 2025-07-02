@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { UnityPackageHelper } from './unityPackageHelper.js';
-import { UnityDetector } from './unityDetector.js';
-import { UnityMessagingClient } from './unityMessagingClient.js';
+import { UnityPackageHelper } from './unityPackageHelper';
+import { UnityDetector } from './unityDetector';
+import { UnityMessagingClient } from './unityMessagingClient';
 
 /**
  * Manages Unity and Hot Reload status bar items

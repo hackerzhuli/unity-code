@@ -1,9 +1,9 @@
 import * as dgram from 'dgram';
 import * as net from 'net';
-import { UnityDetector, UnityDetectionEvent } from './unityDetector.js';
-import { logWithLimit } from './utils.js';
-import { EventEmitter } from './eventEmitter.js';
-import { wait } from './asyncUtils.js';
+import { UnityDetector, UnityDetectionEvent } from './unityDetector';
+import { logWithLimit } from './utils';
+import { EventEmitter } from './eventEmitter';
+import { wait } from './asyncUtils';
 
 export enum MessageType {
     None = 0,

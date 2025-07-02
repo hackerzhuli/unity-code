@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { UnityProjectManager } from './unityProjectManager.js';
-import { parseUnityConsoleStackTraceSourceLocation } from './stackTraceUtils.js';
-import { openFileAtLine } from './vscodeUtils.js';
+import { UnityProjectManager } from './unityProjectManager';
+import { parseUnityConsoleStackTraceSourceLocation } from './stackTraceUtils';
+import { openFileAtLine } from './vscodeUtils';
 
 export interface UnityLogEntry {
     id: string;

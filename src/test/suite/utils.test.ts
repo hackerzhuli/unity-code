@@ -2,19 +2,15 @@ import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
 import { promisify } from 'util';
-import { fileURLToPath } from 'url';
-import { isInsideDirectory, normalizePath } from '../../utils.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { isInsideDirectory, normalizePath } from '../../utils';
 
 describe('Utils Unit Tests', () => {
     
     describe('isInsideDirectory', () => {
-        const tempDir = path.join(__dirname, 'temp-test-dir');
+        const tempDir = path.join(process.cwd(), 'temp-test-dir');
         const subDir = path.join(tempDir, 'subdir');
         const testFile = path.join(subDir, 'test.txt');
-        const outsideDir = path.join(__dirname, 'outside-dir');
+        const outsideDir = path.join(process.cwd(), 'outside-dir');
         const outsideFile = path.join(outsideDir, 'outside.txt');
         
         before(async () => {
@@ -67,7 +63,7 @@ describe('Utils Unit Tests', () => {
         });
         
         it('should return false when directory path does not exist', async () => {
-            const nonExistentDir = path.join(__dirname, 'non-existent-dir');
+            const nonExistentDir = path.join(process.cwd(), 'non-existent-dir');
             const result = await isInsideDirectory(nonExistentDir, testFile);
             assert.strictEqual(result, false);
         });
@@ -103,7 +99,7 @@ describe('Utils Unit Tests', () => {
 
     
     describe('normalizePath', () => {
-        const testDir = path.join(__dirname, 'normalize-test-dir');
+        const testDir = path.join(process.cwd(), 'normalize-test-dir');
         const testFile = path.join(testDir, 'test-file.txt');
         const nestedDir = path.join(testDir, 'nested');
         const nestedFile = path.join(nestedDir, 'nested-file.txt');

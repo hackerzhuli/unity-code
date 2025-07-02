@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { normalizePath } from './utils.js';
+import { normalizePath } from './utils';
 
 /**
  * Result of parsing a Unity stack trace line for source location

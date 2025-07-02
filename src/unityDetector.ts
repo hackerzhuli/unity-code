@@ -1,8 +1,8 @@
 import * as dgram from 'dgram';
 import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from './eventEmitter.js';
-import { NativeBinaryLocator } from './nativeBinaryLocator.js';
-import { wait } from './asyncUtils.js';
+import { EventEmitter } from './eventEmitter';
+import { NativeBinaryLocator } from './nativeBinaryLocator';
+import { wait } from './asyncUtils';
 
 /**
  * Message types for native messaging protocol

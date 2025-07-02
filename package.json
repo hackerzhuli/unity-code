@@ -3,7 +3,6 @@
   "displayName": "Unity Code",
   "description": "VS Code extension that helps you to work with Unity Projects",
   "version": "0.1.0",
-  "type": "module",
   "publisher": "hackerzhuli",
   "repository": {
     "type": "git",
@@ -179,7 +178,9 @@
     "pretest": "npm run lint",
     "test": "npm run compile && npx mocha out/test/suite/*.test.js",
     "compile": "tsc",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "clean": "powershell -Command \"if (Test-Path 'out') { Remove-Item -Recurse -Force 'out' }\"",
+    "build": "npm run clean && npm run compile && vsce package"
   },
   "dependencies": {
     "fast-xml-parser": "^5.2.5"
@@ -197,6 +198,7 @@
     "globals": "^16.2.0",
     "mocha": "^11.7.0",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.34.1"
+    "typescript-eslint": "^8.34.1",
+    "@vscode/vsce": "^3.2.0"
   }
 }

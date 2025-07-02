@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestNodeType, TestAdaptor } from './unityMessagingClient.js';
-import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown, isUnityTestStackTrace } from './stackTraceUtils.js';
-import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils.js';
-import { UnityProjectManager } from './unityProjectManager.js';
-import { wait } from './asyncUtils.js';
+import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestNodeType, TestAdaptor } from './unityMessagingClient';
+import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown, isUnityTestStackTrace } from './stackTraceUtils';
+import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils';
+import { UnityProjectManager } from './unityProjectManager';
+import { wait } from './asyncUtils';
 
 interface TestData {
     fullName: string;

@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
-import { isInsideDirectory, normalizePath } from './utils.js';
-import { VoidEventEmitter } from './eventEmitter.js';
+import { isInsideDirectory, normalizePath } from './utils';
+import { VoidEventEmitter } from './eventEmitter';
 
 const readFile = promisify(fs.readFile);
 const readdir = promisify(fs.readdir);

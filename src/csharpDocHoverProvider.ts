@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { DecompiledFileHelper, DecompiledFileInfo } from './decompiledFileHelper.js';
-import { UnityPackageHelper, PackageInfo } from './unityPackageHelper.js';
-import { getQualifiedTypeName, detectLanguageServer, LanguageServerInfo, isTypeSymbol, extractXmlDocumentation } from './languageServerUtils.js';
-import { xmlToMarkdown } from './xmlToMarkdown.js';
+import { DecompiledFileHelper, DecompiledFileInfo } from './decompiledFileHelper';
+import { UnityPackageHelper, PackageInfo } from './unityPackageHelper';
+import { getQualifiedTypeName, detectLanguageServer, LanguageServerInfo, isTypeSymbol, extractXmlDocumentation } from './languageServerUtils';
+import { xmlToMarkdown } from './xmlToMarkdown';
 
 /**
  * Hover provider that adds documentation links to C# symbols

@@ -2,11 +2,7 @@ import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
 import { promisify } from 'util';
-import { fileURLToPath } from 'url';
-import { parseUnityTestStackTraceSourceLocation, processTestStackTraceToMarkdown, parseUnityConsoleStackTraceSourceLocation, processConsoleLogStackTraceToMarkdown } from '../../stackTraceUtils.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { parseUnityTestStackTraceSourceLocation, processTestStackTraceToMarkdown, parseUnityConsoleStackTraceSourceLocation, processConsoleLogStackTraceToMarkdown } from '../../stackTraceUtils';
 
 describe('Stack Trace Utils Unit Tests', () => {
     
@@ -201,7 +197,7 @@ describe('Stack Trace Utils Unit Tests', () => {
     });
     
     describe('processTestStackTraceToMarkdown', () => {
-        const tempDir = path.join(__dirname, 'temp-stack-trace-test-dir');
+        const tempDir = path.join(process.cwd(), 'temp-stack-trace-test-dir');
         const testProjectPath = path.join(tempDir, 'TestProject');
         const testFile = path.join(testProjectPath, 'Assets', 'Scripts', 'TestScript.cs');
         
@@ -287,7 +283,7 @@ describe('Stack Trace Utils Unit Tests', () => {
         });
         
         it('should handle paths outside project correctly', async () => {
-            const outsidePath = path.join(__dirname, 'outside.cs');
+            const outsidePath = path.join(process.cwd(), 'outside.cs');
             const stackTrace = `at TestNamespace.TestClass.TestMethod () [0x00001] in ${outsidePath}:25`;
             
             // Create the outside file temporarily
@@ -482,7 +478,7 @@ describe('Stack Trace Utils Unit Tests', () => {
     });
 
     describe('processConsoleLogStackTraceToMarkdown', () => {
-        const tempDir = path.join(__dirname, 'temp-console-log-test-dir');
+        const tempDir = path.join(process.cwd(), 'temp-console-log-test-dir');
         const testProjectPath = path.join(tempDir, 'TestProject');
         const testFile = path.join(testProjectPath, 'Assets', 'Scripts', 'TestScript.cs');
         

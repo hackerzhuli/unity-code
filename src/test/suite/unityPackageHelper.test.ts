@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { promisify } from 'util';
-import { UnityPackageHelper } from '../../unityPackageHelper.js';
+import { UnityPackageHelper } from '../../unityPackageHelper';
 
 const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);

@@ -1,14 +1,14 @@
 import * as vscode from 'vscode';
-import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
-import { UnityDetector } from './unityDetector.js';
-import { UnityTestProvider } from './unityTestProvider.js';
-import { UnityMessagingClient } from './unityMessagingClient.js';
-import { UnityPackageHelper } from './unityPackageHelper.js';
-import { UnityProjectManager } from './unityProjectManager.js';
-import { UnityConsoleManager } from './unityConsole.js';
-import { NativeBinaryLocator } from './nativeBinaryLocator.js';
-import { UnityDebuggerManager } from './debugger.js';
-import { StatusBar } from './statusBar.js';
+import { CSharpDocHoverProvider } from './csharpDocHoverProvider';
+import { UnityDetector } from './unityDetector';
+import { UnityTestProvider } from './unityTestProvider';
+import { UnityMessagingClient } from './unityMessagingClient';
+import { UnityPackageHelper } from './unityPackageHelper';
+import { UnityProjectManager } from './unityProjectManager';
+import { UnityConsoleManager } from './unityConsole';
+import { NativeBinaryLocator } from './nativeBinaryLocator';
+import { UnityDebuggerManager } from './debugger';
+import { StatusBar } from './statusBar';
 
 // Global variables for Unity services
 let globalUnityDetector: UnityDetector | null = null;
