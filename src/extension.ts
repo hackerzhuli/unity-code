@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import { CSharpDocHoverProvider } from './csharpDocHoverProvider.js';
 import { UnityDetector } from './unityDetector.js';
 import { UnityTestProvider } from './unityTestProvider.js';
@@ -28,153 +27,17 @@ let globalUnityDebuggerManager: UnityDebuggerManager | null = null;
 let globalStatusBar: StatusBar | null = null;
 
 /**
- * Handle renaming of a single file and its corresponding meta file
- * @param oldUri The original file URI
- * @param newUri The new file URI
- */
-async function handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
-    // Check if we have a Unity project and both paths are within it
-    if (!globalUnityProjectManager || !globalUnityProjectManager.isWorkingWithUnityProject()) {
-        return;
-    }
-
-    // Check if the new new path is an asset of the Unity project
-    // The old file don't exist any more, so we can't check it
-    const isAsset = await globalUnityProjectManager.isAsset(newUri.fsPath);
-
-    if (!isAsset) {
-        return;
-    }
-
-    await renameMetaFile(oldUri.fsPath, newUri.fsPath);
-}
-
-/**
- * Rename the meta file for a given asset file
- * @param oldFilePath The original file path
- * @param newFilePath The new file path
- */
-async function renameMetaFile(oldFilePath: string, newFilePath: string): Promise<void> {
-    const oldMetaPath = `${oldFilePath}.meta`;
-    const newMetaPath = `${newFilePath}.meta`;
-
-    // Check if the meta file exists
-    if (fs.existsSync(oldMetaPath)) {
-        try {
-            // Rename the meta file to match the renamed file
-            fs.renameSync(oldMetaPath, newMetaPath);
-            console.log(`UnityCode: detected asset ${oldFilePath} is renamed to ${newFilePath}, so Renamed meta file ${oldMetaPath} to ${newMetaPath}`);
-        } catch (error) {
-            console.error(`UnityCode: Error renaming meta file: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
-}
-
-/**
  * Handle file rename events from VS Code
  * @param event The file rename event
  */
 async function onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    if (!globalUnityProjectManager) {
         return;
     }
 
     // Process each renamed file
     for (const file of event.files) {
-        await handleFileRename(file.oldUri, file.newUri);
-    }
-}
-
-/**
- * Refresh Unity asset database if conditions are met
- * @param filePath The file path that triggered the refresh
- * @param action The action that triggered the refresh (for logging)
- */
-async function refreshAssetDatabaseIfNeeded(filePath: string, action: string): Promise<void> {
-    if (!globalUnityMessagingClient || !globalUnityProjectManager) {
-        return;
-    }
-
-    // Check if auto-refresh is enabled
-    const config = vscode.workspace.getConfiguration('unity-code');
-    const autoRefreshEnabled = config.get<boolean>('autoRefreshUnity', true);
-
-    if (!autoRefreshEnabled) {
-        return;
-    }
-
-    // Check if we have a Unity project and the file is within it
-    if (!globalUnityProjectManager.isWorkingWithUnityProject()) {
-        return;
-    }
-
-    // Check if the file is an asset (not a .meta file and either exists as an asset or has a corresponding .meta file)
-    if (filePath.endsWith('.meta')) {
-        return;
-    }
-
-    const isAsset = globalUnityProjectManager.isAsset(filePath);
-    const hasMetaFile = fs.existsSync(`${filePath}.meta`);
-
-    if (!isAsset && !hasMetaFile) {
-        return;
-    }
-
-    // Skip asset database refresh if tests are currently running
-    if (globalUnityTestProvider && globalUnityTestProvider.isTestsRunning()) {
-        console.log(`UnityCode: Tests are running, skipping asset database refresh for ${filePath} (${action})`);
-        return;
-    }
-
-    console.log(`UnityCode: Asset ${filePath} was ${action}, refreshing Unity asset database...`);
-    try {
-        await globalUnityMessagingClient.refreshAssetDatabase();
-    } catch (error) {
-        console.error(`UnityCode: Error refreshing asset database after ${action}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
-/**
- * Handle deletion of a single file and its corresponding meta file
- * @param deletedUri The deleted file URI
- */
-async function handleFileDelete(deletedUri: vscode.Uri): Promise<void> {
-    // Check if we have a Unity project
-    if (!globalUnityProjectManager || !globalUnityProjectManager.isWorkingWithUnityProject()) {
-        return;
-    }
-
-    const deletedFilePath = deletedUri.fsPath;
-    const metaPath = `${deletedFilePath}.meta`;
-
-    // Check if this was a .cs file with a corresponding meta file (indicating it was a Unity asset)
-    const wasCsAsset = deletedFilePath.endsWith('.cs') && fs.existsSync(metaPath);
-
-    // If it was a C# asset file, refresh the asset database before deleting the meta file
-    if (wasCsAsset) {
-        await refreshAssetDatabaseIfNeeded(deletedFilePath, 'deleted');
-    }
-
-    // Delete the meta file if it exists
-    await deleteMetaFile(deletedFilePath);
-}
-
-/**
- * Delete the meta file for a given asset file
- * @param deletedFilePath The deleted file path
- */
-async function deleteMetaFile(deletedFilePath: string): Promise<void> {
-    const metaPath = `${deletedFilePath}.meta`;
-
-    // Check if the meta file exists and delete it
-    if (fs.existsSync(metaPath)) {
-        try {
-            fs.unlinkSync(metaPath);
-            console.log(`UnityCode: detected asset ${deletedFilePath} was deleted, so deleted meta file ${metaPath}`);
-        } catch (error) {
-            console.error(`UnityCode: Error deleting meta file: ${error instanceof Error ? error.message : String(error)}`);
-        }
+        await globalUnityProjectManager.handleFileRename(file.oldUri, file.newUri);
     }
 }
 
@@ -183,14 +46,13 @@ async function deleteMetaFile(deletedFilePath: string): Promise<void> {
  * @param event The file delete event
  */
 async function onDidDeleteFiles(event: vscode.FileDeleteEvent): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    if (!globalUnityProjectManager) {
         return;
     }
 
     // Process each deleted file
     for (const deletedUri of event.files) {
-        await handleFileDelete(deletedUri);
+        await globalUnityProjectManager.handleFileDelete(deletedUri, globalUnityMessagingClient || undefined, globalUnityTestProvider || undefined);
     }
 }
 
@@ -198,15 +60,9 @@ async function onDidDeleteFiles(event: vscode.FileDeleteEvent): Promise<void> {
  * Handle file save events for auto-refresh
  */
 async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
-    await refreshAssetDatabaseIfNeeded(document.uri.fsPath, 'saved');
-}
-
-/**
- * Handle creation of a single file and refresh asset database if needed
- * @param createdUri The created file URI
- */
-async function handleFileCreate(createdUri: vscode.Uri): Promise<void> {
-    await refreshAssetDatabaseIfNeeded(createdUri.fsPath, 'created');
+    if (globalUnityProjectManager) {
+        await globalUnityProjectManager.handleFileSave(document, globalUnityMessagingClient || undefined, globalUnityTestProvider || undefined);
+    }
 }
 
 /**
@@ -214,14 +70,13 @@ async function handleFileCreate(createdUri: vscode.Uri): Promise<void> {
  * @param event The file create event
  */
 async function onDidCreateFiles(event: vscode.FileCreateEvent): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    if (!globalUnityProjectManager) {
         return;
     }
 
     // Process each created file
     for (const createdUri of event.files) {
-        await handleFileCreate(createdUri);
+        await globalUnityProjectManager.handleFileCreate(createdUri, globalUnityMessagingClient || undefined, globalUnityTestProvider || undefined);
     }
 }
 
@@ -416,7 +271,7 @@ async function registerEventListeners(context: vscode.ExtensionContext): Promise
  * @param {vscode.ExtensionContext} context
  */
 export async function activate(context: vscode.ExtensionContext) {
-	console.log('UnityCode extension is now active!');
+    console.log('UnityCode extension is now active!');
 
     // Initialize Native Binary Locator
     globalNativeBinaryLocator = new NativeBinaryLocator(context.extensionPath);
@@ -484,7 +339,7 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
 
     await globalUnityDetector.start();
 
-    if(globalUnityPackageHelper){
+    if (globalUnityPackageHelper) {
         await globalUnityPackageHelper.updatePackages();
     }
 
@@ -496,7 +351,7 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
             globalUnityDetector,
             globalUnityMessagingClient
         );
-    }else{
+    } else {
         console.error('UnityCode: StatusBar not initialized');
     }
 }

@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { isInsideDirectory as isInDirectory, normalizePath } from './utils.js';
+import { UnityMessagingClient } from './unityMessagingClient.js';
+import { UnityTestProvider } from './unityTestProvider.js';
 
 /**
  * Unity Project Manager class for centralized Unity project detection and management
@@ -128,5 +130,167 @@ export class UnityProjectManager {
         return false;
     }
 
+    /**
+     * Handle renaming of a single file and its corresponding meta file
+     * @param oldUri The original file URI
+     * @param newUri The new file URI
+     */
+    public async handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
+        // Check if we have a Unity project and both paths are within it
+        if (!this.isWorkingWithUnityProject()) {
+            return;
+        }
 
+        // Check if the new new path is an asset of the Unity project
+        // The old file don't exist any more, so we can't check it
+        const isAsset = await this.isAsset(newUri.fsPath);
+
+        if (!isAsset) {
+            return;
+        }
+
+        await this.renameMetaFile(oldUri.fsPath, newUri.fsPath);
+    }
+
+    /**
+     * Rename the meta file for a given asset file
+     * @param oldFilePath The original file path
+     * @param newFilePath The new file path
+     */
+    private async renameMetaFile(oldFilePath: string, newFilePath: string): Promise<void> {
+        const oldMetaPath = `${oldFilePath}.meta`;
+        const newMetaPath = `${newFilePath}.meta`;
+
+        // Check if the meta file exists
+        if (fs.existsSync(oldMetaPath)) {
+            try {
+                // Rename the meta file to match the renamed file
+                fs.renameSync(oldMetaPath, newMetaPath);
+                console.log(`UnityCode: detected asset ${oldFilePath} is renamed to ${newFilePath}, so Renamed meta file ${oldMetaPath} to ${newMetaPath}`);
+            } catch (error) {
+                console.error(`UnityCode: Error renaming meta file: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+    }
+
+    /**
+     * Handle deletion of a single file and its corresponding meta file
+     * @param deletedUri The deleted file URI
+     * @param messagingClient The Unity messaging client for asset database refresh
+     * @param testProvider Optional test provider to check if tests are running
+     */
+    public async handleFileDelete(deletedUri: vscode.Uri, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
+        // Check if we have a Unity project
+        if (!this.isWorkingWithUnityProject()) {
+            return;
+        }
+
+        const deletedFilePath = deletedUri.fsPath;
+        const metaPath = `${deletedFilePath}.meta`;
+
+        // Check if this was a .cs file with a corresponding meta file (indicating it was a Unity asset)
+        const wasCsAsset = deletedFilePath.endsWith('.cs') && fs.existsSync(metaPath);
+
+        // If it was a C# asset file, refresh the asset database before deleting the meta file
+        if (wasCsAsset && messagingClient) {
+            await this.refreshAssetDatabaseIfNeeded(deletedFilePath, 'deleted', messagingClient, testProvider);
+        }
+
+        // Delete the meta file if it exists
+        await this.deleteMetaFile(deletedFilePath);
+    }
+
+    /**
+     * Delete the meta file for a given asset file
+     * @param deletedFilePath The deleted file path
+     */
+    private async deleteMetaFile(deletedFilePath: string): Promise<void> {
+        const metaPath = `${deletedFilePath}.meta`;
+
+        // Check if the meta file exists and delete it
+        if (fs.existsSync(metaPath)) {
+            try {
+                fs.unlinkSync(metaPath);
+                console.log(`UnityCode: detected asset ${deletedFilePath} was deleted, so deleted meta file ${metaPath}`);
+            } catch (error) {
+                console.error(`UnityCode: Error deleting meta file: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+    }
+
+    /**
+     * Handle creation of a single file and refresh asset database if needed
+     * @param createdUri The created file URI
+     * @param messagingClient The Unity messaging client for asset database refresh
+     * @param testProvider Optional test provider to check if tests are running
+     */
+    public async handleFileCreate(createdUri: vscode.Uri, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
+        if (messagingClient) {
+            await this.refreshAssetDatabaseIfNeeded(createdUri.fsPath, 'created', messagingClient, testProvider);
+        }
+    }
+
+    /**
+     * Handle file save events for auto-refresh
+     * @param document The saved document
+     * @param messagingClient The Unity messaging client for asset database refresh
+     * @param testProvider Optional test provider to check if tests are running
+     */
+    public async handleFileSave(document: vscode.TextDocument, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
+        if (messagingClient) {
+            await this.refreshAssetDatabaseIfNeeded(document.uri.fsPath, 'saved', messagingClient, testProvider);
+        }
+    }
+
+    /**
+     * Refresh Unity asset database if conditions are met
+     * @param filePath The file path that triggered the refresh
+     * @param action The action that triggered the refresh (for logging)
+     * @param messagingClient The Unity messaging client
+     * @param testProvider Optional test provider to check if tests are running
+     */
+    public async refreshAssetDatabaseIfNeeded(
+        filePath: string, 
+        action: string, 
+        messagingClient: UnityMessagingClient,
+        testProvider?: UnityTestProvider
+    ): Promise<void> {
+        // Check if auto-refresh is enabled
+        const config = vscode.workspace.getConfiguration('unity-code');
+        const autoRefreshEnabled = config.get<boolean>('autoRefreshUnity', true);
+
+        if (!autoRefreshEnabled) {
+            return;
+        }
+
+        // Check if we have a Unity project and the file is within it
+        if (!this.isWorkingWithUnityProject()) {
+            return;
+        }
+
+        // Check if the file is an asset (not a .meta file and either exists as an asset or has a corresponding .meta file)
+        if (filePath.endsWith('.meta')) {
+            return;
+        }
+
+        const isAsset = await this.isAsset(filePath);
+        const hasMetaFile = fs.existsSync(`${filePath}.meta`);
+
+        if (!isAsset && !hasMetaFile) {
+            return;
+        }
+
+        // Skip asset database refresh if tests are currently running
+        if (testProvider && testProvider.isTestsRunning()) {
+            console.log(`UnityCode: Tests are running, skipping asset database refresh for ${filePath} (${action})`);
+            return;
+        }
+
+        console.log(`UnityCode: Asset ${filePath} was ${action}, refreshing Unity asset database...`);
+        try {
+            await messagingClient.refreshAssetDatabase();
+        } catch (error) {
+            console.error(`UnityCode: Error refreshing asset database after ${action}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
 }
