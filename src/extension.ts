@@ -482,12 +482,6 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     // Register Unity log message handlers
     registerUnityLogHandlers(context);
 
-    context.subscriptions.push({
-        dispose: () => {
-            cleanup();
-        }
-    });
-
     await globalUnityDetector.start();
 
     if(globalUnityPackageHelper){
