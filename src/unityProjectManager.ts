@@ -180,7 +180,13 @@ export class UnityProjectManager {
 
         // Process each renamed file
         for (const file of event.files) {
-            await this.handleFileRename(file.oldUri, file.newUri);
+            // Check if the new path is an asset of the Unity project
+            // The old file doesn't exist anymore, so we can't check it
+            const isAsset = await this.isAsset(file.newUri.fsPath);
+
+            if (isAsset) {
+                await this.renameMetaFile(file.oldUri.fsPath, file.newUri.fsPath);
+            }
         }
     }
 
@@ -189,13 +195,23 @@ export class UnityProjectManager {
      * @param event The file delete event
      */
     private async onDidDeleteFiles(event: vscode.FileDeleteEvent): Promise<void> {
-        if (!this.isWorkingWithUnityProject()) {
+        if (!this.isWorkingWithUnityProject() || !this.messagingClient) {
             return;
         }
 
-        // Process each deleted file
+        // Check if any deleted files were .cs assets
+        let hasCsAssets = false;
         for (const deletedUri of event.files) {
-            await this.handleFileDelete(deletedUri, this.messagingClient, this.testProvider);
+            const deletedFilePath = deletedUri.fsPath;
+            if (deletedFilePath.endsWith('.cs') && await this.isAsset(deletedFilePath)) {
+                hasCsAssets = true;
+                break;
+            }
+        }
+
+        // Refresh asset database once if any .cs assets were deleted
+        if (hasCsAssets) {
+            await this.refreshAssetDatabaseIfNeeded('batch delete', 'deleted', this.messagingClient, this.testProvider);
         }
     }
 
@@ -204,13 +220,40 @@ export class UnityProjectManager {
      * @param event The file create event
      */
     private async onDidCreateFiles(event: vscode.FileCreateEvent): Promise<void> {
-        if (!this.isWorkingWithUnityProject()) {
+        if (!this.isWorkingWithUnityProject() || !this.messagingClient) {
             return;
         }
 
-        // Process each created file
+        // Check if any created files are valid .cs files that should trigger refresh
+        let hasValidCsFiles = false;
         for (const createdUri of event.files) {
-            await this.handleFileCreate(createdUri, this.messagingClient, this.testProvider);
+            const filePath = createdUri.fsPath;
+            
+            // For .cs files, check if file is saved to disk and not empty
+            if (filePath.endsWith('.cs')) {
+                try {
+                    // Check if file exists and is not empty
+                    const stats = await fs.promises.stat(filePath);
+                    if (stats.size > 0) {
+                        hasValidCsFiles = true;
+                        break;
+                    } else {
+                        console.log(`UnityCode: Skipping asset database refresh for empty .cs file: ${filePath}`);
+                    }
+                } catch (error) {
+                    // File doesn't exist or can't be accessed, skip refresh
+                    console.log(`UnityCode: Skipping asset database refresh for .cs file not saved to disk: ${filePath}`);
+                }
+            } else {
+                // For non-.cs files, always consider them valid for refresh
+                hasValidCsFiles = true;
+                break;
+            }
+        }
+
+        // Refresh asset database once if any valid files were created
+        if (hasValidCsFiles) {
+            await this.refreshAssetDatabaseIfNeeded('batch create', 'created', this.messagingClient, this.testProvider);
         }
     }
 
@@ -219,31 +262,9 @@ export class UnityProjectManager {
      * @param document The saved document
      */
     private async onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
-        if (this.isWorkingWithUnityProject()) {
-            await this.handleFileSave(document, this.messagingClient, this.testProvider);
+        if (this.isWorkingWithUnityProject() && this.messagingClient) {
+            await this.refreshAssetDatabaseIfNeeded(document.uri.fsPath, 'saved', this.messagingClient, this.testProvider);
         }
-    }
-
-    /**
-     * Handle renaming of a single file and its corresponding meta file
-     * @param oldUri The original file URI
-     * @param newUri The new file URI
-     */
-    private async handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
-        // Check if we have a Unity project and both paths are within it
-        if (!this.isWorkingWithUnityProject()) {
-            return;
-        }
-
-        // Check if the new new path is an asset of the Unity project
-        // The old file don't exist any more, so we can't check it
-        const isAsset = await this.isAsset(newUri.fsPath);
-
-        if (!isAsset) {
-            return;
-        }
-
-        await this.renameMetaFile(oldUri.fsPath, newUri.fsPath);
     }
 
     /**
@@ -264,75 +285,6 @@ export class UnityProjectManager {
             } catch (error) {
                 console.error(`UnityCode: Error renaming meta file: ${error instanceof Error ? error.message : String(error)}`);
             }
-        }
-    }
-
-    /**
-     * Handle deletion of a single file and its corresponding meta file
-     * @param deletedUri The deleted file URI
-     * @param messagingClient The Unity messaging client for asset database refresh
-     * @param testProvider Optional test provider to check if tests are running
-     */
-    private async handleFileDelete(deletedUri: vscode.Uri, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
-        // Check if we have a Unity project
-        if (!this.isWorkingWithUnityProject()) {
-            return;
-        }
-
-        const deletedFilePath = deletedUri.fsPath;
-        const metaPath = `${deletedFilePath}.meta`;
-
-        // Check if this was a .cs file with a corresponding meta file (indicating it was a Unity asset)
-        const wasCsAsset = deletedFilePath.endsWith('.cs') && fs.existsSync(metaPath);
-
-        // If it was a C# asset file, refresh the asset database before deleting the meta file
-        if (wasCsAsset && messagingClient) {
-            await this.refreshAssetDatabaseIfNeeded(deletedFilePath, 'deleted', messagingClient, testProvider);
-        }
-
-        // Delete the meta file if it exists
-        await this.deleteMetaFile(deletedFilePath);
-    }
-
-    /**
-     * Delete the meta file for a given asset file
-     * @param deletedFilePath The deleted file path
-     */
-    private async deleteMetaFile(deletedFilePath: string): Promise<void> {
-        const metaPath = `${deletedFilePath}.meta`;
-
-        // Check if the meta file exists and delete it
-        if (fs.existsSync(metaPath)) {
-            try {
-                fs.unlinkSync(metaPath);
-                console.log(`UnityCode: detected asset ${deletedFilePath} was deleted, so deleted meta file ${metaPath}`);
-            } catch (error) {
-                console.error(`UnityCode: Error deleting meta file: ${error instanceof Error ? error.message : String(error)}`);
-            }
-        }
-    }
-
-    /**
-     * Handle creation of a single file and refresh asset database if needed
-     * @param createdUri The created file URI
-     * @param messagingClient The Unity messaging client for asset database refresh
-     * @param testProvider Optional test provider to check if tests are running
-     */
-    private async handleFileCreate(createdUri: vscode.Uri, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
-        if (messagingClient) {
-            await this.refreshAssetDatabaseIfNeeded(createdUri.fsPath, 'created', messagingClient, testProvider);
-        }
-    }
-
-    /**
-     * Handle file save events for auto-refresh
-     * @param document The saved document
-     * @param messagingClient The Unity messaging client for asset database refresh
-     * @param testProvider Optional test provider to check if tests are running
-     */
-    private async handleFileSave(document: vscode.TextDocument, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
-        if (messagingClient) {
-            await this.refreshAssetDatabaseIfNeeded(document.uri.fsPath, 'saved', messagingClient, testProvider);
         }
     }
 
