@@ -89,7 +89,7 @@ export class StatusBar {
         } else if (connected) {
             this.unityStatusBarItem.text = '$(clock)$(unity-cube)';
             this.unityStatusBarItem.tooltip = 'Unity Editor is detected but not connected';
-            this.unityStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+            this.unityStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
         } else {
             this.unityStatusBarItem.text = '$(x)$(unity-cube)';
             this.unityStatusBarItem.tooltip = 'Unity Editor is not detected';
@@ -146,7 +146,7 @@ export class StatusBar {
         });
 
         // Subscribe to Unity state changes to update Hot Reload status
-        if (this.unityDetector && this.hotReloadStatusBarItem) {
+        if (this.unityDetector) {
             this.unityDetector.onUnityStateChanged.subscribe((event) => {
                 if (this.hotReloadStatusBarItem) {
                     this.updateHotReloadStatus(event.isHotReloadEnabled || false);
@@ -237,11 +237,7 @@ export class StatusBar {
             }
 
             try {
-                const state = await this.unityDetector.requestUnityState(1000);
-                if (state) {
-                    //console.log(`Status Bar: Polled hot reload status - Running: ${state.IsHotReloadEnabled}`);
-                    this.updateHotReloadStatus(state.IsHotReloadEnabled);
-                }
+                await this.unityDetector.requestUnityState(1000);
             } catch (error) {
                 console.error('Status Bar: Error polling hot reload status:', error);
             }
