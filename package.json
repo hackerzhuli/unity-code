@@ -22,13 +22,6 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "iconThemes": [
-      {
-        "id": "unity-code-icons",
-        "label": "Unity Code Icons",
-        "path": "./assets/unity-code-icon-theme.json"
-      }
-    ],
     "icons": {
       "unity-cube": {
         "description": "Unity Cube Icon",
