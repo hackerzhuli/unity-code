@@ -44,9 +44,9 @@ export class UnityProjectManager {
         this.isInitialized = true;
         
         if (this.unityProjectPath) {
-            console.log(`UnityCode: Detected Unity project at: ${this.unityProjectPath}`);
+            console.log(`UnityProjectManager: Detected Unity project at: ${this.unityProjectPath}`);
         } else {
-            console.log('UnityCode: No Unity project detected in workspace');
+            console.log('UnityProjectManager: No Unity project detected in workspace');
         }
         
         return this.unityProjectPath;
@@ -245,6 +245,7 @@ export class UnityProjectManager {
             
             // For .cs files, check if file is saved to disk and not empty
             if (filePath.endsWith('.cs')) {
+                console.log(`UnityProjectManager: cs file created: ${filePath}`);
                 try {
                     // Check if file exists and is not empty
                     const stats = await fs.promises.stat(filePath);
@@ -252,11 +253,11 @@ export class UnityProjectManager {
                         hasValidCsFiles = true;
                         break;
                     } else {
-                        console.log(`UnityCode: Skipping asset database refresh for empty .cs file: ${filePath}`);
+                        console.log(`UnityProjectManager: Skipping asset database refresh for empty .cs file: ${filePath}`);
                     }
                 } catch (_error) {
                     // File doesn't exist or can't be accessed, skip refresh
-                    console.log(`UnityCode: Skipping asset database refresh for .cs file not saved to disk: ${filePath}`);
+                    console.log(`UnityProjectManager: Skipping asset database refresh for .cs file not saved to disk: ${filePath}`);
                 }
             } else {
                 // For non-.cs files, always consider them valid for refresh
@@ -295,9 +296,9 @@ export class UnityProjectManager {
             try {
                 // Rename the meta file to match the renamed file
                 fs.renameSync(oldMetaPath, newMetaPath);
-                console.log(`UnityCode: detected asset ${oldFilePath} is renamed to ${newFilePath}, so Renamed meta file ${oldMetaPath} to ${newMetaPath}`);
+                console.log(`UnityProjectManager: detected asset ${oldFilePath} is renamed to ${newFilePath}, so Renamed meta file ${oldMetaPath} to ${newMetaPath}`);
             } catch (error) {
-                console.error(`UnityCode: Error renaming meta file: ${error instanceof Error ? error.message : String(error)}`);
+                console.error(`UnityProjectManager: Error renaming meta file: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
     }
@@ -343,7 +344,7 @@ export class UnityProjectManager {
 
         // If there's already a pending refresh, don't override it - let it handle the batching
         if (this.pendingRefreshTimeout) {
-            console.log(`UnityCode: Asset ${filePath} was ${action}, refresh already pending - batching with existing timeout`);
+            console.log(`UnityProjectManager: Asset ${filePath} was ${action}, refresh already pending - batching with existing timeout`);
             return;
         }
 
@@ -357,16 +358,16 @@ export class UnityProjectManager {
 
         // If enough time has passed since last refresh, refresh immediately
         if (timeSinceLastRefresh >= refreshDelayMs) {
-            console.log(`UnityCode: Asset ${filePath} was ${action}, refreshing Unity asset database...`);
+            console.log(`UnityProjectManager: Asset ${filePath} was ${action}, refreshing Unity asset database...`);
             this.lastRefreshTime = now;
             await this.performAssetDatabaseRefresh(messagingClient);
         } else {
             // Schedule a delayed refresh
             const remainingTime = refreshDelayMs - timeSinceLastRefresh;
-            console.log(`UnityCode: Asset ${filePath} was ${action}, batching refresh (will execute in ${Math.ceil(remainingTime / 1000)}s)`);
+            console.log(`UnityProjectManager: Asset ${filePath} was ${action}, batching refresh (will execute in ${Math.ceil(remainingTime / 1000)}s)`);
             
             this.pendingRefreshTimeout = setTimeout(async () => {
-                console.log(`UnityCode: Executing batched asset database refresh...`);
+                console.log(`UnityProjectManager: Executing batched asset database refresh...`);
                 this.lastRefreshTime = Date.now();
                 await this.performAssetDatabaseRefresh(messagingClient);
                 this.pendingRefreshTimeout = undefined;
@@ -384,20 +385,20 @@ export class UnityProjectManager {
             if (this.unityDetector) {
                 await this.unityDetector.requestUnityState();
                 if (this.unityDetector.isHotReloadEnabled) {
-                    console.log(`UnityCode: Hot Reload is enabled, skipping asset database refresh`);
+                    console.log(`UnityProjectManager: Hot Reload is enabled, skipping asset database refresh`);
                     return;
                 }
             }
 
             // Skip asset database refresh if tests are currently running
             if (this.testProvider && this.testProvider.isTestsRunning()) {
-                console.log(`UnityCode: Tests are running, skipping asset database refresh`);
+                console.log(`UnityProjectManager: Tests are running, skipping asset database refresh`);
                 return;
             }
 
             await messagingClient.refreshAssetDatabase();
         } catch (error) {
-            console.error(`UnityCode: Error refreshing asset database: ${error instanceof Error ? error.message : String(error)}`);
+            console.error(`UnityProjectManager: Error refreshing asset database: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 }
