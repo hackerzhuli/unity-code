@@ -394,9 +394,6 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         if (symbolInfo.definitionLocation) {
             const decompiledInfo = await this.checkDecompiledFile(symbolInfo.definitionLocation.uri);
             if (decompiledInfo.isDecompiled && decompiledInfo.assemblyName && this.unityPackageHelper) {
-                // Only update packages when we actually need assembly-to-package mapping
-                await this.unityPackageHelper.initialize();
-                
                 const packageInfo = this.unityPackageHelper.getPackageByAssembly(decompiledInfo.assemblyName);
                 if (packageInfo) {
                     const packageLinks = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);

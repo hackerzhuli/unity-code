@@ -15,7 +15,7 @@
 - [x] 15. Sometimes (in rare cases) tests didn't run in Unity and we didn't detect that, resulting in test appears running for ever in VS Code.
 - [x] 16. Now when we get tests, both edit mode and play mode will be blocked because of rate limits.
 - [x] 17. We should refresh tests when Unity finised compilation(and we don't need a setting for it), not when user get back to VS Code
-- [ ] 18. We should refresh unity packages here when finished compilation, or extension activation, other refreshes are not needed.
+- [x] 18. We should refresh unity packages here when finished compilation, or extension activation, other refreshes are not needed.
 - [x] 19. Double click on the run button beside tests in Testing window will result in individual tests appearing running forever after the whole test run finished.
 - [x] 20. Running higher level tests doesn't actually run tests, the level above the assembly(the project level), and the mode level, eg. "Play Mode", running these tests, it appears in Unity Editor that the test run started, but no leaf tests are actually run. However in Unity Editor we can actually run the the project level tests, which runs all tests in all assemblies.
 - [x] 21. Create/Delete/Paste a .cs asset file (for the case of create, file must be already saved to disk, and not empty, if not then do nothing) should also trigger a refresh of asset database.
@@ -24,4 +24,4 @@
 - [ ] 24. Unity package should generate launch.json settings for our debugger
 - [x] 25. Change our typescript compile output to CommonJS (but keeping working with esmoudles in typescript source code, also keep package.json type as module if possible) for better compatibility with current VS Code forks(some don't support modules yet). Create a seperate a build script in package.json and make sure we clean js output directory before build, compile the code and also call vsce to package it.
 - [x] 26. Our binary locator should not assume what platform is supported or not(binary locator should handle at least 6 platforms, that is Windows/MacOS/Linux, each with x64 and arm64), just get the binary file for the current platform when requested
-- [ ] 27. Test for a few hours, modify the version to 1.0.0 and publish the extension to open vsx!
+- [ ] 27. Test the extension in Cursor, fix bugs, then modify the version to 1.0.0 and publish the extension to open vsx!
