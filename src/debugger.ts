@@ -26,16 +26,10 @@ export class MonoDebugConfigurationProvider implements vscode.DebugConfiguration
         _token?: vscode.CancellationToken
     ): Promise<vscode.DebugConfiguration | undefined> {
         
-        // Check if platform is supported
-        if (!this.nativeBinaryLocator.isPlatformSupported()) {
-            vscode.window.showErrorMessage('Unity debugging is not supported on this platform. Currently only Windows x64 is supported.');
-            return undefined;
-        }
-        
         // Check if MonoDebugger binary exists
         const debuggerPath = this.nativeBinaryLocator.getMonoDebuggerPath();
         if (!debuggerPath) {
-            vscode.window.showErrorMessage('MonoDebugger binary not found. Please ensure the extension is properly installed.');
+            vscode.window.showErrorMessage('MonoDebugger binary not found for this platform. Please ensure the extension is properly installed.');
             return undefined;
         }
         
@@ -199,7 +193,6 @@ export class UnityDebuggerManager {
      * @returns True if debugging is available, false otherwise
      */
     public isDebuggingAvailable(): boolean {
-        return this.configurationProvider['nativeBinaryLocator'].isPlatformSupported() &&
-               this.configurationProvider['nativeBinaryLocator'].getMonoDebuggerPath() !== undefined;
+        return this.configurationProvider['nativeBinaryLocator'].getMonoDebuggerPath() !== undefined;
     }
 }

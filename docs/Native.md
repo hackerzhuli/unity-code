@@ -11,7 +11,16 @@ bin/
 ├── win_x64/
 │   ├── unity_code_native.exe
 │   └── MonoDebugger.exe
+├── win_arm64/
+│   ├── unity_code_native.exe
+│   └── MonoDebugger.exe
 ├── linux_x64/
+│   ├── unity_code_native
+│   └── MonoDebugger
+├── linux_arm64/
+│   ├── unity_code_native
+│   └── MonoDebugger
+├── mac_x64/
 │   ├── unity_code_native
 │   └── MonoDebugger
 ├── mac_arm64/
@@ -25,35 +34,40 @@ The `NativeBinaryLocator` class provides a centralized way to locate native bina
 
 ### Features
 
-- **Platform Detection**: Automatically detects the current platform (Windows, Linux, macOS)
+- **Platform Detection**: Automatically detects the current platform and architecture (Windows/Linux/macOS with x64/arm64)
 - **Binary Path Resolution**: Provides dedicated methods for each binary type
 - **Existence Checking**: Verifies that binaries exist before returning paths
-- **Cross-Platform Support**: Handles platform-specific file extensions and paths
+- **Cross-Platform Support**: Handles platform-specific file extensions and paths for all supported platforms
 
 ### Usage
 
 ```typescript
-import { getNativeBinaryLocator, NativeBinary } from './nativeBinaryLocator.js';
+import { NativeBinaryLocator } from './nativeBinaryLocator.js';
 
 // Initialize the locator (usually done once in extension activation)
-const locator = getNativeBinaryLocator(extensionRoot);
+const locator = new NativeBinaryLocator(extensionRoot);
 
 // Get specific binary paths
 const unityNativePath = locator.getUnityCodeNativePath();
 const debuggerPath = locator.getMonoDebuggerPath();
 
-// Check platform support
-if (locator.isPlatformSupported()) {
-    // Platform is supported
+// Check if binaries are available for the current platform
+if (unityNativePath && debuggerPath) {
+    // Binaries are available for this platform
 }
-
-// Get all available binaries
-const allBinaries = locator.getAllBinaryPaths();
 ```
 
 ### Platform Support
 
-Currently, only Windows (win_x64) is fully supported. Linux and macOS support may be added in future releases when the corresponding native binaries are available.
+The binary locator supports all major platforms and architectures:
+- Windows x64 (win_x64)
+- Windows ARM64 (win_arm64)
+- Linux x64 (linux_x64)
+- Linux ARM64 (linux_arm64)
+- macOS x64 (mac_x64)
+- macOS ARM64 (mac_arm64)
+
+The locator automatically detects the current platform and architecture, then attempts to locate the appropriate binaries. If binaries are not available for a specific platform, the methods will return `undefined`.
 
 ### Integration
 

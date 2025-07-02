@@ -6,9 +6,12 @@ import * as fs from 'fs';
  * Supported platforms for native binaries
  */
 export enum Platform {
-    Windows = 'win_x64',
-    Linux = 'linux_x64',
-    MacOS = 'mac_arm64'
+    WindowsX64 = 'win_x64',
+    WindowsArm64 = 'win_arm64',
+    LinuxX64 = 'linux_x64',
+    LinuxArm64 = 'linux_arm64',
+    MacOSX64 = 'mac_x64',
+    MacOSArm64 = 'mac_arm64'
 }
 
 /**
@@ -36,22 +39,9 @@ export class NativeBinaryLocator {
         } catch (error) {
             console.warn(`NativeBinaryLocator: ${error}`);
             // Set to a default value but mark detection as failed
-            this.currentPlatform = Platform.Windows;
+            this.currentPlatform = Platform.WindowsX64;
             this.platformDetectionFailed = true;
         }
-    }
-
-    /**
-     * Check if the current platform is supported
-     */
-    public isPlatformSupported(): boolean {
-        // If platform detection failed, it's not supported
-        if (this.platformDetectionFailed) {
-            return false;
-        }
-        
-        // Currently only Windows is fully supported
-        return this.currentPlatform === Platform.Windows;
     }
 
     /**
@@ -90,8 +80,15 @@ export class NativeBinaryLocator {
      */
     private getBinaryPath(binaryName: NativeBinary): string {
         const binDir = this.getBinDirectory();
-        const extension = this.currentPlatform === Platform.Windows ? '.exe' : '';
+        const extension = this.isWindowsPlatform() ? '.exe' : '';
         return path.join(binDir, `${binaryName}${extension}`);
+    }
+    
+    /**
+     * Check if the current platform is Windows
+     */
+    private isWindowsPlatform(): boolean {
+        return this.currentPlatform === Platform.WindowsX64 || this.currentPlatform === Platform.WindowsArm64;
     }
     
     /**
@@ -106,7 +103,7 @@ export class NativeBinaryLocator {
     }
         
     /**
-     * Detect the current platform and validate architecture compatibility
+     * Detect the current platform and architecture
      */
     private detectPlatform(): Platform {
         const platform = os.platform();
@@ -114,28 +111,31 @@ export class NativeBinaryLocator {
         
         switch (platform) {
             case 'win32':
-                // Windows: support x64 architecture
                 if (arch === 'x64') {
-                    return Platform.Windows;
+                    return Platform.WindowsX64;
+                } else if (arch === 'arm64') {
+                    return Platform.WindowsArm64;
                 }
-                throw new Error(`Unsupported Windows architecture: ${arch}. Only x64 is supported.`);
+                throw new Error(`Unsupported Windows architecture: ${arch}. Supported architectures: x64, arm64.`);
             
             case 'linux':
-                // Linux: support x64 architecture
                 if (arch === 'x64') {
-                    return Platform.Linux;
+                    return Platform.LinuxX64;
+                } else if (arch === 'arm64') {
+                    return Platform.LinuxArm64;
                 }
-                throw new Error(`Unsupported Linux architecture: ${arch}. Only x64 is supported.`);
+                throw new Error(`Unsupported Linux architecture: ${arch}. Supported architectures: x64, arm64.`);
             
             case 'darwin':
-                // macOS: support arm64 architecture (Apple Silicon)
-                if (arch === 'arm64') {
-                    return Platform.MacOS;
+                if (arch === 'x64') {
+                    return Platform.MacOSX64;
+                } else if (arch === 'arm64') {
+                    return Platform.MacOSArm64;
                 }
-                throw new Error(`Unsupported macOS architecture: ${arch}. Only arm64 is supported.`);
+                throw new Error(`Unsupported macOS architecture: ${arch}. Supported architectures: x64, arm64.`);
             
             default:
-                throw new Error(`Unsupported platform: ${platform}`);
+                throw new Error(`Unsupported platform: ${platform}. Supported platforms: win32, linux, darwin.`);
         }
     }
 }
