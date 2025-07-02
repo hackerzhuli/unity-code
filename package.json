@@ -139,7 +139,7 @@
         "unity-code.autoRefreshUnity": {
           "type": "boolean",
           "default": true,
-          "description": "Enable/disable automatic Unity asset database refresh when assets are saved, this will be automatically disabled if Hot Reload for Unity is running"
+          "description": "Enable/disable automatic Unity asset database refresh when assets are saved or scripts are created/deleted, this will be automatically disabled if Hot Reload for Unity is running"
         },
         "unity-code.debugger.stepOverPropertiesAndOperators": {
           "type": "boolean",
@@ -155,6 +155,13 @@
           "type": "boolean",
           "default": true,
           "description": "Ignore duplicate logs in Unity Console (logs with exactly the same content including stack trace)"
+        },
+        "unity-code.assetDatabaseRefreshDelay": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 60,
+          "description": "Minimum delay in seconds between Unity asset database refreshes to prevent overwhelming Unity Editor with frequent refresh requests (1-60 seconds)"
         }
       },
       "testing": {

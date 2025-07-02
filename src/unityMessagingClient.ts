@@ -903,7 +903,7 @@ export class UnityMessagingClient {
     }
 
     /**
-     * Refresh Unity's asset database to trigger recompilation( automatically disable this if Hot Reload is enabled)
+     * Refresh Unity's asset database to trigger recompilation
      * @returns true if refresh was sent or queued successfully, false otherwise
      */
     async refreshAssetDatabase(): Promise<boolean> {
@@ -914,21 +914,13 @@ export class UnityMessagingClient {
 
         console.log(`UnityMessagingClient: Sending Refresh message (type ${MessageType.Refresh}) to Unity on port ${this.unityPort}`);
         try {
-            // we need to know if Hot Reload for Unity is Enabled, if so, we dont want a Refresh
-            await this.unityDetector?.requestUnityState();
-
-            if (!this.unityDetector.isHotReloadEnabled) {
-                const success = await this.sendMessage(MessageType.Refresh, '');
-                if (success) {
-                    console.log('UnityMessagingClient: Refresh asset database message sent successfully');
-                } else {
-                    console.log('UnityMessagingClient: Failed to send refresh asset database message');
-                }
-                return success;
+            const success = await this.sendMessage(MessageType.Refresh, '');
+            if (success) {
+                console.log('UnityMessagingClient: Refresh asset database message sent successfully');
             } else {
-                console.log('UnityMessagingClient: Refresh asset database message not sent because Hot Reload is enabled');
-                return true; // Not sending due to Hot Reload is considered successful
+                console.log('UnityMessagingClient: Failed to send refresh asset database message');
             }
+            return success;
         } catch (error) {
             console.error('UnityMessagingClient: Failed to send refresh message:', error);
             return false;

@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { isInsideDirectory as isInDirectory, normalizePath } from './utils.js';
 import { UnityMessagingClient } from './unityMessagingClient.js';
 import { UnityTestProvider } from './unityTestProvider.js';
+import { UnityDetector } from './unityDetector.js';
 
 /**
  * Unity Project Manager class for centralized Unity project detection and management
@@ -15,7 +16,11 @@ export class UnityProjectManager {
     private isInitialized: boolean = false;
     private messagingClient?: UnityMessagingClient;
     private testProvider?: UnityTestProvider;
+    private unityDetector?: UnityDetector;
     private disposables: vscode.Disposable[] = [];
+    private lastRefreshTime: number = 0;
+    private pendingRefreshTimeout?: NodeJS.Timeout;
+    private readonly DEFAULT_ASSET_REFRESH_DELAY_SECONDS = 10; // 10 seconds default
 
     /**
      * Create a new Unity Project Manager instance
@@ -138,15 +143,18 @@ export class UnityProjectManager {
      * @param context The extension context for managing disposables
      * @param messagingClient The Unity messaging client for asset database refresh
      * @param testProvider Optional test provider to check if tests are running
+     * @param unityDetector Optional Unity detector for checking Unity state
      */
     public registerEventListeners(
         context: vscode.ExtensionContext,
         messagingClient?: UnityMessagingClient,
-        testProvider?: UnityTestProvider
+        testProvider?: UnityTestProvider,
+        unityDetector?: UnityDetector
     ): void {
         // Store references for use in event handlers
         this.messagingClient = messagingClient;
         this.testProvider = testProvider;
+        this.unityDetector = unityDetector;
 
         // Register file system event listeners
         const renameDisposable = vscode.workspace.onDidRenameFiles(this.onDidRenameFiles.bind(this));
@@ -167,6 +175,12 @@ export class UnityProjectManager {
     public dispose(): void {
         this.disposables.forEach(disposable => disposable.dispose());
         this.disposables = [];
+        
+        // Clean up pending refresh timeout
+        if (this.pendingRefreshTimeout) {
+            clearTimeout(this.pendingRefreshTimeout);
+            this.pendingRefreshTimeout = undefined;
+        }
     }
 
     /**
@@ -211,7 +225,7 @@ export class UnityProjectManager {
 
         // Refresh asset database once if any .cs assets were deleted
         if (hasCsAssets) {
-            await this.refreshAssetDatabaseIfNeeded('batch delete', 'deleted', this.messagingClient, this.testProvider);
+            await this.refreshAssetDatabaseIfNeeded('batch delete', 'deleted', this.messagingClient);
         }
     }
 
@@ -240,7 +254,7 @@ export class UnityProjectManager {
                     } else {
                         console.log(`UnityCode: Skipping asset database refresh for empty .cs file: ${filePath}`);
                     }
-                } catch (error) {
+                } catch (_error) {
                     // File doesn't exist or can't be accessed, skip refresh
                     console.log(`UnityCode: Skipping asset database refresh for .cs file not saved to disk: ${filePath}`);
                 }
@@ -253,7 +267,7 @@ export class UnityProjectManager {
 
         // Refresh asset database once if any valid files were created
         if (hasValidCsFiles) {
-            await this.refreshAssetDatabaseIfNeeded('batch create', 'created', this.messagingClient, this.testProvider);
+            await this.refreshAssetDatabaseIfNeeded('batch create', 'created', this.messagingClient);
         }
     }
 
@@ -263,7 +277,7 @@ export class UnityProjectManager {
      */
     private async onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
         if (this.isWorkingWithUnityProject() && this.messagingClient) {
-            await this.refreshAssetDatabaseIfNeeded(document.uri.fsPath, 'saved', this.messagingClient, this.testProvider);
+            await this.refreshAssetDatabaseIfNeeded(document.uri.fsPath, 'saved', this.messagingClient);
         }
     }
 
@@ -289,17 +303,18 @@ export class UnityProjectManager {
     }
 
     /**
-     * Refresh Unity asset database if conditions are met
+     * Refresh Unity asset database if conditions are met, with intelligent batching
+     * Notes:
+     * - Refresh may not be triggered immediately, we have times where we save code changes frequently,
+     * - eg. when using an AI agent, we don't want to trigger refresh too frequently, that may waste CPU proccessing power unnecessarily
      * @param filePath The file path that triggered the refresh
      * @param action The action that triggered the refresh (for logging)
      * @param messagingClient The Unity messaging client
-     * @param testProvider Optional test provider to check if tests are running
      */
     private async refreshAssetDatabaseIfNeeded(
         filePath: string, 
         action: string, 
-        messagingClient: UnityMessagingClient,
-        testProvider?: UnityTestProvider
+        messagingClient: UnityMessagingClient
     ): Promise<void> {
         // Check if auto-refresh is enabled
         const config = vscode.workspace.getConfiguration('unity-code');
@@ -326,17 +341,63 @@ export class UnityProjectManager {
             return;
         }
 
-        // Skip asset database refresh if tests are currently running
-        if (testProvider && testProvider.isTestsRunning()) {
-            console.log(`UnityCode: Tests are running, skipping asset database refresh for ${filePath} (${action})`);
+        // If there's already a pending refresh, don't override it - let it handle the batching
+        if (this.pendingRefreshTimeout) {
+            console.log(`UnityCode: Asset ${filePath} was ${action}, refresh already pending - batching with existing timeout`);
             return;
         }
 
-        console.log(`UnityCode: Asset ${filePath} was ${action}, refreshing Unity asset database...`);
+        // Implement intelligent refresh batching
+        const now = Date.now();
+        const timeSinceLastRefresh = now - this.lastRefreshTime;
+
+        // Get configurable refresh delay from settings (in seconds, convert to milliseconds)
+        const refreshDelaySeconds = config.get<number>('assetDatabaseRefreshDelay', this.DEFAULT_ASSET_REFRESH_DELAY_SECONDS);
+        const refreshDelayMs = refreshDelaySeconds * 1000;
+
+        // If enough time has passed since last refresh, refresh immediately
+        if (timeSinceLastRefresh >= refreshDelayMs) {
+            console.log(`UnityCode: Asset ${filePath} was ${action}, refreshing Unity asset database...`);
+            this.lastRefreshTime = now;
+            await this.performAssetDatabaseRefresh(messagingClient);
+        } else {
+            // Schedule a delayed refresh
+            const remainingTime = refreshDelayMs - timeSinceLastRefresh;
+            console.log(`UnityCode: Asset ${filePath} was ${action}, batching refresh (will execute in ${Math.ceil(remainingTime / 1000)}s)`);
+            
+            this.pendingRefreshTimeout = setTimeout(async () => {
+                console.log(`UnityCode: Executing batched asset database refresh...`);
+                this.lastRefreshTime = Date.now();
+                await this.performAssetDatabaseRefresh(messagingClient);
+                this.pendingRefreshTimeout = undefined;
+            }, remainingTime);
+        }
+    }
+
+    /**
+     * Perform the actual asset database refresh
+     * @param messagingClient The Unity messaging client
+     */
+    private async performAssetDatabaseRefresh(messagingClient: UnityMessagingClient): Promise<void> {
         try {
+            // Check if Hot Reload is enabled before refreshing
+            if (this.unityDetector) {
+                await this.unityDetector.requestUnityState();
+                if (this.unityDetector.isHotReloadEnabled) {
+                    console.log(`UnityCode: Hot Reload is enabled, skipping asset database refresh`);
+                    return;
+                }
+            }
+
+            // Skip asset database refresh if tests are currently running
+            if (this.testProvider && this.testProvider.isTestsRunning()) {
+                console.log(`UnityCode: Tests are running, skipping asset database refresh`);
+                return;
+            }
+
             await messagingClient.refreshAssetDatabase();
         } catch (error) {
-            console.error(`UnityCode: Error refreshing asset database after ${action}: ${error instanceof Error ? error.message : String(error)}`);
+            console.error(`UnityCode: Error refreshing asset database: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 }

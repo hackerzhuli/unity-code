@@ -254,7 +254,7 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     globalUnityTestProvider = new UnityTestProvider(context, globalUnityMessagingClient, globalUnityProjectManager!);
 
     // Register file event listeners in UnityProjectManager
-    globalUnityProjectManager!.registerEventListeners(context, globalUnityMessagingClient, globalUnityTestProvider);
+    globalUnityProjectManager!.registerEventListeners(context, globalUnityMessagingClient, globalUnityTestProvider, globalUnityDetector);
 
     // Setup compilation-based test refresh
     setupCompilationFinishedRefresh();
