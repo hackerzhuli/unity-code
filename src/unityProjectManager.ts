@@ -117,12 +117,13 @@ export class UnityProjectManager {
     }
 
     /**
-     * Check if a given path is an assets file or folder (not including meta file) of this Unity project
+     * Check if a given path is an assets file or folder of this Unity project
      * @param path The path to check
+     * @param allowMetaFiles Whether to treat .meta files as assets (default: false)
      * @returns boolean True if the path is an asset, otherwise false
      */
-    public async isAsset(path: string): Promise<boolean> {
-        if (path.endsWith(".meta")) {
+    public async isAsset(path: string, allowMetaFiles: boolean = false): Promise<boolean> {
+        if (path.endsWith(".meta") && !allowMetaFiles) {
             return false;
         }
 
@@ -217,9 +218,13 @@ export class UnityProjectManager {
         let triggerFilePath: string | null = null;
         for (const deletedUri of event.files) {
             const deletedFilePath = deletedUri.fsPath;
-            if (deletedFilePath.endsWith('.cs') && await this.isAsset(deletedFilePath)) {
-                triggerFilePath = deletedFilePath;
-                break;
+            if (deletedFilePath.endsWith('.cs')) {
+                // Since the file is deleted, check if it had a .meta file (indicating it was an asset)
+                const metaFilePath = `${deletedFilePath}.meta`;
+                if (await this.isAsset(metaFilePath, true)) {
+                    triggerFilePath = deletedFilePath;
+                    break;
+                }
             }
         }
 
@@ -336,7 +341,7 @@ export class UnityProjectManager {
         }
 
         const isAsset = await this.isAsset(filePath);
-        const hasMetaFile = fs.existsSync(`${filePath}.meta`);
+        const hasMetaFile = await this.isAsset(`${filePath}.meta`, true);
 
         if (!isAsset && !hasMetaFile) {
             return;
