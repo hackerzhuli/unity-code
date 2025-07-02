@@ -13,6 +13,9 @@ export class UnityProjectManager {
     /** path of the Unity project(normalized) */
     private unityProjectPath: string | null = null;
     private isInitialized: boolean = false;
+    private messagingClient?: UnityMessagingClient;
+    private testProvider?: UnityTestProvider;
+    private disposables: vscode.Disposable[] = [];
 
     /**
      * Create a new Unity Project Manager instance
@@ -131,11 +134,102 @@ export class UnityProjectManager {
     }
 
     /**
+     * Register VS Code event listeners for file operations
+     * @param context The extension context for managing disposables
+     * @param messagingClient The Unity messaging client for asset database refresh
+     * @param testProvider Optional test provider to check if tests are running
+     */
+    public registerEventListeners(
+        context: vscode.ExtensionContext,
+        messagingClient?: UnityMessagingClient,
+        testProvider?: UnityTestProvider
+    ): void {
+        // Store references for use in event handlers
+        this.messagingClient = messagingClient;
+        this.testProvider = testProvider;
+
+        // Register file system event listeners
+        const renameDisposable = vscode.workspace.onDidRenameFiles(this.onDidRenameFiles.bind(this));
+        const deleteDisposable = vscode.workspace.onDidDeleteFiles(this.onDidDeleteFiles.bind(this));
+        const createDisposable = vscode.workspace.onDidCreateFiles(this.onDidCreateFiles.bind(this));
+        const saveDisposable = vscode.workspace.onDidSaveTextDocument(this.onDidSaveDocument.bind(this));
+
+        // Store disposables for cleanup
+        this.disposables.push(renameDisposable, deleteDisposable, createDisposable, saveDisposable);
+        
+        // Add to extension context for automatic cleanup
+        context.subscriptions.push(renameDisposable, deleteDisposable, createDisposable, saveDisposable);
+    }
+
+    /**
+     * Dispose of all registered event listeners
+     */
+    public dispose(): void {
+        this.disposables.forEach(disposable => disposable.dispose());
+        this.disposables = [];
+    }
+
+    /**
+     * Handle file rename events from VS Code
+     * @param event The file rename event
+     */
+    private async onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
+        if (!this.isWorkingWithUnityProject()) {
+            return;
+        }
+
+        // Process each renamed file
+        for (const file of event.files) {
+            await this.handleFileRename(file.oldUri, file.newUri);
+        }
+    }
+
+    /**
+     * Handle file delete events from VS Code
+     * @param event The file delete event
+     */
+    private async onDidDeleteFiles(event: vscode.FileDeleteEvent): Promise<void> {
+        if (!this.isWorkingWithUnityProject()) {
+            return;
+        }
+
+        // Process each deleted file
+        for (const deletedUri of event.files) {
+            await this.handleFileDelete(deletedUri, this.messagingClient, this.testProvider);
+        }
+    }
+
+    /**
+     * Handle file create events from VS Code
+     * @param event The file create event
+     */
+    private async onDidCreateFiles(event: vscode.FileCreateEvent): Promise<void> {
+        if (!this.isWorkingWithUnityProject()) {
+            return;
+        }
+
+        // Process each created file
+        for (const createdUri of event.files) {
+            await this.handleFileCreate(createdUri, this.messagingClient, this.testProvider);
+        }
+    }
+
+    /**
+     * Handle file save events for auto-refresh
+     * @param document The saved document
+     */
+    private async onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
+        if (this.isWorkingWithUnityProject()) {
+            await this.handleFileSave(document, this.messagingClient, this.testProvider);
+        }
+    }
+
+    /**
      * Handle renaming of a single file and its corresponding meta file
      * @param oldUri The original file URI
      * @param newUri The new file URI
      */
-    public async handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
+    private async handleFileRename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
         // Check if we have a Unity project and both paths are within it
         if (!this.isWorkingWithUnityProject()) {
             return;
@@ -179,7 +273,7 @@ export class UnityProjectManager {
      * @param messagingClient The Unity messaging client for asset database refresh
      * @param testProvider Optional test provider to check if tests are running
      */
-    public async handleFileDelete(deletedUri: vscode.Uri, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
+    private async handleFileDelete(deletedUri: vscode.Uri, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
         // Check if we have a Unity project
         if (!this.isWorkingWithUnityProject()) {
             return;
@@ -224,7 +318,7 @@ export class UnityProjectManager {
      * @param messagingClient The Unity messaging client for asset database refresh
      * @param testProvider Optional test provider to check if tests are running
      */
-    public async handleFileCreate(createdUri: vscode.Uri, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
+    private async handleFileCreate(createdUri: vscode.Uri, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
         if (messagingClient) {
             await this.refreshAssetDatabaseIfNeeded(createdUri.fsPath, 'created', messagingClient, testProvider);
         }
@@ -236,7 +330,7 @@ export class UnityProjectManager {
      * @param messagingClient The Unity messaging client for asset database refresh
      * @param testProvider Optional test provider to check if tests are running
      */
-    public async handleFileSave(document: vscode.TextDocument, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
+    private async handleFileSave(document: vscode.TextDocument, messagingClient?: UnityMessagingClient, testProvider?: UnityTestProvider): Promise<void> {
         if (messagingClient) {
             await this.refreshAssetDatabaseIfNeeded(document.uri.fsPath, 'saved', messagingClient, testProvider);
         }

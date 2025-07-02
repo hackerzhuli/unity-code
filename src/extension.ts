@@ -26,59 +26,6 @@ let globalUnityDebuggerManager: UnityDebuggerManager | null = null;
 // Global status bar manager
 let globalStatusBar: StatusBar | null = null;
 
-/**
- * Handle file rename events from VS Code
- * @param event The file rename event
- */
-async function onDidRenameFiles(event: vscode.FileRenameEvent): Promise<void> {
-    if (!globalUnityProjectManager) {
-        return;
-    }
-
-    // Process each renamed file
-    for (const file of event.files) {
-        await globalUnityProjectManager.handleFileRename(file.oldUri, file.newUri);
-    }
-}
-
-/**
- * Handle file delete events from VS Code
- * @param event The file delete event
- */
-async function onDidDeleteFiles(event: vscode.FileDeleteEvent): Promise<void> {
-    if (!globalUnityProjectManager) {
-        return;
-    }
-
-    // Process each deleted file
-    for (const deletedUri of event.files) {
-        await globalUnityProjectManager.handleFileDelete(deletedUri, globalUnityMessagingClient || undefined, globalUnityTestProvider || undefined);
-    }
-}
-
-/**
- * Handle file save events for auto-refresh
- */
-async function onDidSaveDocument(document: vscode.TextDocument): Promise<void> {
-    if (globalUnityProjectManager) {
-        await globalUnityProjectManager.handleFileSave(document, globalUnityMessagingClient || undefined, globalUnityTestProvider || undefined);
-    }
-}
-
-/**
- * Handle file create events from VS Code
- * @param event The file create event
- */
-async function onDidCreateFiles(event: vscode.FileCreateEvent): Promise<void> {
-    if (!globalUnityProjectManager) {
-        return;
-    }
-
-    // Process each created file
-    for (const createdUri of event.files) {
-        await globalUnityProjectManager.handleFileCreate(createdUri, globalUnityMessagingClient || undefined, globalUnityTestProvider || undefined);
-    }
-}
 
 /**
  * Handle Unity compilation finished events for auto-refresh
@@ -243,27 +190,11 @@ async function registerEventListeners(context: vscode.ExtensionContext): Promise
         }
     });
 
-    // Listen for file rename events using workspace API
-    const renameDisposable = vscode.workspace.onDidRenameFiles(onDidRenameFiles);
-
-    // Listen for file delete events using workspace API
-    const deleteDisposable = vscode.workspace.onDidDeleteFiles(onDidDeleteFiles);
-
-    // Listen for file create events using workspace API
-    const createDisposable = vscode.workspace.onDidCreateFiles(onDidCreateFiles);
-
-    // Listen for file save events for auto-refresh
-    const saveDisposable = vscode.workspace.onDidSaveTextDocument(onDidSaveDocument);
-
     context.subscriptions.push(
         refreshTestsDisposable,
         showHotReloadStatusDisposable,
         showConnectionStatusDisposable,
-        runTestsDisposable,
-        renameDisposable,
-        deleteDisposable,
-        createDisposable,
-        saveDisposable
+        runTestsDisposable
     );
 }
 
@@ -322,6 +253,9 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     // Initialize test provider for Unity projects
     globalUnityTestProvider = new UnityTestProvider(context, globalUnityMessagingClient, globalUnityProjectManager!);
 
+    // Register file event listeners in UnityProjectManager
+    globalUnityProjectManager!.registerEventListeners(context, globalUnityMessagingClient, globalUnityTestProvider);
+
     // Setup compilation-based test refresh
     setupCompilationFinishedRefresh();
 
@@ -363,6 +297,7 @@ function cleanup() {
     globalUnityConsoleManager?.dispose();
     globalUnityDebuggerManager?.deactivate();
     globalStatusBar?.dispose();
+    globalUnityProjectManager?.dispose();
     globalUnityDetector = null;
     globalUnityMessagingClient = null;
     globalUnityTestProvider = null;
@@ -370,6 +305,7 @@ function cleanup() {
     globalUnityDebuggerManager = null;
     globalUnityConsoleManager = null;
     globalStatusBar = null;
+    globalUnityProjectManager = null;
 }
 
 /**
