@@ -28,9 +28,7 @@ export class StatusBar {
 
         // Subscribe to package updates to handle Hot Reload status bar changes
         if (this.packageHelper) {
-            console.log('Status Bar: StatusBar subscribing to package updates');
             this.packageHelper.onPackagesUpdated.subscribe(() => {
-                console.log('Status Bar: StatusBar received packages updated event');
                 this.updateHotReloadStatusBarExistenceAndStatus();
             });
         } else {
@@ -38,7 +36,7 @@ export class StatusBar {
         }
 
         this.createUnityStatusBar();
-        this.startMonitoring();
+        this.startUnityStatusMonitoring();
         this.updateHotReloadStatusBarExistenceAndStatus();
     }
 
@@ -57,8 +55,6 @@ export class StatusBar {
 
         // Add to subscriptions for proper cleanup
         this.context.subscriptions.push(this.unityStatusBarItem);
-
-        console.log('Status Bar: Unity status bar created');
     }
 
     /**
@@ -76,8 +72,6 @@ export class StatusBar {
 
         // Add to subscriptions for proper cleanup
         this.context.subscriptions.push(this.hotReloadStatusBarItem);
-
-        console.log('Status Bar: Hot Reload status bar created');
     }
 
     /**
@@ -120,13 +114,6 @@ export class StatusBar {
             this.hotReloadStatusBarItem.tooltip = 'Hot Reload for Unity is not running';
             this.hotReloadStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.offlineBackground');
         }
-    }
-
-    /**
-     * Start monitoring Unity connection and Hot Reload status
-     */
-    private startMonitoring(): void {
-        this.startUnityStatusMonitoring();
     }
 
     /**
@@ -175,9 +162,8 @@ export class StatusBar {
      * Update hot reload status bar item existence and status based on Hot Reload package installation
      */
     private updateHotReloadStatusBarExistenceAndStatus(): void {
-        console.log('Status Bar: handlePackagesUpdated called');
         if (!this.packageHelper) {
-            console.log('Status Bar: No packageHelper available in handlePackagesUpdated');
+            console.error('Status Bar: No packageHelper available in handlePackagesUpdated');
             return;
         }
 
@@ -188,8 +174,6 @@ export class StatusBar {
 
             // Check current status bar state
             const hasStatusBar = this.hotReloadStatusBarItem !== null;
-
-            console.log('Status Bar: Package update check - isInstalled:', isInstalled, 'hasStatusBar:', hasStatusBar);
 
             if (isInstalled != hasStatusBar) {
                 // Package is installed
@@ -255,7 +239,7 @@ export class StatusBar {
             try {
                 const state = await this.unityDetector.requestUnityState(1000);
                 if (state) {
-                    console.log(`Status Bar: Polled hot reload status - Running: ${state.IsHotReloadEnabled}`);
+                    //console.log(`Status Bar: Polled hot reload status - Running: ${state.IsHotReloadEnabled}`);
                     this.updateHotReloadStatus(state.IsHotReloadEnabled);
                 }
             } catch (error) {
