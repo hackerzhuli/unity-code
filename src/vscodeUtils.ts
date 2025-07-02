@@ -16,17 +16,8 @@ export async function openFileAtLine(filePath: string, lineNumber: number, unity
         if (nodePath.isAbsolute(filePath)) {
             absolutePath = filePath;
         } else {
-            // Handle Unity relative paths
-            // Check if the path already starts with "Assets/" or "Assets\\"
-            const hasAssetsPrefix = filePath.startsWith('Assets/') || filePath.startsWith('Assets\\');
-            
-            if (hasAssetsPrefix) {
-                // Path already has Assets prefix, use it directly
-                absolutePath = nodePath.join(unityProjectPath, filePath);
-            } else {
-                // Add Assets prefix for Unity files
-                absolutePath = nodePath.join(unityProjectPath, 'Assets', filePath);
-            }
+            // Handle relative paths by resolving them against the Unity project root
+            absolutePath = nodePath.resolve(unityProjectPath, filePath);
         }
         
         // Check if file exists

@@ -194,12 +194,7 @@ body {
 }
 
 .stack-trace-line {
-    cursor: pointer;
-    color: var(--vscode-textLink-foreground);
-}
-
-.stack-trace-line:hover {
-    text-decoration: underline;
+    cursor: default;
 }
 
 .no-logs {

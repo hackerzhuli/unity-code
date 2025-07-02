@@ -311,6 +311,105 @@ function showLogDetails(log) {
 }
 
 /**
+ * Parses a Unity Test Runner stack trace line to identify the source location part.
+ * Supports stack trace formats from Windows, macOS, and Linux platforms.
+ *
+ * NOTE: This function is copied from the compiled stackTraceUtils.js file.
+ * It should be updated when the compiled result changes to maintain consistency.
+ *
+ * Expected formats:
+ * - Windows: "at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in F:\projects\unity\TestUnityCode\Assets\Scripts\Editor\YallTest.cs:32"
+ * - macOS: "at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in /Users/user/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs:32"
+ * - Linux: "at Something.Yall.hallo.Huma.YallTest.AnotherMethod () [0x00001] in /home/user/projects/unity/TestUnityCode/Assets/Scripts/Editor/YallTest.cs:32"
+ *
+ * @param {string} stackTraceLine A single line from Unity Test Runner stack trace
+ * @returns {Object|null} StackTraceSourceLocation object with indices and parsed data, or null if no source location found
+ */
+function parseUnityTestStackTraceSourceLocation(stackTraceLine) {
+    // Unity stack trace pattern: "at ClassName.Method () [0x00001] in FilePath:LineNumber"
+    // The source location part is "FilePath:LineNumber" after " in "
+    const inKeyword = ' in ';
+    const inIndex = stackTraceLine.lastIndexOf(inKeyword);
+    if (inIndex === -1) {
+        return null;
+    }
+    // Start of source location is after " in "
+    const sourceLocationStart = inIndex + inKeyword.length;
+    // Find the last colon that separates file path from line number
+    // Trim whitespace to handle trailing spaces
+    const remainingText = stackTraceLine.substring(sourceLocationStart).trim();
+    const colonMatch = remainingText.match(/^(.+):(\d+)$/);
+    if (!colonMatch) {
+        return null;
+    }
+    const filePath = colonMatch[1];
+    const lineNumber = parseInt(colonMatch[2], 10);
+    // Validate that this looks like a valid file path
+    // Should end with common code file extensions
+    if (!filePath.match(/\.(cs|js|ts|cpp|c|h|hpp)$/i)) {
+        return null;
+    }
+    // Source location ends at the end of the trimmed text
+    const sourceLocationEnd = sourceLocationStart + remainingText.length;
+    return {
+        startIndex: sourceLocationStart,
+        endIndex: sourceLocationEnd,
+        filePath,
+        lineNumber
+    };
+}
+
+/**
+ * Parses a Unity Console log stack trace line to identify the source location part.
+ * Unity Console logs have a different format than test stack traces.
+ *
+ * NOTE: This function is copied from the compiled stackTraceUtils.js file.
+ * It should be updated when the compiled result changes to maintain consistency.
+ *
+ * Expected format:
+ * - "Script:AnotherMethod () (at Assets/Scripts/Script.cs:12)"
+ * - "Script:Awake () (at Assets/Scripts/Script.cs:8)"
+ *
+ * @param {string} logLine A single line from Unity Console log
+ * @returns {Object|null} StackTraceSourceLocation object with indices and parsed data, or null if no source location found
+ */
+function parseUnityConsoleStackTraceSourceLocation(logLine) {
+    // Unity console log pattern: "ClassName:Method () (at FilePath:LineNumber)"
+    // The source location part is "FilePath:LineNumber" after "(at " and before ")"
+    const atKeyword = '(at ';
+    const atIndex = logLine.lastIndexOf(atKeyword);
+    if (atIndex === -1) {
+        return null;
+    }
+    // Find the closing parenthesis after "(at "
+    const closingParenIndex = logLine.indexOf(')', atIndex);
+    if (closingParenIndex === -1) {
+        return null;
+    }
+    // Start of source location is after "(at "
+    const sourceLocationStart = atIndex + atKeyword.length;
+    // Extract the text between "(at " and ")"
+    const sourceLocationText = logLine.substring(sourceLocationStart, closingParenIndex).trim();
+    const colonMatch = sourceLocationText.match(/^(.+):(\d+)$/);
+    if (!colonMatch) {
+        return null;
+    }
+    const filePath = colonMatch[1];
+    const lineNumber = parseInt(colonMatch[2], 10);
+    // Validate that this looks like a valid file path
+    // Should end with common code file extensions
+    if (!filePath.match(/\.(cs|js|ts|cpp|c|h|hpp)$/i)) {
+        return null;
+    }
+    return {
+        startIndex: sourceLocationStart,
+        endIndex: closingParenIndex,
+        filePath,
+        lineNumber
+    };
+}
+
+/**
  * Processes stack trace text and makes file paths clickable
  * @param {string} text - The stack trace text to process
  * @returns {HTMLElement} Container element with processed stack trace
@@ -322,18 +421,47 @@ function processStackTrace(text) {
     lines.forEach(line => {
         const lineElement = document.createElement('div');
         
-        // Check if line contains file path and line number
-        const fileMatch = line.match(/(.+\.cs):(\d+)/g);
-        if (fileMatch) {
+        // Try both Unity Test and Unity Console stack trace parsing
+        let sourceLocation = parseUnityTestStackTraceSourceLocation(line);
+        if (!sourceLocation) {
+            sourceLocation = parseUnityConsoleStackTraceSourceLocation(line);
+        }
+        
+        if (sourceLocation) {
             lineElement.className = 'stack-trace-line';
-            lineElement.textContent = line;
-            lineElement.addEventListener('click', () => {
+            
+            const filePathWithLine = `${sourceLocation.filePath}:${sourceLocation.lineNumber}`;
+            
+            // Create text before the file path
+            const beforeText = line.substring(0, sourceLocation.startIndex);
+            if (beforeText) {
+                const beforeSpan = document.createElement('span');
+                beforeSpan.textContent = beforeText;
+                lineElement.appendChild(beforeSpan);
+            }
+            
+            // Create clickable link for the file path
+            const linkSpan = document.createElement('span');
+            linkSpan.textContent = filePathWithLine;
+            linkSpan.style.cursor = 'pointer';
+            linkSpan.style.textDecoration = 'underline';
+            linkSpan.style.color = 'var(--vscode-textLink-foreground)';
+            linkSpan.addEventListener('click', () => {
                 // Send the entire line to the extension for parsing
                 vscode.postMessage({
                     type: 'openFile',
                     stackTraceLine: line
                 });
             });
+            lineElement.appendChild(linkSpan);
+            
+            // Create text after the file path
+            const afterText = line.substring(sourceLocation.endIndex);
+            if (afterText) {
+                const afterSpan = document.createElement('span');
+                afterSpan.textContent = afterText;
+                lineElement.appendChild(afterSpan);
+            }
         } else {
             lineElement.textContent = line;
         }
