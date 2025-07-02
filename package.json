@@ -136,7 +136,7 @@
     "configuration": {
       "title": "Unity Code",
       "properties": {
-        "unity-code.autoRefreshUnity": {
+        "unity-code.autoRefreshAssetDatabase": {
           "type": "boolean",
           "default": true,
           "description": "Enable/disable automatic Unity asset database refresh when assets are saved or scripts are created/deleted, this will be automatically disabled if Hot Reload for Unity is running"

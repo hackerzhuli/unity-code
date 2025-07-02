@@ -316,7 +316,7 @@ export class UnityDetector {
 
         const payload = buffer.subarray(9, 9 + payloadLength).toString('utf8');
 
-        console.log(`UnityDetector: Received message type ${messageType}, request ID ${requestId} with payload: ${payload}`);
+        //console.log(`UnityDetector: Received message type ${messageType}, request ID ${requestId} with payload: ${payload}`);
 
         switch (messageType) {
             case MessageType.GetUnityState:

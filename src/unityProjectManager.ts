@@ -318,7 +318,7 @@ export class UnityProjectManager {
     ): Promise<void> {
         // Check if auto-refresh is enabled
         const config = vscode.workspace.getConfiguration('unity-code');
-        const autoRefreshEnabled = config.get<boolean>('autoRefreshUnity', true);
+        const autoRefreshEnabled = config.get<boolean>('autoRefreshAssetDatabase', true);
 
         if (!autoRefreshEnabled) {
             return;
