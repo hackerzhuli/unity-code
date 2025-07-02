@@ -54,7 +54,7 @@ export class StatusBar {
             return; // Already created
         }
 
-        this.unityStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+        this.unityStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 101);
         this.unityStatusBarItem.command = 'unity-code.showConnectionStatus';
         this.updateUnityStatus(false, false);
         this.unityStatusBarItem.show();
@@ -73,7 +73,7 @@ export class StatusBar {
             return; // Already created
         }
 
-        this.hotReloadStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+        this.hotReloadStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
         this.hotReloadStatusBarItem.command = 'unity-code.showHotReloadStatus';
         this.updateHotReloadStatus(false);
         this.hotReloadStatusBarItem.show();
