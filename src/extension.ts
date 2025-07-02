@@ -496,8 +496,8 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
 
     // Initialize status bar for Unity projects
     if (globalUnityProjectManager && globalUnityProjectManager.isWorkingWithUnityProject()) {
-        globalStatusBar = new StatusBar(context);
-        globalStatusBar.initialize(
+        globalStatusBar = new StatusBar(
+            context,
             globalUnityPackageHelper,
             globalUnityDetector,
             globalUnityMessagingClient

@@ -15,18 +15,13 @@ export class StatusBar {
     private messagingClient: UnityMessagingClient | null = null;
     private hotReloadPollingTimer: NodeJS.Timeout | null = null;
 
-    constructor(context: vscode.ExtensionContext) {
-        this.context = context;
-    }
-
-    /**
-     * Initialize the status bar with Unity services
-     */
-    public initialize(
+    constructor(
+        context: vscode.ExtensionContext,
         packageHelper: UnityPackageHelper | null,
         unityDetector: UnityDetector | null,
-        messagingClient: UnityMessagingClient | null,
-    ): void {
+        messagingClient: UnityMessagingClient | null
+    ) {
+        this.context = context;
         this.packageHelper = packageHelper;
         this.unityDetector = unityDetector;
         this.messagingClient = messagingClient;
