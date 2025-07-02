@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
 import { isInsideDirectory, normalizePath } from './utils.js';
+import { VoidEventEmitter } from './eventEmitter.js';
 
 const readFile = promisify(fs.readFile);
 const readdir = promisify(fs.readdir);
@@ -38,6 +39,11 @@ export class UnityPackageHelper {
     private scannedEmbeddedDirectories: Set<string> = new Set();
     private packageCachePath: string;
     private packagesPath: string;
+    
+    /**
+     * Event emitted when packages are updated
+     */
+    public readonly onPackagesUpdated = new VoidEventEmitter();
 
     constructor(unityProjectPath: string) {
         this.packageCachePath = path.join(unityProjectPath, 'Library', 'PackageCache');
@@ -124,6 +130,9 @@ export class UnityPackageHelper {
                 this.assemblyToPackage.set(assembly.name, packageInfo);
             }
         }
+        
+        // Emit event to notify that packages have been updated
+        this.onPackagesUpdated.emit();
     }
 
     /**

@@ -400,13 +400,6 @@ async function registerEventListeners(context: vscode.ExtensionContext): Promise
     // Listen for file save events for auto-refresh
     const saveDisposable = vscode.workspace.onDidSaveTextDocument(onDidSaveDocument);
 
-    // Initialize status bar for Unity projects
-    if (globalUnityProjectManager && globalUnityProjectManager.isWorkingWithUnityProject()) {
-        globalStatusBar = new StatusBar(context);
-        globalStatusBar.createUnityStatusBar();
-        globalStatusBar.checkAndCreateHotReloadStatusBar();
-    }
-
     context.subscriptions.push(
         refreshTestsDisposable,
         showHotReloadStatusDisposable,
@@ -486,19 +479,6 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     // Register C# documentation hover provider with the initialized package helper
     registerHoverProvider(context, packageHelper);
 
-    await globalUnityDetector.start();
-
-    // Initialize and start status bar monitoring
-    if (globalStatusBar) {
-        globalStatusBar.initialize(
-            globalUnityPackageHelper,
-            globalUnityDetector,
-            globalUnityMessagingClient,
-            globalUnityProjectManager
-        );
-        globalStatusBar.startMonitoring();
-    }
-
     // Register Unity log message handlers
     registerUnityLogHandlers(context);
 
@@ -507,6 +487,24 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
             cleanup();
         }
     });
+
+    await globalUnityDetector.start();
+
+    if(globalUnityPackageHelper){
+        await globalUnityPackageHelper.updatePackages();
+    }
+
+    // Initialize status bar for Unity projects
+    if (globalUnityProjectManager && globalUnityProjectManager.isWorkingWithUnityProject()) {
+        globalStatusBar = new StatusBar(context);
+        globalStatusBar.initialize(
+            globalUnityPackageHelper,
+            globalUnityDetector,
+            globalUnityMessagingClient
+        );
+    }else{
+        console.error('UnityCode: StatusBar not initialized');
+    }
 }
 
 function cleanup() {
