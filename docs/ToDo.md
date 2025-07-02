@@ -18,8 +18,8 @@
 - [ ] 18. We should refresh unity packages here when finished compilation, or extension activation, other refreshes are not needed.
 - [x] 19. Double click on the run button beside tests in Testing window will result in individual tests appearing running forever after the whole test run finished.
 - [x] 20. Running higher level tests doesn't actually run tests, the level above the assembly(the project level), and the mode level, eg. "Play Mode", running these tests, it appears in Unity Editor that the test run started, but no leaf tests are actually run. However in Unity Editor we can actually run the the project level tests, which runs all tests in all assemblies.
-- [ ] 21. Create/Delete/Paste a .cs asset file (for the case of create, file must be already saved to disk, and not empty, if not then do nothing) should also trigger a refresh of asset database.
-- [ ] 22. We shouldn't try to manage .meta files when user delete files, Unity will handle that, so no need for us to do anything
-- [ ] 23. Debugger should find user assemblies in a more precise way(looking at project files)
+- [x] 21. Create/Delete/Paste a .cs asset file (for the case of create, file must be already saved to disk, and not empty, if not then do nothing) should also trigger a refresh of asset database.
+- [x] 22. We shouldn't try to manage .meta files when user delete files, Unity will handle that, so no need for us to do anything
+- [ ] 23. Debugger should find user assemblies in a more precise way(looking at project files), also we should remove our setting for project assemblies only because that's always true for now
 - [ ] 24. Unity package should generate launch.json settings for our debugger
 - [ ] 25. Use esbuild bundler to optimize build output(while keeping our development/debug workflow as is if possible) and also we need to make our output Common JS (but keep our typescript code use modules) for better compatibility with current VS Code forks(some don't support modules yet). Create a seperate a build script in package.json and make sure we clean js output directory before build.
