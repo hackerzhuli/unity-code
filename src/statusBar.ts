@@ -229,7 +229,7 @@ export class StatusBar {
             return; // Already polling
         }
 
-        console.log('Status Bar: Starting hot reload status polling (every 3 seconds)');
+        console.log('Status Bar: Starting hot reload status polling (every 5 seconds)');
 
         this.hotReloadPollingTimer = setInterval(async () => {
             if (!this.unityDetector || !this.hotReloadStatusBarItem) {
@@ -237,11 +237,15 @@ export class StatusBar {
             }
 
             try {
+                // We don't need to do anything about the return value here
+                // Because we have subscribed to onUnityStateChanged event 
                 await this.unityDetector.requestUnityState(1000);
             } catch (error) {
                 console.error('Status Bar: Error polling hot reload status:', error);
             }
-        }, 3000); // Poll every 3 seconds
+        }, 5000);
+        // No need to be frequent here, because Hot Reload start takes a 5-10 seconds
+        // For stops, we will actually receive event even if we didn't request so that will be timely too
     }
 
     /**
