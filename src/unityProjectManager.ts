@@ -343,7 +343,7 @@ export class UnityProjectManager {
      * @param messagingClient The Unity messaging client
      * @param testProvider Optional test provider to check if tests are running
      */
-    public async refreshAssetDatabaseIfNeeded(
+    private async refreshAssetDatabaseIfNeeded(
         filePath: string, 
         action: string, 
         messagingClient: UnityMessagingClient,
