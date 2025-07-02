@@ -22,3 +22,4 @@
 - [ ] 22. We shouldn't try to manage .meta files when user delete files, Unity will handle that, so no need for us to do anything
 - [ ] 23. Debugger should find user assemblies in a more precise way(looking at project files)
 - [ ] 24. Unity package should generate launch.json settings for our debugger
+- [ ] 25. Use esbuild bundler to optimize build output(while keeping our development/debug workflow as is if possible) and also we need to make our output Common JS for better compatibility with current VS Code forks(some don't support modules yet). Create a seperate a build script in package.json and make sure we clean js output directory before build.
