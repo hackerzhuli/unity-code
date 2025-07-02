@@ -3,6 +3,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 import { isInsideDirectory, normalizePath } from './utils';
 import { VoidEventEmitter } from './eventEmitter';
+import { MessageType, UnityMessagingClient } from './unityMessagingClient';
 
 const readFile = promisify(fs.readFile);
 const readdir = promisify(fs.readdir);
@@ -39,6 +40,7 @@ export class UnityPackageHelper {
     private scannedEmbeddedDirectories: Set<string> = new Set();
     private packageCachePath: string;
     private packagesPath: string;
+    private isInitialized: boolean = false;
     
     /**
      * Event emitted when packages are updated
@@ -113,10 +115,26 @@ export class UnityPackageHelper {
     }
 
     /**
+     * Initialize the package helper and perform initial package scan.
+     * This method can only be called once.
+     * @returns Promise<void>
+     */
+    public async initialize(): Promise<void> {
+        if (this.isInitialized) {
+            console.warn('UnityCode: UnityPackageHelper.initialize() called multiple times - ignoring subsequent calls');
+            return;
+        }
+        
+        this.isInitialized = true;
+        console.log('UnityCode: Initializing package helper and performing initial package scan...');
+        await this.updatePackages();
+    }
+
+    /**
      * Update packages' information by scanning the PackageCache and Packages directories
      * @returns Promise<void>
      */
-    public async updatePackages(): Promise<void> {
+    private async updatePackages(): Promise<void> {
         // Scan PackageCache directory
         await this.updatePackageCachePackages();
         
@@ -386,6 +404,22 @@ export class UnityPackageHelper {
     }
 
     /**
+     * Setup compilation finished event handler to automatically update packages
+     * @param messagingClient The Unity messaging client to listen for compilation events
+     */
+    public setupCompilationFinishedHandler(messagingClient: UnityMessagingClient): void {
+        if (!this.isInitialized) {
+            console.warn('UnityCode: Cannot setup compilation finished handler - package helper not initialized');
+            return;
+        }
+
+        messagingClient.onMessage(MessageType.CompilationFinished, async () => {
+            console.log('UnityCode: Compilation finished, updating packages...');
+            await this.updatePackages();
+        });
+    }
+
+    /**
      * Clear all cached package information
      */
     public clear(): void {
@@ -393,5 +427,6 @@ export class UnityPackageHelper {
         this.assemblyToPackage.clear();
         this.scannedDirectories.clear();
         this.scannedEmbeddedDirectories.clear();
+        this.isInitialized = false;
     }
 }

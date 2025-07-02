@@ -34,7 +34,7 @@ describe('UnityPackageHelper Unit Tests', () => {
 
     describe('Package Discovery', () => {
         it('should handle empty PackageCache directory', async () => {
-            await packageHelper.updatePackages();
+            await packageHelper.initialize();
             
             const packages = packageHelper.getAllPackages();
             assert.strictEqual(packages.length, 0);
@@ -54,7 +54,7 @@ describe('UnityPackageHelper Unit Tests', () => {
             };
             await writeFile(path.join(packageDir, 'package.json'), JSON.stringify(packageJson, null, 2));
             
-            await packageHelper.updatePackages();
+            await packageHelper.initialize();
             
             const packageInfo = packageHelper.getPackageByName('com.unity.inputsystem');
             assert.ok(packageInfo);
@@ -85,7 +85,7 @@ describe('UnityPackageHelper Unit Tests', () => {
             };
             await writeFile(path.join(runtimeDir, 'Unity.InputSystem.asmdef'), JSON.stringify(asmdef, null, 2));
             
-            await packageHelper.updatePackages();
+            await packageHelper.initialize();
             
             const packageInfo = packageHelper.getPackageByName('com.unity.inputsystem');
             assert.ok(packageInfo);
@@ -125,7 +125,7 @@ describe('UnityPackageHelper Unit Tests', () => {
             };
             await writeFile(path.join(testsDir, 'Unity.InputSystem.Tests.asmdef'), JSON.stringify(testsAsmdef, null, 2));
             
-            await packageHelper.updatePackages();
+            await packageHelper.initialize();
             
             const packageInfo = packageHelper.getPackageByName('com.unity.inputsystem');
             assert.ok(packageInfo);
@@ -196,7 +196,7 @@ describe('UnityPackageHelper Unit Tests', () => {
                 );
             }
             
-            await packageHelper.updatePackages();
+            await packageHelper.initialize();
             
             const packageInfo = packageHelper.getPackageByName('com.unity.render-pipelines.universal');
             assert.ok(packageInfo);
@@ -271,7 +271,7 @@ describe('UnityPackageHelper Unit Tests', () => {
                 );
             }
             
-            await packageHelper.updatePackages();
+            await packageHelper.initialize();
             
             const packageInfo = packageHelper.getPackageByName('com.unity.addressables');
             assert.ok(packageInfo);
@@ -321,7 +321,7 @@ describe('UnityPackageHelper Unit Tests', () => {
              // Create malformed assembly definition (invalid JSON)
              await writeFile(path.join(malformedDir, 'Unity.Test.Malformed.asmdef'), '{ "name": "Unity.Test.Malformed", invalid json }');
              
-             await packageHelper.updatePackages();
+             await packageHelper.initialize();
              
              const packageInfo = packageHelper.getPackageByName('com.unity.test.malformed');
              assert.ok(packageInfo);
@@ -351,7 +351,7 @@ describe('UnityPackageHelper Unit Tests', () => {
                 subdirectory: 'Runtime'
             }]);
             
-            await packageHelper.updatePackages();
+            await packageHelper.initialize();
         });
 
         it('should find package by name', () => {
@@ -392,7 +392,7 @@ describe('UnityPackageHelper Unit Tests', () => {
             const nonExistentHelper = new UnityPackageHelper('/non/existent/path');
             
             // Should not throw
-            await nonExistentHelper.updatePackages();
+            await nonExistentHelper.initialize();
             
             const packages = nonExistentHelper.getAllPackages();
             assert.strictEqual(packages.length, 0);
@@ -404,7 +404,7 @@ describe('UnityPackageHelper Unit Tests', () => {
                 version: '1.0.0'
             }, []);
             
-            await packageHelper.updatePackages();
+            await packageHelper.initialize();
             assert.strictEqual(packageHelper.getAllPackages().length, 1);
             
             packageHelper.clear();

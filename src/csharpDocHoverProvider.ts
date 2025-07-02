@@ -375,9 +375,6 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     private async generateDocLink(symbolInfo: SymbolInfo): Promise<DocLinkInfo | undefined> {
         // Check if this is a package symbol from PackageCache
         if (symbolInfo.definitionLocation && this.unityPackageHelper && this.unityPackageHelper.isPackagePath(symbolInfo.definitionLocation.uri.fsPath)) {
-            // Only update packages when we actually need package information
-            await this.unityPackageHelper.updatePackages();
-            
             const packageInfo = await this.unityPackageHelper.getPackageByPath(symbolInfo.definitionLocation.uri.fsPath);
             if (packageInfo) {
                 const packageLinks = this.generatePackageDocumentationLink(symbolInfo.type, packageInfo);
@@ -398,7 +395,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             const decompiledInfo = await this.checkDecompiledFile(symbolInfo.definitionLocation.uri);
             if (decompiledInfo.isDecompiled && decompiledInfo.assemblyName && this.unityPackageHelper) {
                 // Only update packages when we actually need assembly-to-package mapping
-                await this.unityPackageHelper.updatePackages();
+                await this.unityPackageHelper.initialize();
                 
                 const packageInfo = this.unityPackageHelper.getPackageByAssembly(decompiledInfo.assemblyName);
                 if (packageInfo) {

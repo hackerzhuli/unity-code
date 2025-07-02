@@ -27,24 +27,7 @@ let globalUnityDebuggerManager: UnityDebuggerManager | null = null;
 let globalStatusBar: StatusBar | null = null;
 
 
-/**
- * Handle Unity compilation finished events for auto-refresh
- */
-function setupCompilationFinishedRefresh(): void {
-    const config = vscode.workspace.getConfiguration('unity-code');
-    const refreshEnabled = config.get<boolean>('refreshTestsOnCompilation', true);
 
-    if (!refreshEnabled) {
-        console.log('UnityCode: Compilation finished refresh is disabled');
-        return;
-    }
-
-    if (!globalUnityTestProvider || !globalUnityProjectManager?.isWorkingWithUnityProject()) {
-        return;
-    }
-
-    console.log('UnityCode: Setting up compilation finished refresh');
-}
 
 /**
  * Register Unity log message handlers to display logs in Unity Console WebView
@@ -256,14 +239,9 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     // Register file event listeners in UnityProjectManager
     globalUnityProjectManager!.registerEventListeners(context, globalUnityMessagingClient, globalUnityTestProvider, globalUnityDetector);
 
-    // Setup compilation-based test refresh
-    setupCompilationFinishedRefresh();
-
     // Initialize package helper for Unity projects
     const packageHelper = new UnityPackageHelper(unityProjectPath);
     globalUnityPackageHelper = packageHelper;
-
-    console.log('UnityCode: Package helper initialized (packages will be loaded lazily when needed)');
 
     // Register C# documentation hover provider with the initialized package helper
     registerHoverProvider(context, packageHelper);
@@ -273,8 +251,10 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
 
     await globalUnityDetector.start();
 
+    // Initialize package helper and setup compilation finished handler
     if (globalUnityPackageHelper) {
-        await globalUnityPackageHelper.updatePackages();
+        await globalUnityPackageHelper.initialize();
+        globalUnityPackageHelper.setupCompilationFinishedHandler(globalUnityMessagingClient);
     }
 
     // Initialize status bar for Unity projects
