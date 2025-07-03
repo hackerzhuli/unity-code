@@ -83,7 +83,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 
 *"The integrated test runner is a game-changer. I can run my Unity tests without leaving my AI IDE."*
 
-*"The hover documentation feature saves me so much time."*
+*"The hover documentation links saves me so much time."*
 
 ## 🚀 Get Started in Minutes
 
@@ -97,4 +97,4 @@ Join Unity developers who have already upgraded their workflow with Unity Code. 
 
 ---
 
-*Unity Code - Where Unity development meets VS Code forks* 🎮✨
+*Unity Code - Where Unity IDE meets AI IDE* 🎮✨
