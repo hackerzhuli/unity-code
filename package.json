@@ -48,10 +48,6 @@
         "title": "Unity Code: Refresh Tests"
       },
       {
-        "command": "unity-code.showUnityLogs",
-        "title": "Unity Code: Show Unity Logs"
-      },
-      {
         "command": "unity-code.showUnityConsole",
         "title": "Unity Code: Show Unity Console"
       }

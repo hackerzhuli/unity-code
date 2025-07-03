@@ -37,15 +37,6 @@ function registerUnityLogHandlers(context: vscode.ExtensionContext): void {
         return;
     }
 
-    // Check if Unity log forwarding is enabled
-    const config = vscode.workspace.getConfiguration('unity-code');
-    const showUnityLogs = config.get<boolean>('showUnityLogs', true);
-
-    if (!showUnityLogs) {
-        console.log('UnityCode: Unity log forwarding is disabled in settings');
-        return;
-    }
-
     // Initialize Unity Console Manager
     globalUnityConsoleManager = new UnityConsoleManager(context, globalUnityProjectManager);
     globalUnityConsoleManager.initialize();
