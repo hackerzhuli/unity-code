@@ -5,6 +5,7 @@
 Unity Code is a powerful Visual Studio Code extension that brings professional Unity development tools directly to your favorite code editor. Whether you're using VS Code, Cursor, Windsurf, or Trae, Unity Code delivers a seamless Unity development experience without the limitations of official extensions.
 
 > **📋 Platform Support:** Currently supports Windows x64 only. For other platforms (Linux, macOS), you can build the extension yourself from the source code.
+> 
 > **⚠️ Unity Version Requirement:** Our companion Unity package requires Unity 6.0 or higher.
 
 ## 🎮 Perfect for Unity Developers Who Want:
