@@ -1,6 +1,7 @@
 {
   "name": "unity-code",
   "displayName": "Unity Code",
+  "icon": "assets/icon.png",
   "description": "VS Code extension that helps you to work with Unity Projects",
   "version": "1.0.0",
   "publisher": "hackerzhuli",
