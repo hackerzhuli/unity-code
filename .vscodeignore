@@ -11,3 +11,5 @@ eslint.config.mjs
 *.vsix
 *.zip
 stats.toml
+scripts/**
+.vscodeignore.backup

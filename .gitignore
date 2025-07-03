@@ -3,6 +3,9 @@ out/
 dist/
 !eslint.config.mjs
 
+scripts/*.js
+scripts/*.map
+
 # binaries
 bin/
 

@@ -5,6 +5,7 @@
   "description": "VS Code extension that helps you to work with Unity Projects",
   "version": "1.0.0",
   "publisher": "hackerzhuli",
+  "readme": "assets/README.md",
   "repository": {
     "type": "git",
     "url": "https://github.com/hackerzhuli/unity-code.git"
@@ -16,7 +17,10 @@
     "nromanov.dotrush"
   ],
   "categories": [
-    "Other"
+    "Other",
+    "Debuggers",
+    "Programming Languages",
+    "Testing"
   ],
   "activationEvents": [
     "workspaceContains:ProjectSettings/ProjectVersion.txt"
@@ -169,7 +173,19 @@
     "compile": "tsc",
     "watch": "tsc -watch -p ./",
     "clean": "rimraf out",
-    "build": "npm run clean && npm run compile"
+    "build": "npm run clean && npm run compile",
+    "build:win_x64": "npm run build && npx tsx scripts/package.ts win_x64",
+    "build:win_arm64": "npm run build && npx tsx scripts/package.ts win_arm64",
+    "build:linux_x64": "npm run build && npx tsx scripts/package.ts linux_x64",
+    "build:linux_arm64": "npm run build && npx tsx scripts/package.ts linux_arm64",
+    "build:mac_x64": "npm run build && npx tsx scripts/package.ts mac_x64",
+    "build:mac_arm64": "npm run build && npx tsx scripts/package.ts mac_arm64",
+    "publish:win_x64": "npm run build && npx tsx scripts/package.ts win_x64 --publish-open-vsx",
+    "publish:win_arm64": "npm run build && npx tsx scripts/package.ts win_arm64 --publish-open-vsx",
+    "publish:linux_x64": "npm run build && npx tsx scripts/package.ts linux_x64 --publish-open-vsx",
+    "publish:linux_arm64": "npm run build && npx tsx scripts/package.ts linux_arm64 --publish-open-vsx",
+    "publish:mac_x64": "npm run build && npx tsx scripts/package.ts mac_x64 --publish-open-vsx",
+    "publish:mac_arm64": "npm run build && npx tsx scripts/package.ts mac_arm64 --publish-open-vsx"
   },
   "dependencies": {
     "fast-xml-parser": "^5.2.5"
@@ -181,12 +197,15 @@
     "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.34.1",
     "@typescript-eslint/parser": "^8.34.1",
+    "@vscode/vsce": "^3.2.0",
     "eslint": "^9.29.0",
     "esm": "^3.2.25",
     "esmock": "^2.7.0",
     "globals": "^16.2.0",
     "mocha": "^11.7.0",
+    "ovsx": "^0.9.5",
     "rimraf": "^6.0.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.34.1"
   }
