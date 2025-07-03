@@ -69,9 +69,10 @@ Built from the ground up for performance, Unity Code provides powerful features 
 
 ## 🎮 Perfect for Unity Developers Who Want:
 
+- **🤖 AI-Powered Development** - Use advanced AI-powered editors like Cursor, Windsurf, or Trae with full Unity IDE capabilities
 - **🚀 Faster development cycles** with integrated testing and debugging
-- **📖 Better code documentation** with instant access to Unity and .NET docs
-- **🔧 Streamlined workflow** without constantly switching between tools
+- **📖 Better code documentation** with one click access to Unity and .NET docs
+- **🔧 Streamlined workflow** without constantly switching between an AI-powered editor and a powerful IDE for Unity like Rider
 - **💰 Cost-effective solution** that doesn't require expensive subscriptions
 - **🎯 Editor flexibility** to use their preferred VS Code-based environment
 - **⚡ Lightweight tooling** that doesn't slow down their development machine
