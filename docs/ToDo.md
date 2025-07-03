@@ -24,7 +24,7 @@
 - [x] 24. Unity package should generate launch.json settings for our debugger
 - [x] 25. Change our typescript compile output to CommonJS (but keeping working with esmoudles in typescript source code, also keep package.json type as module if possible) for better compatibility with current VS Code forks(some don't support modules yet). Create a seperate a build script in package.json and make sure we clean js output directory before build, compile the code and also call vsce to package it.
 - [x] 26. Our binary locator should not assume what platform is supported or not(binary locator should handle at least 6 platforms, that is Windows/MacOS/Linux, each with x64 and arm64), just get the binary file for the current platform when requested
-- [ ] 27. Test the extension in Cursor/Windsurf/Trae, fix bugs, add an icon for the extension, refine readme for users of the extension, then modify the version to 1.0.0 and publish the extension to open vsx!
+- [x] 27. Test the extension in Cursor/Windsurf/Trae, fix bugs, add an icon for the extension, refine readme for users of the extension, then modify the version to 1.0.0 and publish the extension to open vsx!
 - [x] 28. For links for official Unity site(not packages), we should specify the Unity version of the project there, eg. "https://docs.unity3d.com/2020.3/Documentation/ScriptReference/Debug.html"
 - [x] 29. Add a search bar for Unity Console to filter logs
 - [x] 30. The line break in xml docs are not proper in output markdown(they are still in the same line)
