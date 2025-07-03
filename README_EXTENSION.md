@@ -39,7 +39,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 ![Unity Tests](./assets/Run%20Unity%20Tests%20In%20Trae.png)
 
 ### 📊 **Unity Console Integration**
-- **Real-time Unity logs** - See all Unity console output directly in your editor
+- **Real-time Unity logs** - See Unity logs directly in your code editor
 - **Clickable stack traces** - Navigate directly to the source of the logs
 - **Log filtering** - Search specific words to find the logs you need
 
