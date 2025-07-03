@@ -1,4 +1,4 @@
-# Unity Code - Enhanced Unity Development Experience for Cursor, Windsurf and Trae
+# Unity Code - Unity IDE right inside Cursor, Windsurf and Trae!
 
 🚀 **Supercharge your Unity development workflow with Unity Code!**
 
@@ -70,7 +70,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 ## 🚀 Get Started in Minutes
 
 1. **Install Unity Code** from Open VSX
-2. **Install the companion Unity package** - [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code)
+2. **Install the companion Unity package in your Unity project** - [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code)
 3. **Start coding!** - All features work automatically once installed
 
 ## 🎯 Ready to Transform Your Unity Development?
