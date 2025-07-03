@@ -15,24 +15,6 @@
   "extensionDependencies": [
     "nromanov.dotrush"
   ],
-  "nativeDependencies": {
-    "unity_code_native": {
-      "win32-x64": "./bin/win_x64/unity_code_native.exe",
-      "win32-arm64": "./bin/win_arm64/unity_code_native.exe",
-      "linux-x64": "./bin/linux_x64/unity_code_native",
-      "linux-arm64": "./bin/linux_arm64/unity_code_native",
-      "darwin-x64": "./bin/mac_x64/unity_code_native",
-      "darwin-arm64": "./bin/mac_arm64/unity_code_native"
-    },
-    "MonoDebugger": {
-      "win32-x64": "./bin/win_x64/MonoDebugger.exe",
-      "win32-arm64": "./bin/win_arm64/MonoDebugger.exe",
-      "linux-x64": "./bin/linux_x64/MonoDebugger",
-      "linux-arm64": "./bin/linux_arm64/MonoDebugger",
-      "darwin-x64": "./bin/mac_x64/MonoDebugger",
-      "darwin-arm64": "./bin/mac_arm64/MonoDebugger"
-    }
-  },
   "categories": [
     "Other"
   ],

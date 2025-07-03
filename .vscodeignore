@@ -1,8 +1,8 @@
 .trae/**
 .vscode/**
-out/**/*.map
+.github/**
+out/test/**
 src/**
-test/**
 docs/**
 .gitignore
 tsconfig.json
