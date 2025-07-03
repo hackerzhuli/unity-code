@@ -16,3 +16,4 @@ scripts/**
 .vscodeignore.backup
 README.md.backup
 README_EXTENSION.md
+node_modules

@@ -80,9 +80,9 @@ And proceed to build the extension, our build script will only package what's ne
 npm install
 
 # eg. build the package for specific platforms
-npm run build:win_x64     # Build for Windows x64
-npm run build:linux_x64   # Build for Linux x64
-npm run build:mac_arm64   # Build for macOS ARM64
+npm run build:win     # Build for Windows x64
+npm run build:linux   # Build for Linux x64
+npm run build:macarm   # Build for macOS ARM64
 ```
 
 ### Publishing to Open VSX
@@ -93,6 +93,6 @@ The extension also supports direct publishing to the Open VSX Registry.
 # First, set your Open VSX access token as environment variable OVSX_PAT in your terminal or OS
 
 # Then publish a platform-specific build to Open VSX, this will build and publish the extension for the specified platform
-npm run publish:win_x64     # Build and publish for Windows x64
-npm run publish:mac_arm64   # Build and publish for macOS ARM64
+npm run publish:win     # Build and publish for Windows x64
+npm run publish:macarm   # Build and publish for macOS ARM64
 ```
