@@ -66,7 +66,6 @@ Automatically renames Unity `.meta` files when you rename assets in your code ed
 
 - **Automatic meta file handling** - Unity `.meta` files are automatically renamed when you rename or move files
 - **Asset database refresh** - Automatic Unity recompilation when you save C# scripts
-- **Seamless file operations** - Move, rename, and delete assets with confidence
 - **Smart Unity awareness** - Knows about whether you're in play mode, whether Unity maybe compiling, and whether you are running Hot Reload for Unity
 
 ![Status Bar](./assets/Status%20Bar.png)
