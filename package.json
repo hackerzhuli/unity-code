@@ -87,7 +87,6 @@
           "csharp"
         ],
         "label": "Unity Code Debugger",
-        "program": "./bin/win_x64/MonoDebugger.exe",
         "configurationAttributes": {
           "attach": {
             "required": [],
