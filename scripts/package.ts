@@ -170,7 +170,7 @@ class Package {
         cwd: this.projectRoot, 
         stdio: 'pipe' 
       });
-    } catch (error) {
+    } catch (_error) {
       console.log('Installing @vscode/vsce...');
       execSync('npm install -g @vscode/vsce', { 
         cwd: this.projectRoot, 
@@ -185,7 +185,7 @@ class Package {
         cwd: this.projectRoot, 
         stdio: 'pipe' 
       });
-    } catch (error) {
+    } catch (_error) {
       console.log('Installing ovsx...');
       execSync('npm install -g ovsx', { 
         cwd: this.projectRoot, 
