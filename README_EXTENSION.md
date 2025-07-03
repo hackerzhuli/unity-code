@@ -6,6 +6,16 @@ Unity Code is a powerful Visual Studio Code extension that brings professional U
 
 > **📋 Platform Support:** Currently supports Windows x64 only. For other platforms (Linux, macOS), you can build the extension yourself from the source code.
 
+## 🎮 Perfect for Unity Developers Who Want:
+
+- **🤖 AI-Powered Development** - Use advanced AI-powered editors like Cursor, Windsurf, or Trae with full Unity IDE capabilities
+- **🚀 Faster development cycles** with integrated testing and debugging
+- **📖 Better code documentation** with one click access to Unity and .NET docs
+- **🔧 Streamlined workflow** without constantly switching between an AI-powered editor and a powerful IDE for Unity like Rider
+- **💰 Cost-effective solution** that doesn't require expensive subscriptions
+- **🎯 Editor flexibility** to use their preferred VS Code-based environment
+- **⚡ Lightweight tooling** that doesn't slow down their development machine
+
 ## ✨ Why Choose Unity Code?
 
 ### 🆓 **Completely Free & Open Source**
@@ -63,19 +73,9 @@ Built from the ground up for performance, Unity Code provides powerful features 
 - **Automatic meta file handling** - Unity `.meta` files are automatically renamed or moved when you rename or move files
 - **Asset database refresh** - Automatic Unity recompilation when you save C# scripts
 - **Seamless file operations** - Move, rename, and delete assets with confidence
-- **Smart Unity awareness** - Knows about whether you're in play mode, whether Unity maybe compiling, and whether you are running Hot Reload for Unity, and act accordingly
+- **Smart Unity awareness** - Knows about whether you're in play mode, whether Unity may be compiling, and whether you are running Hot Reload for Unity, and act accordingly
 
 ![Status Bar](./assets/Status%20Bar.png)
-
-## 🎮 Perfect for Unity Developers Who Want:
-
-- **🤖 AI-Powered Development** - Use advanced AI-powered editors like Cursor, Windsurf, or Trae with full Unity IDE capabilities
-- **🚀 Faster development cycles** with integrated testing and debugging
-- **📖 Better code documentation** with one click access to Unity and .NET docs
-- **🔧 Streamlined workflow** without constantly switching between an AI-powered editor and a powerful IDE for Unity like Rider
-- **💰 Cost-effective solution** that doesn't require expensive subscriptions
-- **🎯 Editor flexibility** to use their preferred VS Code-based environment
-- **⚡ Lightweight tooling** that doesn't slow down their development machine
 
 ## 🌟 What Unity Developers Are Saying:
 
