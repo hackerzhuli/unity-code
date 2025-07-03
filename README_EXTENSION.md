@@ -60,7 +60,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 ![Static Analysis](./assets/Static%20Analysis.png)
 
 ### 🔄 **Smart Asset Management**
-- **Automatic meta file handling** - Unity `.meta` files are automatically renamed when you rename or move files
+- **Automatic meta file handling** - Unity `.meta` files are automatically renamed or moved when you rename or move files
 - **Asset database refresh** - Automatic Unity recompilation when you save C# scripts
 - **Seamless file operations** - Move, rename, and delete assets with confidence
 - **Smart Unity awareness** - Knows about whether you're in play mode, whether Unity maybe compiling, and whether you are running Hot Reload for Unity, and act accordingly
@@ -81,9 +81,9 @@ Built from the ground up for performance, Unity Code provides powerful features 
 
 *"Finally, a Unity extension that just works! No more licensing headaches or editor restrictions."*
 
-*"The integrated test runner is a game-changer. I can run my Unity tests without leaving my code editor."*
+*"The integrated test runner is a game-changer. I can run my Unity tests without leaving my AI IDE."*
 
-*"The hover documentation feature saves me so much time. No more hunting through Unity docs!"*
+*"The hover documentation feature saves me so much time."*
 
 ## 🚀 Get Started in Minutes
 
