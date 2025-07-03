@@ -22,14 +22,18 @@ Built from the ground up for performance, Unity Code provides powerful features 
 ### 🧪 **Unity Test Explorer**
 - **Run tests directly in your editor** - No more switching between Unity and your code editor
 - **Inline test results** - See pass/fail status right where your test methods are defined
-- **Detailed stack traces** - Debug failed tests with comprehensive error information
+- **Clickable stack traces** - Click on stack trace line for failed test to go to the source line where it fails instantly.
 - **One-click test execution** - Run individual tests or entire test suites with a single click
+- **Run tests reliably** - You can click run test when Unity is compiling, and it will run the test right after compilation finishes, not even Rider can do this reliably.
+
+![Unity Tests](./assets/Run%20Unity%20Tests%20In%20Trae.png)
 
 ### 📊 **Unity Console Integration**
 - **Real-time Unity logs** - See all Unity console output directly in your editor
-- **Clickable stack traces** - Jump directly to the source of errors and warnings
-- **Filtered log levels** - Focus on what matters with customizable log filtering
-- **Beautiful formatting** - Clean, readable log display with syntax highlighting
+- **Clickable stack traces** - Navigate directly to the source of the logs
+- **Log filtering** - Search specific words to find the logs you need
+
+![Unity Console](./assets/Unity%20Console%20in%20Trae.png)
 
 ### 🐛 **Integrated Unity Debugger**
 - **Seamless debugging experience** - Attach to Unity Editor with one click
@@ -37,18 +41,31 @@ Built from the ground up for performance, Unity Code provides powerful features 
 - **MonoDebugger integration** - Professional-grade debugging capabilities
 - **No external tools required** - Everything you need built right into your editor
 
+![Debug](./assets/Debug%20in%20Trae.png)
+
 ### 📚 **Intelligent Documentation**
-- **Hover documentation** - Get instant access to C# documentation on mouse hover
+- **Hover documentation** - Show links for C# documentation on mouse hover
 - **Unity API links** - Direct links to official Unity Scripting API documentation
-- **XML docs support** - Beautiful markdown rendering of your project's XML documentation
-- **.NET documentation** - Quick access to official .NET class documentation
-- **Smart context awareness** - Relevant documentation based on your current code context
+- **Smart context awareness** - Know which Unity package and version this class is from and show you the link to docs. Also knows the Unity Editor version of the project and show you non Unity package official class doc links accordingly.
+
+![Hover Doc Link](./assets/Hover%20Doc%20Link.png)
+
+
+### 🔍 **Advanced Code Analysis**
+- **Roslyn-powered static analysis** - Unity-specific code analysis that understands Unity patterns and best practices
+- **Real-time problem detection** - See issues, warnings, and suggestions directly in your editor as you type
+- **Unity-aware diagnostics** - Specialized analyzers for Unity-specific code patterns and performance optimizations
+- **Instant feedback** - No need to compile or switch to Unity to see code issues
+
+![Static Analysis](./assets/Static%20Analysis.png)
 
 ### 🔄 **Smart Asset Management**
-- **Automatic meta file handling** - Unity `.meta` files are automatically renamed when you refactor
+- **Automatic meta file handling** - Unity `.meta` files are automatically renamed when you rename or move files
 - **Asset database refresh** - Automatic Unity recompilation when you save C# scripts
 - **Seamless file operations** - Move, rename, and delete assets with confidence
-- **Zero manual intervention** - Everything happens automatically in the background
+- **Smart Unity awareness** - Knows about whether you're in play mode, whether Unity maybe compiling, and whether you are running Hot Reload for Unity, and act accordingly
+
+![Status Bar](./assets/Status%20Bar.png)
 
 ## 🎮 Perfect for Unity Developers Who Want:
 
@@ -77,8 +94,6 @@ Built from the ground up for performance, Unity Code provides powerful features 
 
 Join Unity developers who have already upgraded their workflow with Unity Code. Experience the freedom of choice, the power of integrated tools, and the joy of efficient Unity development.
 
-**Download Unity Code today and see why it's becoming the go-to Unity extension for professional developers!**
-
 ---
 
-*Unity Code - Where Unity development meets modern tooling* 🎮✨
+*Unity Code - Where Unity development meets VS Code forks* 🎮✨
