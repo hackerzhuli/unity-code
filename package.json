@@ -5,7 +5,6 @@
   "description": "VS Code extension that helps you to work with Unity Projects",
   "version": "1.0.0",
   "publisher": "hackerzhuli",
-  "readme": "assets/README.md",
   "repository": {
     "type": "git",
     "url": "https://github.com/hackerzhuli/unity-code.git"

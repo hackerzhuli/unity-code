@@ -2,6 +2,7 @@
 .vscode/**
 .github/**
 out/test/**
+out/*.map
 src/**
 docs/**
 .gitignore
@@ -13,3 +14,5 @@ eslint.config.mjs
 stats.toml
 scripts/**
 .vscodeignore.backup
+README.md.backup
+README_EXTENSION.md

@@ -52,6 +52,9 @@ const PLATFORMS: Record<string, PlatformConfig> = {
 
 const VSCODEIGNORE_PATH = '.vscodeignore';
 const BACKUP_PATH = '.vscodeignore.backup';
+const README_PATH = 'README.md';
+const README_EXTENSION_PATH = 'README_EXTENSION.md';
+const README_BACKUP_PATH = 'README.md.backup';
 
 /**
  * Package class for managing platform-specific build operations.
@@ -59,6 +62,7 @@ const BACKUP_PATH = '.vscodeignore.backup';
  */
 class Package {
   private originalVsCodeIgnore: string = '';
+  private originalReadme: string = '';
   private projectRoot: string;
 
   constructor() {
@@ -84,6 +88,39 @@ class Package {
   private restoreVsCodeIgnore(): void {
     this.writeVsCodeIgnore(this.originalVsCodeIgnore);
     const backupPath = path.join(this.projectRoot, BACKUP_PATH);
+    if (fs.existsSync(backupPath)) {
+      fs.unlinkSync(backupPath);
+    }
+  }
+
+  private readReadme(): string {
+    const readmePath = path.join(this.projectRoot, README_PATH);
+    return fs.readFileSync(readmePath, 'utf8');
+  }
+
+  private writeReadme(content: string): void {
+    const readmePath = path.join(this.projectRoot, README_PATH);
+    fs.writeFileSync(readmePath, content, 'utf8');
+  }
+
+  private backupReadme(): void {
+    this.originalReadme = this.readReadme();
+    const backupPath = path.join(this.projectRoot, README_BACKUP_PATH);
+    fs.writeFileSync(backupPath, this.originalReadme, 'utf8');
+  }
+
+  private swapToExtensionReadme(): void {
+    const extensionReadmePath = path.join(this.projectRoot, README_EXTENSION_PATH);
+    if (!fs.existsSync(extensionReadmePath)) {
+      throw new Error(`Extension README not found: ${extensionReadmePath}`);
+    }
+    const extensionReadmeContent = fs.readFileSync(extensionReadmePath, 'utf8');
+    this.writeReadme(extensionReadmeContent);
+  }
+
+  private restoreReadme(): void {
+    this.writeReadme(this.originalReadme);
+    const backupPath = path.join(this.projectRoot, README_BACKUP_PATH);
     if (fs.existsSync(backupPath)) {
       fs.unlinkSync(backupPath);
     }
@@ -205,6 +242,11 @@ class Package {
       this.backupVsCodeIgnore();
       console.log('Backed up .vscodeignore');
 
+      // Backup original README.md and swap to extension README
+      this.backupReadme();
+      this.swapToExtensionReadme();
+      console.log('Swapped README.md with README_EXTENSION.md');
+
       // Modify .vscodeignore for the target platform
       this.modifyVsCodeIgnoreForPlatform(targetPlatform);
       console.log(`Modified .vscodeignore to exclude other platforms (keeping ${platform.binDir})`);
@@ -223,9 +265,11 @@ class Package {
       console.error('Build failed:', error);
       process.exit(1);
     } finally {
-      // Always restore the original .vscodeignore
+      // Always restore the original .vscodeignore and README
       this.restoreVsCodeIgnore();
       console.log('Restored original .vscodeignore');
+      this.restoreReadme();
+      console.log('Restored original README.md');
     }
   }
 }
