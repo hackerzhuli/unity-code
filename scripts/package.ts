@@ -4,13 +4,24 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 
+/**
+ * Configuration interface for platform-specific build settings
+ */
 interface PlatformConfig {
+  /** Internal platform identifier */
   name: string;
+  /** Directory path containing platform-specific binaries */
   binDir: string;
+  /** Human-readable platform description */
   description: string;
+  /** VS Code marketplace target identifier for vsce packaging */
   vsceTarget: string;
 }
 
+/**
+ * Platform configurations for all supported architectures
+ * Maps platform names to their specific build configurations
+ */
 const PLATFORMS: Record<string, PlatformConfig> = {
   win_x64: {
     name: 'win_x64',
@@ -50,10 +61,15 @@ const PLATFORMS: Record<string, PlatformConfig> = {
   }
 };
 
+/** Path to the VS Code ignore file */
 const VSCODEIGNORE_PATH = '.vscodeignore';
+/** Backup path for the original VS Code ignore file */
 const BACKUP_PATH = '.vscodeignore.backup';
+/** Path to the main README file */
 const README_PATH = 'README.md';
+/** Path to the extension-specific README file */
 const README_EXTENSION_PATH = 'README_EXTENSION.md';
+/** Backup path for the original README file */
 const README_BACKUP_PATH = 'README.md.backup';
 
 /**
@@ -65,26 +81,45 @@ class Package {
   private originalReadme: string = '';
   private projectRoot: string;
 
+  /**
+   * Initializes the Package builder with project root directory
+   */
   constructor() {
     this.projectRoot = path.resolve(__dirname, '..');
   }
 
+  /**
+   * Reads the current .vscodeignore file content
+   * @returns The content of the .vscodeignore file
+   */
   private readVsCodeIgnore(): string {
     const vscodeignorePath = path.join(this.projectRoot, VSCODEIGNORE_PATH);
     return fs.readFileSync(vscodeignorePath, 'utf8');
   }
 
+  /**
+   * Writes content to the .vscodeignore file
+   * @param content The content to write to the file
+   */
   private writeVsCodeIgnore(content: string): void {
     const vscodeignorePath = path.join(this.projectRoot, VSCODEIGNORE_PATH);
     fs.writeFileSync(vscodeignorePath, content, 'utf8');
   }
 
+  /**
+   * Creates a backup of the original .vscodeignore file
+   * Stores the content in memory and creates a backup file on disk
+   */
   private backupVsCodeIgnore(): void {
     this.originalVsCodeIgnore = this.readVsCodeIgnore();
     const backupPath = path.join(this.projectRoot, BACKUP_PATH);
     fs.writeFileSync(backupPath, this.originalVsCodeIgnore, 'utf8');
   }
 
+  /**
+   * Restores the original .vscodeignore file from backup
+   * Removes the temporary backup file after restoration
+   */
   private restoreVsCodeIgnore(): void {
     this.writeVsCodeIgnore(this.originalVsCodeIgnore);
     const backupPath = path.join(this.projectRoot, BACKUP_PATH);
@@ -93,22 +128,40 @@ class Package {
     }
   }
 
+  /**
+   * Reads the current README.md file content
+   * @returns The content of the README.md file
+   */
   private readReadme(): string {
     const readmePath = path.join(this.projectRoot, README_PATH);
     return fs.readFileSync(readmePath, 'utf8');
   }
 
+  /**
+   * Writes content to the README.md file
+   * @param content The content to write to the README file
+   */
   private writeReadme(content: string): void {
     const readmePath = path.join(this.projectRoot, README_PATH);
     fs.writeFileSync(readmePath, content, 'utf8');
   }
 
+  /**
+   * Creates a backup of the original README.md file
+   * Stores the content in memory and creates a backup file on disk
+   */
   private backupReadme(): void {
     this.originalReadme = this.readReadme();
     const backupPath = path.join(this.projectRoot, README_BACKUP_PATH);
     fs.writeFileSync(backupPath, this.originalReadme, 'utf8');
   }
 
+  /**
+   * Swaps the main README.md with the extension-specific README
+   * This is necessary because the extension marketplace requires different content
+   * than the development README
+   * @throws Error if the extension README file is not found
+   */
   private swapToExtensionReadme(): void {
     const extensionReadmePath = path.join(this.projectRoot, README_EXTENSION_PATH);
     if (!fs.existsSync(extensionReadmePath)) {
@@ -118,6 +171,10 @@ class Package {
     this.writeReadme(extensionReadmeContent);
   }
 
+  /**
+   * Restores the original README.md file from backup
+   * Removes the temporary backup file after restoration
+   */
   private restoreReadme(): void {
     this.writeReadme(this.originalReadme);
     const backupPath = path.join(this.projectRoot, README_BACKUP_PATH);
@@ -126,6 +183,12 @@ class Package {
     }
   }
 
+  /**
+   * Modifies the .vscodeignore file to exclude binaries for other platforms
+   * This ensures that only the target platform's binaries are included in the package
+   * @param targetPlatform The platform to build for (other platforms will be excluded)
+   * @throws Error if the target platform is not recognized
+   */
   private modifyVsCodeIgnoreForPlatform(targetPlatform: string): void {
     const platform = PLATFORMS[targetPlatform];
     if (!platform) {
@@ -152,6 +215,12 @@ class Package {
     this.writeVsCodeIgnore(content);
   }
 
+  /**
+   * Executes the vsce package command for the specified platform
+   * Creates a platform-specific .vsix file using VS Code Extension CLI
+   * @param platform The platform configuration to package for
+   * @throws Error if the vsce package command fails
+   */
   private runVscePackage(platform: PlatformConfig): void {
     console.log(`Running vsce package for ${platform.vsceTarget}...`);
     try {
@@ -164,6 +233,10 @@ class Package {
     }
   }
 
+  /**
+   * Ensures that the VS Code Extension CLI (vsce) is available
+   * Installs it globally if not found
+   */
   private ensureVsceDependency(): void {
     try {
       execSync('npx vsce --version', { 
@@ -179,6 +252,10 @@ class Package {
     }
   }
 
+  /**
+   * Ensures that the Open VSX CLI (ovsx) is available
+   * Installs it globally if not found (required for Open VSX marketplace publishing)
+   */
   private ensureOvxDependency(): void {
     try {
       execSync('npx ovsx --version', { 
@@ -194,6 +271,12 @@ class Package {
     }
   }
 
+  /**
+   * Constructs the expected path to the generated .vsix file
+   * The filename follows vsce's naming convention: name-target-version.vsix
+   * @param platform The platform configuration
+   * @returns The full path to the expected .vsix file
+   */
   private getVsixFilePath(platform: PlatformConfig): string {
     // Read package.json to get name and version
     const packageJsonPath = path.join(this.projectRoot, 'package.json');
@@ -205,6 +288,12 @@ class Package {
     return path.join(this.projectRoot, vsixFileName);
   }
 
+  /**
+   * Publishes the generated .vsix file to the Open VSX marketplace
+   * Open VSX is an open-source alternative to the VS Code marketplace
+   * @param platform The platform configuration for the package to publish
+   * @throws Error if the .vsix file is not found or publishing fails
+   */
   private publishToOpenVSX(platform: PlatformConfig): void {
     const vsixPath = this.getVsixFilePath(platform);
     
@@ -224,6 +313,18 @@ class Package {
     }
   }
 
+  /**
+   * Main method to build the extension for a specific platform
+   * Handles the complete build process including:
+   * - Backing up and modifying configuration files
+   * - Running vsce package command
+   * - Optionally publishing to Open VSX marketplace
+   * - Restoring original configuration files
+   * 
+   * @param targetPlatform The platform identifier to build for
+   * @param publishToOpenVSX Whether to publish to Open VSX marketplace after building
+   * @throws Error if the platform is unknown or any build step fails
+   */
   public async buildForPlatform(targetPlatform: string, publishToOpenVSX: boolean = false): Promise<void> {
     const platform = PLATFORMS[targetPlatform];
     if (!platform) {
@@ -274,7 +375,10 @@ class Package {
   }
 }
 
-// Main execution
+/**
+ * Main execution block - runs when script is executed directly
+ * Parses command line arguments and initiates the build process
+ */
 if (require.main === module) {
   const args = process.argv.slice(2);
   
@@ -296,4 +400,5 @@ if (require.main === module) {
   });
 }
 
+// Export the main class and platform configurations for external use
 export { Package as PlatformBuilder, PLATFORMS };
