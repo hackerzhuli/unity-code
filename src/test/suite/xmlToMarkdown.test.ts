@@ -141,9 +141,23 @@ for this instance.
 
     it('should convert line breaks', () => {
         const input = `Note: paragraphs are double spaced. Use the *br*<br/>tag for single spaced lines.`;
-        const expected = `Note: paragraphs are double spaced. Use the *br*\ntag for single spaced lines.`;
+        const expected = `Note: paragraphs are double spaced. Use the *br*\n\ntag for single spaced lines.`;
         
         assert.strictEqual(xmlToMarkdown(input), expected);
+    });
+
+    it('should convert br tags in summary blocks to double newlines for proper markdown line breaks', () => {
+        const input = `<summary>
+This is the first line.<br/>This is the second line.<br/>This is the third line.
+</summary>`;
+        
+        const result = xmlToMarkdown(input);
+        
+        // Verify the summary section is created
+        assert.ok(result.includes('## Summary'));
+        
+        // Verify that each <br/> tag produces double newlines for proper markdown line breaks
+        assert.ok(result.includes('This is the first line.\n\nThis is the second line.\n\nThis is the third line.'));
     });
 
     it('should handle complex method documentation', () => {

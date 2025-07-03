@@ -180,7 +180,7 @@ function processXmlElement(tagName: string, node: unknown): string {
             return `\n${processContent(content)}\n`;
             
         case 'br':
-            return '\n';
+            return '\n\n';
               case 'list':
             return processList(content);
             
