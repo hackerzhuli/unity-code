@@ -85,7 +85,6 @@ export class MonoDebugConfigurationProvider implements vscode.DebugConfiguration
                     },
                 },
                 stepOverPropertiesAndOperators: MonoDebugConfigurationProvider.getSetting('unity-code.debugger.stepOverPropertiesAndOperators', true),
-                projectAssembliesOnly: MonoDebugConfigurationProvider.getSetting('unity-code.debugger.projectAssembliesOnly', true),
                 automaticSourceLinkDownload: "never",
                 skipNativeTransitions: true,
             };

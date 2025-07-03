@@ -2,7 +2,7 @@
   "name": "unity-code",
   "displayName": "Unity Code",
   "description": "VS Code extension that helps you to work with Unity Projects",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "hackerzhuli",
   "repository": {
     "type": "git",
@@ -14,6 +14,24 @@
   "extensionDependencies": [
     "nromanov.dotrush"
   ],
+  "nativeDependencies": {
+    "unity_code_native": {
+      "win32-x64": "./bin/win_x64/unity_code_native.exe",
+      "win32-arm64": "./bin/win_arm64/unity_code_native.exe",
+      "linux-x64": "./bin/linux_x64/unity_code_native",
+      "linux-arm64": "./bin/linux_arm64/unity_code_native",
+      "darwin-x64": "./bin/mac_x64/unity_code_native",
+      "darwin-arm64": "./bin/mac_arm64/unity_code_native"
+    },
+    "MonoDebugger": {
+      "win32-x64": "./bin/win_x64/MonoDebugger.exe",
+      "win32-arm64": "./bin/win_arm64/MonoDebugger.exe",
+      "linux-x64": "./bin/linux_x64/MonoDebugger",
+      "linux-arm64": "./bin/linux_arm64/MonoDebugger",
+      "darwin-x64": "./bin/mac_x64/MonoDebugger",
+      "darwin-arm64": "./bin/mac_arm64/MonoDebugger"
+    }
+  },
   "categories": [
     "Other"
   ],
@@ -138,11 +156,6 @@
           "default": true,
           "description": "Step over properties and operators when debugging Unity code"
         },
-        "unity-code.debugger.projectAssembliesOnly": {
-          "type": "boolean",
-          "default": true,
-          "description": "Only debug project assemblies, excluding Unity engine and third-party libraries"
-        },
         "unity-code.ignoreDuplicateLogs": {
           "type": "boolean",
           "default": true,
@@ -173,7 +186,7 @@
     "compile": "tsc",
     "watch": "tsc -watch -p ./",
     "clean": "rimraf out",
-    "build": "npm run clean && npm run compile && vsce package"
+    "build": "npm run clean && npm run compile"
   },
   "dependencies": {
     "fast-xml-parser": "^5.2.5"

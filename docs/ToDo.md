@@ -27,3 +27,5 @@
 - [ ] 27. Test the extension in Cursor/Windsurf/Trae, fix bugs, add an icon for the extension, then modify the version to 1.0.0 and publish the extension to open vsx!
 - [ ] 28. For logs for official Unity site(not packages), we should specify the Unity version of the project there, eg. "https://docs.unity3d.com/2020.3/Documentation/ScriptReference/Debug.html"
 - [x] 29. Add a search bar for Unity Console to filter logs
+- [ ] 30. The line break in xml docs are not proper in output markdown(they are still in the same line)
+- [ ] 31. Dot Rush just released a new version that shows XML docs, try it out and determine should we remove our xml docs feature?
