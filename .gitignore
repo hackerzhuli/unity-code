@@ -8,6 +8,7 @@ scripts/*.map
 
 # binaries
 bin/
+assemblies/
 
 # Node.js dependencies
 node_modules/

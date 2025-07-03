@@ -40,9 +40,14 @@ First you have to build the native binaries, they are [unity_code_native](https:
 
 Once you have built them, copy them(just the executables are enough) into the platform specific folder in bin directory. Like shown below.
 
+Also there is one assembly, that you want to copy to assemblies folder, it's `Microsoft.Unity.Analyzers.dll`, from publish output from one of our UnityCodeSharp project. It is cross platform.
+
 ```
 assets/
 ├──unityConsole.html
+└──...
+assemblies/
+├──Microsoft.Unity.Analyzers.dll
 └──...
 bin/
 ├── win_x64/

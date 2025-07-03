@@ -20,12 +20,16 @@
 - [x] 20. Running higher level tests doesn't actually run tests, the level above the assembly(the project level), and the mode level, eg. "Play Mode", running these tests, it appears in Unity Editor that the test run started, but no leaf tests are actually run. However in Unity Editor we can actually run the the project level tests, which runs all tests in all assemblies.
 - [x] 21. Create/Delete/Paste a .cs asset file (for the case of create, file must be already saved to disk, and not empty, if not then do nothing) should also trigger a refresh of asset database.
 - [x] 22. We shouldn't try to manage .meta files when user delete files, Unity will handle that, so no need for us to do anything
-- [ ] 23. Debugger should find user assemblies in a more precise way(looking at project files), also we should remove our setting for project assemblies only because that's always true for now
+- [x] 23. Debugger should find user assemblies in a more precise way(looking at project files), also we should remove our setting for project assemblies only because that's always true for now
 - [x] 24. Unity package should generate launch.json settings for our debugger
 - [x] 25. Change our typescript compile output to CommonJS (but keeping working with esmoudles in typescript source code, also keep package.json type as module if possible) for better compatibility with current VS Code forks(some don't support modules yet). Create a seperate a build script in package.json and make sure we clean js output directory before build, compile the code and also call vsce to package it.
 - [x] 26. Our binary locator should not assume what platform is supported or not(binary locator should handle at least 6 platforms, that is Windows/MacOS/Linux, each with x64 and arm64), just get the binary file for the current platform when requested
-- [ ] 27. Test the extension in Cursor/Windsurf/Trae, fix bugs, add an icon for the extension, then modify the version to 1.0.0 and publish the extension to open vsx!
+- [ ] 27. Test the extension in Cursor/Windsurf/Trae, fix bugs, add an icon for the extension, refine readme for users of the extension, then modify the version to 1.0.0 and publish the extension to open vsx!
 - [x] 28. For links for official Unity site(not packages), we should specify the Unity version of the project there, eg. "https://docs.unity3d.com/2020.3/Documentation/ScriptReference/Debug.html"
 - [x] 29. Add a search bar for Unity Console to filter logs
 - [x] 30. The line break in xml docs are not proper in output markdown(they are still in the same line)
 - [ ] 31. Dot Rush just is about to release a new version that shows XML docs, try it out and determine should we remove our xml docs feature?
+- [x] 32. Should we add analyzers of Dot Rush to Unity pacakge's detection?
+- [x] 33. Debugger, there seems to be too many threads, that's unrelated to the user shown.
+- [x] 34. ~~Now that we do include analyzers in our package, but it is not working as expected, roslyn from Dot Rush doesn't seem to use it. Should I report an issue?~~
+- [x] 35. After I run tests, the run button didn't reappear as expected. When we run tests, the run button disappear when running. But when I stop tests, the run button should appear. But it doesn't, in Cursor and Windsurf, but it does in Trae and VS Code. It can be a problem of VS Code itself, because Cursor and Windsurf use older version of VS Code(cursor 1.96, windsurf 1.99, trae 1.100, vs code 1.101). It turns out that we can still run tests when you right click on them and there is run test even though the button disappeared, this seems to be a UI bug. So not a problem.
