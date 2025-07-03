@@ -43,7 +43,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 - **Clickable stack traces** - Navigate directly to the source of the logs
 - **Log filtering** - Search specific words to find the logs you need
 
-![Unity Console](./assets/Unity%20Console%20in%20Trae.png)
+![Unity Console](./assets/Unity%20Console.png)
 
 ### 🐛 **Integrated Unity Debugger**
 - **Seamless debugging experience** - Attach to Unity Editor with one click

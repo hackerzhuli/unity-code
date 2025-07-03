@@ -32,7 +32,7 @@ See Unity logs in your code editor with clickable stack trace!
 - **Clickable stack traces** - Navigate directly to the source of the logs
 - **Log filtering** - Search specific words to find the logs you need
 
-![Unity Console](./assets/Unity%20Console%20in%20Trae.png)
+![Unity Console](./assets/Unity%20Console.png)
 
 ### 🐛 Unity Debugger
 Attach to Unity Editor from your code editor using the integrated MonoDebugger and crush the bugs!
