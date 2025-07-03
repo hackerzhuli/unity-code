@@ -2,7 +2,7 @@
   "name": "unity-code",
   "displayName": "Unity Code",
   "icon": "assets/icon.png",
-  "description": "VS Code extension that helps you to work with Unity Projects",
+  "description": "Unity IDE right inside of Cursor, Windsurf and Trae!",
   "version": "1.0.0",
   "publisher": "hackerzhuli",
   "repository": {
@@ -117,10 +117,10 @@
         ],
         "configurationSnippets": [
           {
-            "label": "Unity Code: Attach",
+            "label": "Attach to Unity Editor with Unity Code",
             "description": "Attach to Unity Editor",
             "body": {
-              "name": "Unity Code Attach",
+              "name": "Attach to Unity Editor with Unity Code",
               "type": "unity-code",
               "request": "attach",
               "cwd": "${workspaceFolder}"
