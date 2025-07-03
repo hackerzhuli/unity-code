@@ -57,3 +57,21 @@ export async function isInsideDirectory(dirPath: string, path: string): Promise<
     // Check if the path starts with the directory path
     return normalizedPath.startsWith(normalizedDirPath) && normalizedPath.length > normalizedDirPath.length && (normalizedPath[normalizedDirPath.length] === nodePath.sep) ;
 }
+
+/**
+ * Extracts the major.minor version from a version string.
+ * Supports both semantic versioning (e.g., "1.2.3", "2.0.0-beta.1") and Unity's version format (e.g., "6000.0.51f1", "2023.3.15f1").
+ * @param version The version string to parse
+ * @returns The major.minor version (e.g., "1.2", "6000.0") or undefined if the format is invalid
+ */
+export function extractMajorMinorVersion(version: string): string | undefined {
+    if (!version || typeof version !== 'string') {
+        return undefined;
+    }
+
+    // Match major.minor pattern at the start of the version string
+    // This handles both semantic versions (1.2.3) and Unity versions (6000.0.51f1)
+    const versionMatch = version.match(/^(\d+\.\d+)/);
+    
+    return versionMatch ? versionMatch[1] : undefined;
+}

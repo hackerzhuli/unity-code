@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { parse as parseYaml } from 'yaml';
 import { isInsideDirectory as isInDirectory, normalizePath } from './utils';
 import { UnityMessagingClient } from './unityMessagingClient';
 import { UnityTestProvider } from './unityTestProvider';
@@ -13,6 +14,8 @@ import { UnityDetector } from './unityDetector';
 export class UnityProjectManager {
     /** path of the Unity project(normalized) */
     private unityProjectPath: string | null = null;
+    /** Unity editor version string (e.g., "6000.0.51f1") */
+    private unityEditorVersion: string | null = null;
     private isInitialized: boolean = false;
     private messagingClient?: UnityMessagingClient;
     private testProvider?: UnityTestProvider;
@@ -41,10 +44,19 @@ export class UnityProjectManager {
         }
 
         this.unityProjectPath = await this.detectUnityProjectPath(workspaceFolders);
+        
+        // Load Unity editor version if project is detected
+        if (this.unityProjectPath) {
+            this.unityEditorVersion = await this.loadUnityEditorVersion();
+        }
+        
         this.isInitialized = true;
         
         if (this.unityProjectPath) {
             console.log(`UnityProjectManager: Detected Unity project at: ${this.unityProjectPath}`);
+            if (this.unityEditorVersion) {
+                console.log(`UnityProjectManager: Unity editor version: ${this.unityEditorVersion}`);
+            }
         } else {
             console.log('UnityProjectManager: No Unity project detected in workspace');
         }
@@ -89,11 +101,47 @@ export class UnityProjectManager {
     }
 
     /**
+     * Load and parse the Unity editor version from ProjectVersion.txt
+     * @returns Promise<string | null> The Unity editor version string or null if not found
+     */
+    private async loadUnityEditorVersion(): Promise<string | null> {
+        if (!this.unityProjectPath) {
+            return null;
+        }
+
+        try {
+            const projectVersionPath = path.join(this.unityProjectPath, 'ProjectSettings', 'ProjectVersion.txt');
+            const content = await fs.promises.readFile(projectVersionPath, 'utf8');
+            
+            // Parse the YAML content safely
+            const parsedData = parseYaml(content) as { m_EditorVersion?: string } | null;
+            if (parsedData && parsedData.m_EditorVersion) {
+                return parsedData.m_EditorVersion;
+            }
+        } catch (error) {
+            console.error(`UnityProjectManager: Error reading Unity editor version: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        return null;
+    }
+
+    /**
      * Get the Unity project path
      * @returns The Unity project path or null if not detected
      */
     public getUnityProjectPath(): string | null {
         return this.unityProjectPath;
+    }
+
+    /**
+     * Get the Unity editor version string for the project
+     * @returns The Unity editor version (e.g., "6000.0.51f1") or null if not detected
+     * @example
+     * const version = manager.getUnityEditorVersion();
+     * // Returns: "6000.0.51f1" or "2023.3.15f1" or null
+     */
+    public getUnityEditorVersion(): string | null {
+        return this.unityEditorVersion;
     }
 
     /**

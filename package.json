@@ -187,7 +187,8 @@
     "publish:mac_arm64": "npm run build && npx tsx scripts/package.ts mac_arm64 --publish-open-vsx"
   },
   "dependencies": {
-    "fast-xml-parser": "^5.2.5"
+    "fast-xml-parser": "^5.2.5",
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",

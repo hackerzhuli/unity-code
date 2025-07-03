@@ -11,7 +11,8 @@ export default [
       ".next/",
       "coverage/",
       "node_modules/",
-      "out"
+      "out",
+      "scripts/**/*.js",
     ],
   },
   js.configs.recommended,

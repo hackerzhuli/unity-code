@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import { DecompiledFileHelper, DecompiledFileInfo } from './decompiledFileHelper';
 import { UnityPackageHelper, PackageInfo } from './unityPackageHelper';
+import { UnityProjectManager } from './unityProjectManager';
 import { getQualifiedTypeName, detectLanguageServer, LanguageServerInfo, isTypeSymbol, extractXmlDocumentation } from './languageServerUtils';
 import { xmlToMarkdown } from './xmlToMarkdown';
+import { extractMajorMinorVersion } from './utils';
 
 /**
  * Hover provider that adds documentation links to C# symbols
@@ -15,9 +17,11 @@ import { xmlToMarkdown } from './xmlToMarkdown';
  */
 export class CSharpDocHoverProvider implements vscode.HoverProvider {
     private readonly unityPackageHelper: UnityPackageHelper | undefined;
+    private readonly unityProjectManager: UnityProjectManager | undefined;
 
-    constructor(unityPackageHelper?: UnityPackageHelper) {
+    constructor(unityPackageHelper?: UnityPackageHelper, unityProjectManager?: UnityProjectManager) {
         this.unityPackageHelper = unityPackageHelper;
+        this.unityProjectManager = unityProjectManager;
     }
 
     /**
@@ -36,20 +40,23 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         {
             name: 'Unity Engine',
             namespace: 'UnityEngine',
-            urlTemplate: 'https://docs.unity3d.com/ScriptReference/{typeName}.html',
-            namespaceRemoveLevel: 1
+            urlTemplate: 'https://docs.unity3d.com/{unityVersion}/Documentation/ScriptReference/{typeName}.html',
+            namespaceRemoveLevel: 1,
+            requiresUnityVersion: true
         },
         {
             name: 'Unity UI',
             namespace: 'UnityEngine.UI',
-            urlTemplate: 'https://docs.unity3d.com/ScriptReference/{typeName}.html',
-            namespaceRemoveLevel: 2
+            urlTemplate: 'https://docs.unity3d.com/{unityVersion}/Documentation/ScriptReference/{typeName}.html',
+            namespaceRemoveLevel: 2,
+            requiresUnityVersion: true
         },
         {
             name: 'Unity Editor',
             namespace: 'UnityEditor',
-            urlTemplate: 'https://docs.unity3d.com/ScriptReference/{typeName}.html',
-            namespaceRemoveLevel: 1
+            urlTemplate: 'https://docs.unity3d.com/{unityVersion}/Documentation/ScriptReference/{typeName}.html',
+            namespaceRemoveLevel: 1,
+            requiresUnityVersion: true
         },
         {
             name: '.NET Framework',
@@ -130,8 +137,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
 
             return undefined;
 
-        } catch (error) {
-            console.error('Error getting symbol info:', error);
+        } catch (_error) {
+            console.error('Error getting symbol info:', _error);
             return undefined;
         }
     }
@@ -192,8 +199,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             }
             
             return symbolInfo;
-        } catch (error) {
-            console.error('Error analyzing definition:', error);
+        } catch (_error) {
+            console.error('Error analyzing definition:', _error);
             return undefined;
         }
     }    /**
@@ -283,8 +290,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             
             return topLevelType;
             
-        } catch (error) {
-            console.error('Error getting symbol info for empty range:', error);
+        } catch (_error) {
+            console.error('Error getting symbol info for empty range:', _error);
             return undefined;
         }
     }
@@ -305,8 +312,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             }
 
             return this.findSymbolAtPosition(symbols, position, "", false, languageServerInfo, document);
-        } catch (error) {
-            console.error('Error getting detailed symbol info:', error);
+        } catch (_error) {
+            console.error('Error getting detailed symbol info:', _error);
             return undefined;
         }
     }    /**
@@ -430,8 +437,8 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     private async checkDecompiledFile(uri: vscode.Uri): Promise<DecompiledFileInfo> {
         try {
             return await DecompiledFileHelper.analyzeUri(uri);
-        } catch (error) {
-            console.error('Error checking decompiled file:', error);
+        } catch (_error) {
+            console.error('Error checking decompiled file:', _error);
             return { isDecompiled: false };
         }
     }
@@ -484,20 +491,14 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
      * Generate Unity package documentation links (both API and manual)
      * @param typeName The fully qualified type name
      * @param packageInfo The Unity package information
-     * @returns The Unity package documentation links
+     * @returns The Unity package documentation links, or undefined if version extraction fails
      */
-    private generateUnityPackageLinks(typeName: string, packageInfo: PackageInfo): PackageDocumentationLinks {
+    private generateUnityPackageLinks(typeName: string, packageInfo: PackageInfo): PackageDocumentationLinks | undefined {
         // Extract major.minor version from the version string (Unity package URLs only use two components)
-        let cleanVersion = packageInfo.version;
-        
-        // Try to extract major.minor version pattern (e.g., "1.5" from "1.5.2-preview.1" or hash)
-        const versionMatch = packageInfo.version.match(/^(\d+\.\d+)/); 
-        if (versionMatch) {
-            cleanVersion = versionMatch[1];
-        } else {
-            // If no version pattern found, try to read from package.json
-            // For now, use the raw version as fallback
+        const cleanVersion = extractMajorMinorVersion(packageInfo.version);
+        if (!cleanVersion) {
             console.warn(`Could not extract major.minor version from: ${packageInfo.version}`);
+            return undefined;
         }
         
         // Type name should already be in the correct format for Unity package docs
@@ -570,7 +571,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     /**
      * Generate documentation link using the provided configuration
      */
-    private generateLinkFromConfig(typeName: string, config: DocLinkConfig): string {
+    private generateLinkFromConfig(typeName: string, config: DocLinkConfig): string | undefined {
         let transformedTypeName = typeName;
 
         // Remove namespace levels if specified (default: 0)
@@ -595,8 +596,35 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         // Clean up any trailing slashes or backslashes
         transformedTypeName = transformedTypeName.replace(/[/\\]+$/, '');
 
-        // Replace placeholder in URL template
-        return config.urlTemplate.replace('{typeName}', transformedTypeName);
+        // Start with the URL template
+        let url = config.urlTemplate;
+
+        // Replace typeName placeholder
+        url = url.replace('{typeName}', transformedTypeName);
+
+        // Handle Unity version replacement if required
+        if (config.requiresUnityVersion && url.includes('{unityVersion}')) {
+            if (!this.unityProjectManager) {
+                // No Unity project manager available, cannot generate versioned URL
+                return undefined;
+            }
+
+            const unityVersion = this.unityProjectManager.getUnityEditorVersion();
+            if (!unityVersion) {
+                // No Unity version detected, cannot generate versioned URL
+                return undefined;
+            }
+
+            // Extract major.minor version using utility function
+            const shortVersion = extractMajorMinorVersion(unityVersion);
+            if (!shortVersion) {
+                // Invalid version format, cannot generate versioned URL
+                return undefined;
+            }
+            url = url.replace('{unityVersion}', shortVersion);
+        }
+
+        return url;
     }
       /**
      * Create hover content with documentation link using type name
@@ -704,7 +732,7 @@ interface DocLinkConfig {
     /** Exact namespace to match against type names */
     namespace: string;
     
-    /** URL template with {typeName} placeholder */
+    /** URL template with {typeName} and optional {unityVersion} placeholders */
     urlTemplate: string;
     
     /** Number of namespace levels to remove from the type name (default: 0 = no removal) */
@@ -715,6 +743,9 @@ interface DocLinkConfig {
     
     /** String to replace dots with in the type name (default: no replacement) */
     dotReplacement?: string;
+    
+    /** Whether this config requires Unity version information (default: false) */
+    requiresUnityVersion?: boolean;
 }
 
 /**
