@@ -476,7 +476,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             return;
         }
 
-        if (this.messagingClient.unityPlaying) {
+        if (this.messagingClient.isUnityPlaying) {
             vscode.window.showErrorMessage('UnityCode: Cannot run tests while Unity is in Play Mode. Please stop Play Mode first.');
             return;
         }

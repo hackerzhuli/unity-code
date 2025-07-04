@@ -903,28 +903,11 @@ export class UnityMessagingClient {
     }
 
     /**
-     * Refresh Unity's asset database to trigger recompilation
-     * @returns true if refresh was sent or queued successfully, false otherwise
+     * Send a message to tell Unity to refresh asset database
+     * @returns true if refresh message was sent, false otherwise
      */
     async refreshAssetDatabase(): Promise<boolean> {
-        if (!this.isConnected) {
-            console.log('UnityMessagingClient: Not connected to Unity, cannot refresh asset database');
-            return false;
-        }
-
-        console.log(`UnityMessagingClient: Sending Refresh message (type ${MessageType.Refresh}) to Unity on port ${this.unityPort}`);
-        try {
-            const success = await this.sendMessage(MessageType.Refresh, '');
-            if (success) {
-                console.log('UnityMessagingClient: Refresh asset database message sent successfully');
-            } else {
-                console.log('UnityMessagingClient: Failed to send refresh asset database message');
-            }
-            return success;
-        } catch (error) {
-            console.error('UnityMessagingClient: Failed to send refresh message:', error);
-            return false;
-        }
+        return await this.sendMessage(MessageType.Refresh, '');
     }
 
     /**
@@ -944,7 +927,7 @@ export class UnityMessagingClient {
     /**
      * Check if Unity is currently playing
      */
-    get unityPlaying(): boolean {
+    get isUnityPlaying(): boolean {
         return this.isUnityEditorPlaying;
     }
 

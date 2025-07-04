@@ -450,6 +450,11 @@ export class UnityProjectManager {
      */
     private async performAssetDatabaseRefresh(messagingClient: UnityMessagingClient): Promise<void> {
         try {
+            if (this.messagingClient?.isUnityPlaying){
+                console.log(`UnityProjectManager: Unity is in play mode, skipping asset database refresh`);
+                return;
+            }
+
             // Check if Hot Reload is enabled before refreshing
             if (this.unityDetector) {
                 await this.unityDetector.requestUnityState();
@@ -465,7 +470,9 @@ export class UnityProjectManager {
                 return;
             }
 
-            await messagingClient.refreshAssetDatabase();
+            if(!await messagingClient.refreshAssetDatabase()){
+                console.error(`UnityProjectManager: Failed to send refresh asset database message`);
+            }
         } catch (error) {
             console.error(`UnityProjectManager: Error refreshing asset database: ${error instanceof Error ? error.message : String(error)}`);
         }

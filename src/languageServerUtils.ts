@@ -235,7 +235,7 @@ function findSymbolRecursiveCSharpDevKit(
         return null;
     }
     
-    console.log(`[CSharpDevKit] Looking for path: ${fullTargetPath} (from index ${currentIndex}), available symbols: ${symbols.map(s => `${s.name}(${s.kind})`).join(', ')}`);
+    //console.log(`[CSharpDevKit] Looking for path: ${fullTargetPath} (from index ${currentIndex}), available symbols: ${symbols.map(s => `${s.name}(${s.kind})`).join(', ')}`);
     
     for (const symbol of symbols) {
         // For type symbols, check if the detail field matches our full target path
@@ -245,17 +245,17 @@ function findSymbolRecursiveCSharpDevKit(
                 continue;
             }
 
-            console.log(`[CSharpDevKit] Checking type symbol: ${symbol.name}, detail: ${symbol.detail}`);
+            //console.log(`[CSharpDevKit] Checking type symbol: ${symbol.name}, detail: ${symbol.detail}`);
             
             // C# Dev Kit puts the fully qualified name in the detail field
             if (symbol.detail === fullTargetPath) {
-                console.log(`[CSharpDevKit] Found exact match via detail field: ${symbol.name}`);
+                //console.log(`[CSharpDevKit] Found exact match via detail field: ${symbol.name}`);
                 return symbol;
             }
             
             // Check if this type is part of our target path (for nested symbols)
             if (fullTargetPath.startsWith(symbol.detail + '.')) {
-                console.log(`[CSharpDevKit] Type ${symbol.name} is part of target path, searching children`);
+                //console.log(`[CSharpDevKit] Type ${symbol.name} is part of target path, searching children`);
                 // Calculate how many path parts this type symbol consumes
                 const typePathPartsCount = (symbol.detail.match(/\./g) || []).length + 1;
                 const newIndex = currentIndex + typePathPartsCount;
@@ -273,7 +273,7 @@ function findSymbolRecursiveCSharpDevKit(
         // Non-type symbols cannot have children, so they're always leaf nodes
         const currentTarget = pathParts[currentIndex];
         if (symbol.name === currentTarget) {
-            console.log(`[CSharpDevKit] Found matching symbol: ${symbol.name}, kind: ${symbol.kind}`);
+            //console.log(`[CSharpDevKit] Found matching symbol: ${symbol.name}, kind: ${symbol.kind}`);
             
             // If this is the last part of the path, we found our target
             if (currentIndex === pathParts.length - 1) {
