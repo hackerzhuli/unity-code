@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestNodeType, TestAdaptor } from './unityMessagingClient';
 import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown, isUnityTestStackTrace } from './stackTraceUtils';
-import { findSymbolByPath, detectLanguageServer, LanguageServerInfo } from './languageServerUtils';
+import { findSymbolByPath } from './languageServerUtils';
 import { UnityProjectManager } from './unityProjectManager';
 import { wait } from './asyncUtils';
 
@@ -854,11 +854,8 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 return [];
             }
 
-            // Detect language server once at entry point for optimization
-            const languageServerInfo = detectLanguageServer(symbols);
-
             const codeLenses: vscode.CodeLens[] = [];
-            await this.findTestCodeLenses(symbols, document, codeLenses, languageServerInfo);
+            await this.findTestCodeLenses(symbols, document, codeLenses);
 
             console.log(`Generated code lenses count: ${codeLenses.length}`);
             return codeLenses;
@@ -875,8 +872,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     private async findTestCodeLenses(
         symbols: vscode.DocumentSymbol[],
         document: vscode.TextDocument,
-        codeLenses: vscode.CodeLens[],
-        languageServerInfo: LanguageServerInfo
+        codeLenses: vscode.CodeLens[]
     ): Promise<void> {
         // Create one code lens for each unique test class
         for (const [_, topLevelTestItem] of this.testController.items) {
@@ -888,7 +884,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 if (testData.nodeType === TestNodeType.Method) {
                     continue;
                 }
-                const classSymbol = findSymbolByPath(symbols, testData.fullName, languageServerInfo);
+                const classSymbol = findSymbolByPath(symbols, testData.fullName);
                 if (classSymbol && (classSymbol.kind === vscode.SymbolKind.Class || classSymbol.kind === vscode.SymbolKind.Struct)) {
                     const codeLen = this.createCodeLens(classSymbol, testData, document);
                     if (codeLen) {

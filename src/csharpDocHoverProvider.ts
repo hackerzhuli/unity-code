@@ -2,18 +2,16 @@ import * as vscode from 'vscode';
 import { DecompiledFileHelper, DecompiledFileInfo } from './decompiledFileHelper';
 import { UnityPackageHelper, PackageInfo } from './unityPackageHelper';
 import { UnityProjectManager } from './unityProjectManager';
-import { getQualifiedTypeName, detectLanguageServer, LanguageServerInfo, isTypeSymbol, extractXmlDocumentation } from './languageServerUtils';
+import { getQualifiedTypeName, isTypeSymbol, extractXmlDocumentation } from './languageServerUtils';
 import { xmlToMarkdown } from './xmlToMarkdown';
 import { extractMajorMinorVersion } from './utils';
 
 /**
  * Hover provider that adds documentation links to C# symbols
  * 
- * Supports multiple language servers with different symbol handling:
- * - C# Dev Kit: Uses detail field for fully qualified type names, no namespace symbols
- * - Dot Rush: Constructs qualified names from namespace hierarchy in symbol tree
+ * Uses Dot Rush language server which constructs qualified names from namespace hierarchy in symbol tree.
  * 
- * See docs/LanguageServerIntegration.md for detailed differences
+ * See docs/LanguageServerIntegration.md for Dot Rush symbol handling details
  */
 export class CSharpDocHoverProvider implements vscode.HoverProvider {
     private readonly unityPackageHelper: UnityPackageHelper | undefined;
@@ -168,7 +166,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             // Open the definition document
             const definitionDocument = await vscode.workspace.openTextDocument(definition.uri);
             
-            // Get document symbols first to detect language server
+            // Get document symbols for Dot Rush analysis
             const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
                 'vscode.executeDocumentSymbolProvider',
                 definitionDocument.uri
@@ -177,20 +175,16 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             if (!symbols || symbols.length === 0) {
                 return undefined;
             }
-
-            // Detect language server type
-            const languageServerInfo = detectLanguageServer(symbols);
-            // console.log(`Detected language server: ${languageServerInfo.type}`);
             
             let symbolInfo: SymbolInfo | undefined;
             
             if(definition.range.isEmpty){
                 // console.log('Definition range is empty, trying fallback to single top-level type.');
                 // Fallback: if range is empty, try to find a single top-level type in the file
-                symbolInfo = await this.getSymbolInfoForEmptyRange(definitionDocument, word, languageServerInfo);
+                symbolInfo = await this.getSymbolInfoForEmptyRange(definitionDocument, word);
             } else {
                 // Get detailed symbol information using document symbol provider
-                symbolInfo = await this.getSymbolInfoFromPosition(definitionDocument, definition.range.start, languageServerInfo);
+                symbolInfo = await this.getSymbolInfoFromPosition(definitionDocument, definition.range.start);
             }
             
             // Add definition location to symbol info for Unity package detection
@@ -203,30 +197,31 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             console.error('Error analyzing definition:', _error);
             return undefined;
         }
-    }    /**
+    }
+    
+    /**
      * Find the single top-level type in the symbol hierarchy.
      * 
      * Returns SymbolInfo for the top-level type if there is exactly one,
      * otherwise returns undefined if there are multiple or no top-level types.
      * 
      * @param symbols The document symbols to search through
-     * @param languageServerInfo Information about the detected language server
      * @param document The text document to extract XML documentation from
      * @returns SymbolInfo for the single top-level type, or undefined
      */
-    private findTopLevelType(symbols: vscode.DocumentSymbol[], languageServerInfo: LanguageServerInfo, document: vscode.TextDocument): SymbolInfo | undefined {
+    private findTopLevelType(symbols: vscode.DocumentSymbol[], document: vscode.TextDocument): SymbolInfo | undefined {
         const topLevelTypes: vscode.DocumentSymbol[] = [];
         let topLevelTypePath = "";
 
         const searchSymbols = (symbolList: vscode.DocumentSymbol[], path: string, isInsideType: boolean = false) => {
             for (const symbol of symbolList) {
-                // Use definitive type detection based on language server
+                // Use definitive type detection for Dot Rush
                 const isType = isTypeSymbol(symbol);
                 
                 if (isType && !isInsideType) {
                     // This is a top-level type (not nested inside another type)
                     topLevelTypes.push(symbol);
-                    // Use getQualifiedTypeName to handle different language servers properly
+                    // Use getQualifiedTypeName for Dot Rush namespace hierarchy
                     topLevelTypePath = getQualifiedTypeName(symbol, combinePath(path, symbol.name));
                 }
 
@@ -247,9 +242,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         // Return SymbolInfo only if there's exactly one top-level type
         if (topLevelTypes.length === 1) {
             const typeSymbol = topLevelTypes[0];
-              // Determine the fully qualified type name
-            // Prefer detail field if it contains a qualified name (C# Dev Kit)
-            // Otherwise use the constructed path (Dot Rush)
+              // Determine the fully qualified type name using Dot Rush namespace hierarchy
             const qualifiedTypeName = getQualifiedTypeName(typeSymbol, topLevelTypePath);
               // Extract XML documentation for the symbol
             const xmlDocs = extractXmlDocumentation(document, typeSymbol);
@@ -270,7 +263,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     /**
      * Get symbol information for empty range by checking if file contains only one top-level type
      */
-    private async getSymbolInfoForEmptyRange(document: vscode.TextDocument, _word: string, languageServerInfo: LanguageServerInfo): Promise<SymbolInfo | undefined> {
+    private async getSymbolInfoForEmptyRange(document: vscode.TextDocument, _word: string): Promise<SymbolInfo | undefined> {
         try {
             // Get document symbols
             const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
@@ -282,7 +275,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 return undefined;
             }
               // Find the single top-level type, returns undefined if multiple or none found
-            const topLevelType = this.findTopLevelType(symbols, languageServerInfo, document);
+            const topLevelType = this.findTopLevelType(symbols, document);
             
             if (!topLevelType) {
                 // console.log('Cannot determine symbol for empty range - multiple or no top-level types found.');
@@ -299,7 +292,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     /**
      * Get detailed symbol information using document symbol provider
      */
-    private async getSymbolInfoFromPosition(document: vscode.TextDocument, position: vscode.Position, languageServerInfo: LanguageServerInfo): Promise<SymbolInfo | undefined> {
+    private async getSymbolInfoFromPosition(document: vscode.TextDocument, position: vscode.Position): Promise<SymbolInfo | undefined> {
         try {
             // Get document symbols
             const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
@@ -311,12 +304,14 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 return undefined;
             }
 
-            return this.findSymbolAtPosition(symbols, position, "", false, languageServerInfo, document);
+            return this.findSymbolAtPosition(symbols, position, "", false, document);
         } catch (_error) {
             console.error('Error getting detailed symbol info:', _error);
             return undefined;
         }
-    }    /**
+    }
+    
+    /**
      * Find symbol at position and return SymbolInfo directly
      */
     private findSymbolAtPosition(
@@ -325,7 +320,6 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         /* the fully qualified name of the top level type that contains the symbols if exists, otherwise that path we accumulate as we go down the hierarchy */
         topLevelTypePath: string,
         isTopLevelTypeFound:boolean,
-        languageServerInfo: LanguageServerInfo,
         document: vscode.TextDocument
     ): SymbolInfo | undefined {
         for (const symbol of symbols) {
@@ -338,7 +332,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 if (symbol.children && symbol.children.length > 0) {
                     if (!isTopLevelTypeFound){
                         if(isTypeSymbol(symbol)){
-                            // For C# Dev Kit, use the detail field if available, otherwise combine path
+                            // For Dot Rush, use the constructed path from namespace hierarchy
                             updatedTopLevelTypePath = getQualifiedTypeName(symbol, combinePath(topLevelTypePath, symbol.name));
                             updatedIsTopLevelTypeFound = true;
                         } else {
@@ -347,13 +341,13 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                         }
                     }
                     
-                    const childResult = this.findSymbolAtPosition(symbol.children, position, updatedTopLevelTypePath, updatedIsTopLevelTypeFound, languageServerInfo, document);
+                    const childResult = this.findSymbolAtPosition(symbol.children, position, updatedTopLevelTypePath, updatedIsTopLevelTypeFound, document);
                     if (childResult) {
                         // Found a more specific symbol within this one
                         return childResult;
                     }
                 }
-                  // For the target symbol, determine the best qualified type name
+                // For the target symbol, determine the qualified type name using Dot Rush hierarchy
                 // If this is a type symbol, use its own qualification
                 // Otherwise, use the top-level type path we've been building
                 const qualifiedTypeName = isTypeSymbol(symbol) 
