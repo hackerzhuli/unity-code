@@ -1,7 +1,11 @@
 ## A word from author
-The Unity extension is not too bad but not that good either, and what's worse, it is not available in VS Code forks. That is why I built Unity Code Pro. So VS Code and any fork can become a real Unity IDE.
+Hi, I am a long time game developer here. I swtiched to VS Code and forks to develop games this year(2025), said my goodbye to traditional C# IDEs like Visual Studio and Rider. The Unity extension for VS Code is not too bad but not good enough either, and what's worse, it is not available in VS Code forks. That is why I built Unity Code Pro. So VS Code and its forks can become real Unity IDEs. Enable us to develop games more efficiently.
 
 **⚠️ About the name:** Sorry for the Pro at the end of the name that sounds like a paid extension, I intended to call it Unity Code, but vs marketplace doesn't allow extensions with the same name, and the name is already taken by an extension named Unity Code which was abandoned the day it was published years ago. So I had to change the name to Unity Code Pro, but it is still totally free and open source.
+
+**⚠️ Platform Support:** Currently supports Windows x64 only. For other platforms (Linux, macOS), you can build the extension yourself from the source code.
+
+**⚠️ Unity Version Requirement:** Our companion Unity package requires Unity 6.0 or higher.
 
 ## Description
 
