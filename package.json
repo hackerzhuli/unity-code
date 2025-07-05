@@ -3,7 +3,7 @@
   "displayName": "Unity Code",
   "icon": "assets/icon.png",
   "description": "Unity IDE right inside of Cursor, Windsurf and Trae!",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "hackerzhuli",
   "repository": {
     "type": "git",
@@ -130,12 +130,12 @@
         "unity-code.autoRefreshAssetDatabase": {
           "type": "boolean",
           "default": true,
-          "description": "Enable/disable automatic Unity asset database refresh when assets are saved or scripts are created/deleted, this will be automatically disabled if Hot Reload for Unity is running"
+          "description": "Automatically refresh Unity asset database when assets are saved or C# scripts are created/deleted/moved in code editor. Asset database refresh will be skipped if Hot Reload for Unity is running, tests are running or Unity is in Play Mode"
         },
         "unity-code.debugger.stepOverPropertiesAndOperators": {
           "type": "boolean",
           "default": true,
-          "description": "Step over properties and operators when debugging Unity code"
+          "description": "Step over properties and operators when debugging"
         },
         "unity-code.ignoreDuplicateLogs": {
           "type": "boolean",
@@ -147,7 +147,7 @@
           "default": 10,
           "minimum": 1,
           "maximum": 60,
-          "description": "Minimum delay in seconds between Unity asset database refreshes to prevent overwhelming Unity Editor with frequent refresh requests (1-60 seconds)"
+          "description": "Minimum delay in seconds between Unity asset database refreshes to prevent unnecessary frequent refreshes (1-60 seconds)"
         }
       },
       "testing": {

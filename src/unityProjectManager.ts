@@ -455,6 +455,12 @@ export class UnityProjectManager {
                 return;
             }
 
+            // Skip asset database refresh if tests are currently running
+            if (this.testProvider && this.testProvider.isTestsRunning()) {
+                console.log(`UnityProjectManager: Tests are running, skipping asset database refresh`);
+                return;
+            }
+
             // Check if Hot Reload is enabled before refreshing
             if (this.unityDetector) {
                 await this.unityDetector.requestUnityState();
@@ -462,12 +468,6 @@ export class UnityProjectManager {
                     console.log(`UnityProjectManager: Hot Reload is enabled, skipping asset database refresh`);
                     return;
                 }
-            }
-
-            // Skip asset database refresh if tests are currently running
-            if (this.testProvider && this.testProvider.isTestsRunning()) {
-                console.log(`UnityProjectManager: Tests are running, skipping asset database refresh`);
-                return;
             }
 
             if(!await messagingClient.refreshAssetDatabase()){
