@@ -73,6 +73,11 @@ Automatically renames Unity `.meta` files when you rename assets in your code ed
 ## Dependencies
 To use this extension, you have to first install my Unity package [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code) in Unity. Also this extension depends on [Dot Rush](https://github.com/JaneySprings/DotRush).
 
+## Installation
+You can install this extension inside your code editor or from our release assets.
+
+I can't upload this extension to VS Market Place because the extension name "unity-code" is taken there. So only if you use a code editor that uses Open VSX, you can directly install it within your code editor.
+
 ## Platform Support
 I only support Windows x64.
 
