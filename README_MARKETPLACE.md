@@ -1,8 +1,8 @@
-# Unity Code - Unity IDE right inside Cursor, Windsurf and Trae!
+# Unity Code - Professional Unity Development in VS Code
 
 🚀 **Supercharge your Unity development workflow with Unity Code!**
 
-Unity Code is a powerful Visual Studio Code extension that brings professional Unity development tools directly to your favorite code editor. Whether you're using VS Code, Cursor, Windsurf, or Trae, Unity Code delivers a seamless Unity development experience without the limitations of official extensions.
+Unity Code is a powerful Visual Studio Code extension that brings professional Unity development tools directly to your code editor. Unity Code delivers a seamless Unity development experience with comprehensive features for modern Unity development.
 
 > **📋 Platform Support:** Currently supports Windows x64 only. For other platforms (Linux, macOS), you can build the extension yourself from the source code.
 > 
@@ -10,21 +10,20 @@ Unity Code is a powerful Visual Studio Code extension that brings professional U
 
 ## 🎮 Perfect for Unity Developers Who Want:
 
-- **🤖 AI-Powered Development** - Use advanced AI-powered editors like Cursor, Windsurf, or Trae with full Unity IDE capabilities
 - **🚀 Faster development cycles** with integrated testing and debugging
 - **📖 Better code documentation** with one click access to Unity and .NET docs
-- **🔧 Streamlined workflow** without constantly switching between an AI-powered editor and a powerful IDE for Unity like Rider
+- **🔧 Streamlined workflow** without constantly switching between VS Code and Unity Editor
 - **💰 Cost-effective solution** that doesn't require expensive subscriptions
-- **🎯 Editor flexibility** to use their preferred VS Code-based environment
 - **⚡ Lightweight tooling** that doesn't slow down their development machine
+- **🎯 Professional Unity development** directly in VS Code
 
 ## ✨ Why Choose Unity Code?
 
 ### 🆓 **Completely Free & Open Source**
-No subscriptions, no licensing fees, no restrictions. Unity Code is 100% free and open source, giving you full control over your development environment.
+No subscriptions, no licensing fees. Unity Code is 100% free and open source, giving you full control over your development environment.
 
-### 🔓 **Editor Freedom**
-Unlike official Unity extensions that lock you into specific editors, Unity Code works across multiple VS Code-based editors, giving you the freedom to choose your preferred development environment.
+### 🔧 **Professional Unity Tools**
+Unity Code provides comprehensive Unity development features that enhance your VS Code experience with professional-grade Unity tooling.
 
 ### ⚡ **Lightweight & Fast**
 Built from the ground up for performance, Unity Code provides powerful features without bloating your editor or slowing down your workflow.
@@ -32,16 +31,16 @@ Built from the ground up for performance, Unity Code provides powerful features 
 ## 🎯 Awesome Features
 
 ### 🧪 **Unity Test Explorer**
-- **Run tests directly in your editor** - No more switching between Unity and your code editor
+- **Run tests directly in VS Code** - No more switching between Unity and your code editor
 - **Inline test results** - See pass/fail status right where your test methods are defined
 - **Clickable stack traces** - Click on stack trace line for failed test to go to the source line where it fails instantly.
 - **One-click test execution** - Run individual tests or entire test suites with a single click
-- **Run tests reliably** - You can click run test when Unity is compiling, and it will run the test right after compilation finishes, not even Rider can do this reliably.
+- **Run tests reliably** - You can click run test when Unity is compiling, and it will run the test right after compilation finishes
 
-![Unity Tests](./assets/Run%20Unity%20Tests%20In%20Trae.png)
+![Unity Tests](./assets/Run%20Unity%20Tests%20In%20VS%20Code.png)
 
 ### 📊 **Unity Console Integration**
-- **Real-time Unity logs** - See Unity logs directly in your code editor
+- **Real-time Unity logs** - See Unity logs directly in VS Code
 - **Clickable stack traces** - Navigate directly to the source of the logs
 - **Log filtering** - Search specific words to find the logs you need
 
@@ -51,9 +50,9 @@ Built from the ground up for performance, Unity Code provides powerful features 
 - **Seamless debugging experience** - Attach to Unity Editor with one click
 - **Full breakpoint support** - Set breakpoints, inspect variables, and step through code
 - **MonoDebugger integration** - Professional-grade debugging capabilities
-- **No external tools required** - Everything you need built right into your editor
+- **No external tools required** - Everything you need built right into VS Code
 
-![Debug](./assets/Debug%20in%20Trae.png)
+![Debug](./assets/Debug%20in%20VS%20Code.png)
 
 ### 📚 **Intelligent Documentation**
 - **Hover documentation** - Show links for C# documentation on mouse hover
@@ -65,7 +64,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 
 ### 🔍 **Advanced Code Analysis**
 - **Roslyn-powered static analysis** - Unity-specific code analysis that understands Unity patterns and best practices
-- **Real-time problem detection** - See issues, warnings, and suggestions directly in your editor as you type
+- **Real-time problem detection** - See issues, warnings, and suggestions directly in VS Code as you type
 - **Unity-aware diagnostics** - Specialized analyzers for Unity-specific code patterns and performance optimizations
 - **Instant feedback** - No need to compile or switch to Unity to see code issues
 
@@ -81,22 +80,22 @@ Built from the ground up for performance, Unity Code provides powerful features 
 
 ## 🌟 What Unity Developers Are Saying:
 
-*"Finally, a Unity extension that just works! No more licensing headaches or editor restrictions."*
+*"Finally, a Unity extension that just works!"*
 
-*"The integrated test runner is a game-changer. I can run my Unity tests without leaving my AI IDE."*
+*"The integrated test runner is a game-changer. I can run my Unity tests without leaving VS Code."*
 
 *"The hover documentation links saves me so much time."*
 
 ## 🚀 Get Started in Minutes
 
-1. **Install Unity Code** from Open VSX
+1. **Install Unity Code** from marketplace in your code editor
 2. **Install the companion Unity package in your Unity project** - [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code)
 3. **Start coding!** - All features work automatically once installed
 
 ## 🎯 Ready to Transform Your Unity Development?
 
-Join Unity developers who have already upgraded their workflow with Unity Code. Experience the freedom of choice, the power of integrated tools, and the joy of efficient Unity development.
+Join Unity developers who have already upgraded their workflow with Unity Code. Experience the power of integrated tools and the joy of efficient Unity development directly in VS Code.
 
 ---
 
-*Unity Code - Where Unity IDE meets AI IDE* 🎮✨
+*Unity Code - Professional Unity Development in VS Code* 🎮✨

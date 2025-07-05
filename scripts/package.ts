@@ -68,7 +68,7 @@ const BACKUP_PATH = '.vscodeignore.backup';
 /** Path to the main README file */
 const README_PATH = 'README.md';
 /** Path to the extension-specific README file */
-const README_EXTENSION_PATH = 'README_EXTENSION.md';
+const README_EXTENSION_PATH = 'README_MARKETPLACE.md';
 /** Backup path for the original README file */
 const README_BACKUP_PATH = 'README.md.backup';
 
