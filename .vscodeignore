@@ -17,3 +17,9 @@ scripts/**
 README.md.backup
 README_EXTENSION.md
 node_modules
+# Temporary platform-specific exclusions
+bin/win_arm64/**
+bin/linux_x64/**
+bin/linux_arm64/**
+bin/mac_x64/**
+bin/mac_arm64/**

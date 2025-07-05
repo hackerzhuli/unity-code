@@ -1,9 +1,9 @@
 {
-  "name": "unity-code",
-  "displayName": "Unity Code",
+  "name": "unity-code-pro",
+  "displayName": "Unity Code Pro",
   "icon": "assets/icon.png",
-  "description": "Unity IDE right inside of VS Code, Cursor, and Trae!",
-  "version": "1.0.1",
+  "description": "Unity IDE right inside of VS Code!",
+  "version": "1.0.2",
   "publisher": "hackerzhuli",
   "repository": {
     "type": "git",
@@ -45,11 +45,11 @@
     "commands": [
       {
         "command": "unity-code.refreshTests",
-        "title": "Unity Code: Refresh Tests"
+        "title": "Unity Code Pro: Refresh Tests"
       },
       {
         "command": "unity-code.showUnityConsole",
-        "title": "Unity Code: Show Unity Console"
+        "title": "Unity Code Pro: Show Unity Console"
       }
     ],
     "viewsContainers": {
@@ -125,7 +125,7 @@
       }
     ],
     "configuration": {
-      "title": "Unity Code",
+      "title": "Unity Code Pro",
       "properties": {
         "unity-code.autoRefreshAssetDatabase": {
           "type": "boolean",

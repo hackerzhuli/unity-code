@@ -1,9 +1,10 @@
 # Changelog
 
-All notable changes to the Unity Code extension will be documented in this file.
+## [1.0.2] - 2025-07-05
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### 🚀 Features
+
+-  rebranding: Rename from Unity Code to Unity Code Pro because of name conflicts with an existing vs code extension.
 
 ## [1.0.1] - 2025-07-05
 
@@ -19,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 Initial Release
 
-First stable release of Unity Code - bringing Unity IDE capabilities to VS Code-based code editors.
+First stable release of Unity Code Pro - bringing Unity IDE capabilities to VS Code-based code editors.
 
 ### Added
 - 🧪 **Unity Test Explorer** - Run Unity tests directly in editor with inline results

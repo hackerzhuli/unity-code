@@ -1,8 +1,8 @@
-# Unity Code - Professional Unity Development in VS Code
+# Unity Code Pro - Professional Unity Development in VS Code
 
-🚀 **Supercharge your Unity development workflow with Unity Code!**
+🚀 **Supercharge your Unity development workflow with Unity Code Pro!**
 
-Unity Code is a powerful Visual Studio Code extension that brings professional Unity development tools directly to your code editor. Unity Code delivers a seamless Unity development experience with comprehensive features for modern Unity development.
+Unity Code Pro is a powerful Visual Studio Code extension that brings professional Unity development tools directly to your code editor. Unity Code Pro delivers a seamless Unity development experience with comprehensive features for modern Unity development.
 
 > **📋 Platform Support:** Currently supports Windows x64 only. For other platforms (Linux, macOS), you can build the extension yourself from the source code.
 > 
@@ -17,16 +17,16 @@ Unity Code is a powerful Visual Studio Code extension that brings professional U
 - **⚡ Lightweight tooling** that doesn't slow down their development machine
 - **🎯 Professional Unity development** directly in VS Code
 
-## ✨ Why Choose Unity Code?
+## ✨ Why Choose Unity Code Pro?
 
 ### 🆓 **Completely Free & Open Source**
-No subscriptions, no licensing fees. Unity Code is 100% free and open source, giving you full control over your development environment.
+No subscriptions, no licensing fees. Unity Code Pro is 100% free and open source, giving you full control over your development environment.
 
 ### 🔧 **Professional Unity Tools**
-Unity Code provides comprehensive Unity development features that enhance your VS Code experience with professional-grade Unity tooling.
+Unity Code Pro provides comprehensive Unity development features that enhance your VS Code experience with professional-grade Unity tooling.
 
 ### ⚡ **Lightweight & Fast**
-Built from the ground up for performance, Unity Code provides powerful features without bloating your editor or slowing down your workflow.
+Built from the ground up for performance, Unity Code Pro provides powerful features without bloating your editor or slowing down your workflow.
 
 ## 🎯 Awesome Features
 
@@ -37,7 +37,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 - **One-click test execution** - Run individual tests or entire test suites with a single click
 - **Run tests reliably** - You can click run test when Unity is compiling, and it will run the test right after compilation finishes
 
-![Unity Tests](./assets/Run%20Unity%20Tests%20In%20Trae.png)
+![Unity Tests](./assets/Run%20Unity%20Tests%20In%20VS%20Code.png)
 
 ### 📊 **Unity Console Integration**
 - **Real-time Unity logs** - See Unity logs directly in VS Code
@@ -52,7 +52,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 - **MonoDebugger integration** - Professional-grade debugging capabilities
 - **No external tools required** - Everything you need built right into VS Code
 
-![Debug](./assets/Debug%20in%20Trae.png)
+![Debug](./assets/Debug%20in%20VS%20Code.png)
 
 ### 📚 **Intelligent Documentation**
 - **Hover documentation** - Show links for C# documentation on mouse hover
@@ -88,14 +88,14 @@ Built from the ground up for performance, Unity Code provides powerful features 
 
 ## 🚀 Get Started in Minutes
 
-1. **Install Unity Code** from marketplace in your code editor
+1. **Install Unity Code Pro** from marketplace in your code editor
 2. **Install the companion Unity package in your Unity project** - [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code)
 3. **Start coding!** - All features work automatically once installed
 
 ## 🎯 Ready to Transform Your Unity Development?
 
-Join Unity developers who have already upgraded their workflow with Unity Code. Experience the power of integrated tools and the joy of efficient Unity development directly in VS Code.
+Join Unity developers who have already upgraded their workflow with Unity Code Pro. Experience the power of integrated tools and the joy of efficient Unity development directly in VS Code.
 
 ---
 
-*Unity Code - Professional Unity Development in VS Code* 🎮✨
+*Unity Code Pro - Professional Unity Development in VS Code* 🎮✨
