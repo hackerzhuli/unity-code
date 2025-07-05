@@ -9,10 +9,9 @@ Hi, I am a long time game developer here. I swtiched to VS Code and forks to dev
 
 ## Description
 
-Unity Code Pro is a powerful Visual Studio Code extension that brings professional Unity development tools directly to your favorite code editor. Whether you're using VS Code, Cursor, Windsurf, or Trae, Unity Code Pro delivers a seamless Unity development experience with integrated testing, debugging, and intelligent documentation features.
+Unity Code Pro is a powerful Visual Studio Code extension that brings professional Unity development tools directly to your favorite code editor. Whether you're using VS Code, Cursor, or Trae, Unity Code Pro delivers a seamless Unity development experience with integrated testing, debugging, and intelligent documentation features.
 
 **🎯 Perfect for developers who want:**
-- **🤖 AI-Powered Development** - Use advanced AI-powered editors like Cursor, Windsurf, or Trae with full Unity IDE capabilities
 - **🚀 Faster development cycles** with integrated testing and debugging
 - **📖 Better code documentation** with one-click access to Unity and .NET docs
 - **💰 Cost-effective solution** that doesn't require expensive subscriptions
