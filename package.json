@@ -2,7 +2,7 @@
   "name": "unity-code",
   "displayName": "Unity Code",
   "icon": "assets/icon.png",
-  "description": "Unity IDE right inside of VS Code!",
+  "description": "Unity IDE right inside of VS Code, Cursor, and Trae!",
   "version": "1.0.1",
   "publisher": "hackerzhuli",
   "repository": {
