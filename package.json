@@ -2,7 +2,7 @@
   "name": "unity-code",
   "displayName": "Unity Code",
   "icon": "assets/icon.png",
-  "description": "Unity IDE right inside of Cursor, Windsurf and Trae!",
+  "description": "Unity IDE right inside of VS Code!",
   "version": "1.0.1",
   "publisher": "hackerzhuli",
   "repository": {
