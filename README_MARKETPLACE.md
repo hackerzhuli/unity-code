@@ -37,7 +37,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 - **One-click test execution** - Run individual tests or entire test suites with a single click
 - **Run tests reliably** - You can click run test when Unity is compiling, and it will run the test right after compilation finishes
 
-![Unity Tests](./assets/Run%20Unity%20Tests%20In%20VS%20Code.png)
+![Unity Tests](./assets/Run%20Unity%20Tests%20In%20Trae.png)
 
 ### 📊 **Unity Console Integration**
 - **Real-time Unity logs** - See Unity logs directly in VS Code
@@ -52,7 +52,7 @@ Built from the ground up for performance, Unity Code provides powerful features 
 - **MonoDebugger integration** - Professional-grade debugging capabilities
 - **No external tools required** - Everything you need built right into VS Code
 
-![Debug](./assets/Debug%20in%20VS%20Code.png)
+![Debug](./assets/Debug%20in%20Trae.png)
 
 ### 📚 **Intelligent Documentation**
 - **Hover documentation** - Show links for C# documentation on mouse hover
