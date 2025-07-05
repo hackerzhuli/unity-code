@@ -8,7 +8,7 @@ Unity Code Pro is a powerful Visual Studio Code extension that brings profession
 > 
 > **⚠️ Unity Version Requirement:** Our companion Unity package requires Unity 6.0 or higher.
 >
-> **⚠️ About the name:** Sorry for the Pro at the end of the name that seems odd, I intended to call it Unity Code, but vs marketplace doesn't allow extensions with the same name, and the name Unity Code is already taken.
+> **⚠️ About the name:** Sorry for the Pro at the end of the name that sounds like a paid extension, I intended to call it Unity Code, but vs marketplace doesn't allow extensions with the same name, and the name Unity Code is already taken. So Pro it is, but it is still totally free and open source!
 
 ## 🎮 Perfect for Unity Developers Who Want:
 
