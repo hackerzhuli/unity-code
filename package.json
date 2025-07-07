@@ -3,7 +3,7 @@
   "displayName": "Unity Code Pro",
   "icon": "assets/icon.png",
   "description": "Unity IDE right inside of VS Code!",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "hackerzhuli",
   "repository": {
     "type": "git",
