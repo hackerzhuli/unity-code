@@ -23,3 +23,5 @@ bin/linux_x64/**
 bin/linux_arm64/**
 bin/mac_x64/**
 bin/mac_arm64/**
+# assets that don't need to be included in build
+assets/ignore/**

@@ -30,7 +30,7 @@ Displays Unity tests in your code editor's Testing window. Run tests right where
 - **One-click test execution** - Run individual tests or entire test suites with a single click
 - **Run tests reliably** - You can click run test when Unity is compiling, and it will run the test right after compilation finishes
 
-![Unity Tests](./assets/Run%20Unity%20Tests%20In%20Trae.png)
+![Unity Tests](./assets/ignore/Run%20Unity%20Tests%20In%20Trae.png)
 
 ### 📊 Unity Console
 See Unity logs in your code editor with clickable stack trace!
@@ -49,7 +49,7 @@ Attach to Unity Editor from your code editor using the integrated MonoDebugger a
 - **MonoDebugger integration** - Professional-grade debugging capabilities
 - **No external tools required** - Everything you need built right into your editor
 
-![Debug](./assets/Debug%20in%20Trae.png)
+![Debug](./assets/ignore/Debug%20in%20Trae.png)
 
 ### 📚 Intelligent Documentation
 Shows beautiful markdown from xml docs for in project classes and members. Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET.
