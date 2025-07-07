@@ -4,7 +4,9 @@
 
 Unity Code Pro is a powerful Visual Studio Code extension that brings professional Unity development tools directly to your code editor. Unity Code Pro delivers a seamless Unity development experience with comprehensive features for modern Unity development.
 
-> **📋 Platform Support:** Currently supports Windows x64 only. For other platforms (Linux, macOS), you can build the extension yourself from the source code.
+> **⚠️ Dependency:** This extension depends on [Dot Rush](https://github.com/JaneySprings/DotRush), which is a C# language server. If you're using C# extension or C# dev kit extension, you have to disable them in order for this extension to function correctly.
+> 
+> **⚠️ Platform Support:** Currently supports Windows x64 only. For other platforms (Linux, macOS), you can build the extension yourself from the source code.
 > 
 > **⚠️ Unity Version Requirement:** Our companion Unity package requires Unity 6.0 or higher.
 

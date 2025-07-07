@@ -3,6 +3,8 @@ Hi, I am a long time game developer here. I swtiched to VS Code and forks to dev
 
 **⚠️ About the name:** Sorry for the Pro at the end of the name that sounds like a paid extension, I intended to call it Unity Code, but vs marketplace doesn't allow extensions with the same name, and the name is already taken by an extension named Unity Code which was abandoned the day it was published years ago. So I had to change the name to Unity Code Pro, but it is still totally free and open source.
 
+**⚠️ Dependency:** This extension depends on [Dot Rush](https://github.com/JaneySprings/DotRush), which is a C# language server. If you're using C# extension or C# dev kit extension, you have to disable them in order for this extension to function correctly.
+
 **⚠️ Platform Support:** Currently supports Windows x64 only. For other platforms (Linux, macOS), you can build the extension yourself from the source code.
 
 **⚠️ Unity Version Requirement:** Our companion Unity package requires Unity 6.0 or higher.
