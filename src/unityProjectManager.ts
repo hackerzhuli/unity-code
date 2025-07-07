@@ -324,6 +324,16 @@ export class UnityProjectManager {
         if (triggerFilePath) {
             await this.refreshAssetDatabaseIfNeeded(triggerFilePath, 'deleted', this.messagingClient);
         }
+
+        // delete meta files after we finished other operations
+        // because meta files may be needed for other operations to work correctly
+        // ideally we should only delete directories and let Unity handle delete other meta files
+        // because Unity will recreate directory if you don't delete the meta file, which will make user delete directory in VS Code impossible
+        // but we can't know if it is a directory because it is already deleted, checking meta file content is error prone
+        // so we just delete everything, files and directories
+        for (const fileUri of event.files) {
+            await this.deleteMetaFileIfExists(fileUri.fsPath);
+        }
     }
 
     /**
@@ -368,6 +378,30 @@ export class UnityProjectManager {
                 console.log(`UnityProjectManager: detected asset ${oldFilePath} is renamed to ${newFilePath}, so Renamed meta file ${oldMetaPath} to ${newMetaPath}`);
             } catch (error) {
                 console.error(`UnityProjectManager: Error renaming meta file: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+    }
+
+    /**
+     * Delete the meta file for a given file or directory if it exists
+     * This is important for directory deletions to prevent Unity from recreating the directory
+     * @param filePath The file or directory path whose meta file should be deleted
+     */
+    private async deleteMetaFileIfExists(filePath: string): Promise<void> {
+        const metaFilePath = `${filePath}.meta`;
+
+        try {
+            // Check if the meta file exists
+            await fs.promises.access(metaFilePath, fs.constants.F_OK);
+            
+            // Delete the meta file
+            await fs.promises.unlink(metaFilePath);
+            console.log(`UnityProjectManager: Deleted meta file for deleted asset: ${metaFilePath}`);
+        } catch (error) {
+            // Meta file doesn't exist or couldn't be deleted - this is not necessarily an error
+            // Only log if it's not a "file not found" error
+            if (error instanceof Error && 'code' in error && error.code !== 'ENOENT') {
+                console.error(`UnityProjectManager: Error deleting meta file ${metaFilePath}: ${error.message}`);
             }
         }
     }
