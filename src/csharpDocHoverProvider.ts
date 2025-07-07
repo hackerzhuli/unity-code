@@ -624,26 +624,25 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
      * Create hover content with documentation link using type name
      */
     private createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo?: DocLinkInfo): vscode.Hover {
-        const hoverContent = new vscode.MarkdownString();        // Show XML documentation if available (at the top)
-        const hasXmlDocs = symbolInfo.xmlDocs && symbolInfo.xmlDocs.trim().length > 0;
-        if (hasXmlDocs) {
-            // console.log(`abc Adding XML docs for symbol: ${symbolInfo.name}, docs is: ${symbolInfo.xmlDocs}`);
-            // console.log(`abc XML docs length: ${symbolInfo.xmlDocs.length}, trimmed length: ${symbolInfo.xmlDocs.trim().length}`);
-            
-            // Convert XML docs to Markdown format
-            const markdownDocs = xmlToMarkdown(symbolInfo.xmlDocs!, ["summary", "returns", "param", "exception"]);
-            // console.log(`abc Converted to markdown: ${markdownDocs}`);
-            if(markdownDocs){
-                hoverContent.appendMarkdown(markdownDocs);
-            }
-        } else {
-            // console.log(`abc No XML docs found for symbol: ${symbolInfo.name}, xmlDocs value:`, symbolInfo.xmlDocs);
+        const hoverContent = new vscode.MarkdownString();
+        // Show XML documentation if available (at the top)
+        // console.log(`abc Adding XML docs for symbol: ${symbolInfo.name}, docs is: ${symbolInfo.xmlDocs}`);
+        // console.log(`abc XML docs length: ${symbolInfo.xmlDocs.length}, trimmed length: ${symbolInfo.xmlDocs.trim().length}`);
+        
+        let addedXmlDocs = false;
+
+        // Convert XML docs to Markdown format
+        const markdownDocs = xmlToMarkdown(symbolInfo.xmlDocs!, ["summary", "returns", "param", "exception"]);
+        // console.log(`abc Converted to markdown: ${markdownDocs}`);
+        if(markdownDocs){
+            hoverContent.appendMarkdown(markdownDocs);
+            addedXmlDocs = true;
         }
         
         // Only show documentation link information if available
         if (docLinkInfo) {
             // Add separator only if we have both XML docs and doc links
-            if (hasXmlDocs) {
+            if (addedXmlDocs) {
                 hoverContent.appendMarkdown('\n\n---\n\n');
             }
             // Add package information if available
