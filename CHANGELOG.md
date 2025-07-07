@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3] - 2025-07-07
+
+### 🔧 Improvements & Bug Fixes
+
+### Fixed
+- 🛠️ **Documentation Hover** - Fixed unnecessary separator display in hover tooltips when only XML documentation is present without documentation links. 
+- 🛠️ **Documentation Hover** - Now ignoring summary, returns, param, and exception tags from XML docs in hover display because Dot Rush already covered these.
+
 ## [1.0.2] - 2025-07-05
 
 ### 🚀 Features

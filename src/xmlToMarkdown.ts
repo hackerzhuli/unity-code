@@ -20,9 +20,10 @@ interface XmlAttributeNode extends XmlNode {
  * The input should already have the /// markers removed.
  * 
  * @param xmlDocs The XML documentation string (without /// markers)
+ * @param ignoredTags Optional array of tag names to ignore at the top level
  * @returns The converted Markdown string
  */
-export function xmlToMarkdown(xmlDocs: string): string {
+export function xmlToMarkdown(xmlDocs: string, ignoredTags: string[] = []): string {
     if (!xmlDocs || xmlDocs.trim().length === 0) {
         return '';
     }
@@ -51,10 +52,28 @@ export function xmlToMarkdown(xmlDocs: string): string {
             rootContent = result.root;
         }
         
-        // If rootContent is an array, apply grouping logic at the top level
+        // If rootContent is an array, filter out ignored tags and apply grouping logic at the top level
         if (Array.isArray(rootContent)) {
-            const groupedContent = groupConsecutiveElements(rootContent);
+            // Filter out ignored tags at the top level
+            const filteredContent = rootContent.filter((item: unknown) => {
+                if (typeof item === 'object' && item !== null) {
+                    const keys = Object.keys(item as Record<string, unknown>);
+                    const tagName = keys.find(key => key !== ':@');
+                    return !tagName || !ignoredTags.includes(tagName.toLowerCase());
+                }
+                return true;
+            });
+            const groupedContent = groupConsecutiveElements(filteredContent);
             rootContent = groupedContent;
+        } else if (typeof rootContent === 'object' && rootContent !== null) {
+            // For single object, filter out ignored tags
+            const filteredContent: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(rootContent as Record<string, unknown>)) {
+                if (key === ':@' || !ignoredTags.includes(key.toLowerCase())) {
+                    filteredContent[key] = value;
+                }
+            }
+            rootContent = filteredContent;
         }
           // Process the parsed XML and convert to Markdown
         const markdown = processXmlNode(rootContent);
@@ -137,10 +156,10 @@ function processXmlElement(tagName: string, node: unknown): string {
         ? (node as Record<string, unknown>)[tagName] 
         : node;
       switch (tagName.toLowerCase()) {        case 'summary':
-            return `## Summary\n\n${processContent(content)}\n\n`;
+            return `### Summary\n\n${processContent(content)}\n\n`;
             
         case 'remarks':
-            return `## Remarks\n\n${processContent(content)}\n\n`;        case 'param': {
+            return `### Remarks\n\n${processContent(content)}\n\n`;        case 'param': {
             // Individual param (not grouped) - use old format for multi-line content
             const paramName = extractAttribute(node, 'name');
             const paramText = processContent(content);
@@ -148,7 +167,7 @@ function processXmlElement(tagName: string, node: unknown): string {
         }
             
         case 'returns':
-            return `## Return Value\n\n${processContent(content)}\n\n`;
+            return `### Return Value\n\n${processContent(content)}\n\n`;
             
         case 'exception': {
             // Individual exception (not grouped) - use old format for multi-line content
@@ -158,9 +177,9 @@ function processXmlElement(tagName: string, node: unknown): string {
         }
             
         case 'value':
-            return `## Value\n\n${processContent(content)}\n\n`;
+            return `### Value\n\n${processContent(content)}\n\n`;
               case 'example':
-            return `## Example\n\n${processContent(content)}\n\n`;        case 'code': {
+            return `### Example\n\n${processContent(content)}\n\n`;        case 'code': {
             const codeContent = processContent(content);
             const normalizedCode = normalizeCodeIndentation(codeContent);
             return `\`\`\`\n${normalizedCode}\n\`\`\``;
@@ -671,7 +690,7 @@ function processSpecialGroup(group: Record<string, unknown>): string {
             return `- **\`${paramName}\`**: ${paramText}`;
         });
         
-        return `## Parameters\n\n${items.join('\n')}\n\n`;
+        return `### Parameters\n\n${items.join('\n')}\n\n`;
     } else if (groupType === 'exception') {
         const items = elements.map(element => {
             const exceptionType = extractAttribute(element, 'cref');
@@ -682,7 +701,7 @@ function processSpecialGroup(group: Record<string, unknown>): string {
             return `- **\`${exceptionType}\`**: ${exceptionText}`;
         });
         
-        return `## Exceptions\n\n${items.join('\n')}\n\n`;
+        return `### Exceptions\n\n${items.join('\n')}\n\n`;
     }
     
     return '';

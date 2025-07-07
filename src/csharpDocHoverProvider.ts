@@ -625,22 +625,27 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
      */
     private createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo?: DocLinkInfo): vscode.Hover {
         const hoverContent = new vscode.MarkdownString();        // Show XML documentation if available (at the top)
-        if (symbolInfo.xmlDocs && symbolInfo.xmlDocs.trim().length > 0) {
+        const hasXmlDocs = symbolInfo.xmlDocs && symbolInfo.xmlDocs.trim().length > 0;
+        if (hasXmlDocs) {
             // console.log(`abc Adding XML docs for symbol: ${symbolInfo.name}, docs is: ${symbolInfo.xmlDocs}`);
             // console.log(`abc XML docs length: ${symbolInfo.xmlDocs.length}, trimmed length: ${symbolInfo.xmlDocs.trim().length}`);
             
             // Convert XML docs to Markdown format
-            const markdownDocs = xmlToMarkdown(symbolInfo.xmlDocs);
+            const markdownDocs = xmlToMarkdown(symbolInfo.xmlDocs!, ["summary", "returns", "param", "exception"]);
             // console.log(`abc Converted to markdown: ${markdownDocs}`);
-            
-            hoverContent.appendMarkdown(markdownDocs);
-            hoverContent.appendMarkdown('\n\n---\n\n'); // Add a separator
+            if(markdownDocs){
+                hoverContent.appendMarkdown(markdownDocs);
+            }
         } else {
             // console.log(`abc No XML docs found for symbol: ${symbolInfo.name}, xmlDocs value:`, symbolInfo.xmlDocs);
         }
         
         // Only show documentation link information if available
         if (docLinkInfo) {
+            // Add separator only if we have both XML docs and doc links
+            if (hasXmlDocs) {
+                hoverContent.appendMarkdown('\n\n---\n\n');
+            }
             // Add package information if available
             if (docLinkInfo.packageInfo) {
                 let embedded = '';
