@@ -34,4 +34,6 @@
 - [x] 34. ~~Now that we do include analyzers in our package, but it is not working as expected, roslyn from Dot Rush doesn't seem to use it. Should I report an issue?~~
 - [x] 35. After I run tests, the run button didn't reappear as expected. When we run tests, the run button disappear when running. But when I stop tests, the run button should appear. But it doesn't, in Cursor and Windsurf, but it does in Trae and VS Code. It can be a problem of VS Code itself, because Cursor and Windsurf use older version of VS Code(cursor 1.96, windsurf 1.99, trae 1.100, vs code 1.101). It turns out that we can still run tests when you right click on them and there is run test even though the button disappeared, this seems to be a UI bug. So not a problem.
 - [x] 36. Don't refresh asset database when Unity is in Play mode. But this is not a big problem because Unity can be set to prevent recompiling when in Play mode(it can even be the default behavior).
-- [ ] 37. Unity package should remove launch items when an extension is not installed for the items that is likely added by itself
+- [x] 37. ~~Unity package should remove launch items when an extension is not installed for the items that is likely added by itself~~
+- [ ] 38. When deleting a directory, we probabily do want to directly handle .meta file deletion, because if we don't, then Unity will recreate the directory because it sees the .meta file, then it will appear to the user that he can't delete a directory
+- [ ] 39. Dot Rush is adding remarks block soon and we should remove that part too.
