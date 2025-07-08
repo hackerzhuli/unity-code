@@ -1,25 +1,41 @@
 {
   "name": "unity-code-pro",
   "displayName": "Unity Code Pro",
+  "author": "hackerzhuli",
   "icon": "assets/icon.png",
   "description": "Unity IDE right inside of VS Code!",
   "version": "1.0.4",
   "publisher": "hackerzhuli",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/hackerzhuli/unity-code.git"
   },
+  "categories": [
+		"Programming Languages",
+		"Debuggers",
+		"Other"
+	],
+	"keywords": [
+		"gaming",
+		"unity",
+		"unity3d",
+		"debugger",
+		"C#",
+		"dotnet",
+		"scripting"
+	],
+  "capabilities": {
+		"virtualWorkspaces": false,
+		"untrustedWorkspaces": {
+			"supported": false
+		}
+	},
   "engines": {
     "vscode": "^1.96.0"
   },
   "extensionDependencies": [
     "nromanov.dotrush"
-  ],
-  "categories": [
-    "Other",
-    "Debuggers",
-    "Programming Languages",
-    "Testing"
   ],
   "activationEvents": [
     "workspaceContains:ProjectSettings/ProjectVersion.txt"
