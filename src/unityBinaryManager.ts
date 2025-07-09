@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as dgram from 'dgram';
 import { spawn, ChildProcess } from 'child_process';
-import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, ErrorAction, CloseAction } from 'vscode-languageclient/node';
 import { EventEmitter } from './eventEmitter';
 import { NativeBinaryLocator } from './nativeBinaryLocator';
 import { wait } from './asyncUtils';
@@ -218,7 +218,7 @@ export class UnityBinaryManager {
         console.log(`UnityBinaryManager: Starting native binary: ${binaryPath}`);
 
         // Start binary with both UDP detection and language server capabilities
-        this.nativeBinary = spawn(binaryPath, [this.projectPath, '--dual-mode'], {
+        this.nativeBinary = spawn(binaryPath, [this.projectPath], {
             stdio: ['pipe', 'pipe', 'pipe']
         });
 
@@ -276,13 +276,15 @@ export class UnityBinaryManager {
         }
 
         try {
-            console.log('UnityBinaryManager: Initializing language server...');
+            console.log('UnityBinaryManager: Initializing language server using existing process...');
 
-            // Configure server options to use the existing binary process
-            const serverOptions: ServerOptions = {
-                command: this.nativeBinaryLocator.getUnityCodeNativePath()!,
-                args: [this.projectPath, '--language-server'],
-                transport: TransportKind.stdio
+            // Use the existing dual-mode binary process for language server
+            const serverOptions: ServerOptions = () => {
+                console.log('UnityBinaryManager: Reusing existing binary process for language server');
+                return Promise.resolve({
+                    process: this.nativeBinary!,
+                    detached: false
+                });
             };
 
             // Configure client options
