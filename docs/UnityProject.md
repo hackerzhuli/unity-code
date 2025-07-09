@@ -9,7 +9,7 @@ Library/
 Packages/
 ```
 
-The core is that `ProjectVersion.txt` is used to store the Unity version of the project.
+The core is that `ProjectVersion.txt` is used to store the Unity version of the project(the format is YAML).
 
 Example:
 ```

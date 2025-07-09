@@ -287,13 +287,13 @@ export class UnityBinaryManager {
 
             // Configure client options
             const clientOptions: LanguageClientOptions = {
-                // Register the server for C# documents
+                // Register the server for Unity-related documents
                 documentSelector: [
-                    { scheme: 'file', language: 'csharp' }
+                    { scheme: 'file', pattern: '**/*.uss' }
                 ],
                 synchronize: {
-                    // Notify the server about file changes to C# files
-                    fileEvents: vscode.workspace.createFileSystemWatcher('**/*.cs')
+                    // Notify the server about file changes to Unity files
+                    fileEvents: vscode.workspace.createFileSystemWatcher('**/*.uss')
                 },
                 outputChannelName: 'Unity Language Server',
                 // Additional client options
