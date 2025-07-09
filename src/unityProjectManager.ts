@@ -5,7 +5,7 @@ import { parse as parseYaml } from 'yaml';
 import { isInsideDirectory as isInDirectory, normalizePath } from './utils';
 import { UnityMessagingClient } from './unityMessagingClient';
 import { UnityTestProvider } from './unityTestProvider';
-import { UnityDetector } from './unityDetector';
+import { UnityBinaryManager } from './unityBinaryManager';
 
 /**
  * Unity Project Manager class for centralized Unity project detection and management
@@ -19,7 +19,7 @@ export class UnityProjectManager {
     private isInitialized: boolean = false;
     private messagingClient?: UnityMessagingClient;
     private testProvider?: UnityTestProvider;
-    private unityDetector?: UnityDetector;
+    private unityBinaryManager?: UnityBinaryManager;
     private disposables: vscode.Disposable[] = [];
     private lastRefreshTime: number = 0;
     private pendingRefreshTimeout?: NodeJS.Timeout;
@@ -192,18 +192,18 @@ export class UnityProjectManager {
      * @param context The extension context for managing disposables
      * @param messagingClient The Unity messaging client for asset database refresh
      * @param testProvider Optional test provider to check if tests are running
-     * @param unityDetector Optional Unity detector for checking Unity state
+     * @param unityBinaryManager Optional Unity binary manager for checking Unity state
      */
     public registerEventListeners(
         context: vscode.ExtensionContext,
         messagingClient?: UnityMessagingClient,
         testProvider?: UnityTestProvider,
-        unityDetector?: UnityDetector
+        unityBinaryManager?: UnityBinaryManager
     ): void {
         // Store references for use in event handlers
         this.messagingClient = messagingClient;
         this.testProvider = testProvider;
-        this.unityDetector = unityDetector;
+        this.unityBinaryManager = unityBinaryManager;
 
         // Register file system event listeners
         const renameDisposable = vscode.workspace.onDidRenameFiles(this.onDidRenameFiles.bind(this));
@@ -496,9 +496,9 @@ export class UnityProjectManager {
             }
 
             // Check if Hot Reload is enabled before refreshing
-            if (this.unityDetector) {
-                await this.unityDetector.requestUnityState();
-                if (this.unityDetector.isHotReloadEnabled) {
+            if (this.unityBinaryManager) {
+                await this.unityBinaryManager.requestUnityState();
+                if (this.unityBinaryManager.isHotReloadEnabled) {
                     console.log(`UnityProjectManager: Hot Reload is enabled, skipping asset database refresh`);
                     return;
                 }

@@ -2,7 +2,7 @@
 Native binaries are included in bin directory. Their source code is not in this project, and they will be built and copied to the bin directory here.
 
 They are:
-- `unity_code_native` - The binary that does Unity Editor detection
+- `unity_code_native` - The binary that does Unity Editor detection and serves as a language server
 - `MonoDebugger` - The debugger for Unity games
 
 ## Directory Structure
@@ -71,4 +71,54 @@ The locator automatically detects the current platform and architecture, then at
 
 ### Integration
 
-The `UnityDetector` class now uses `NativeBinaryLocator` to find the `unity_code_native` binary, providing better error handling and platform compatibility.
+The `UnityBinaryManager` class now uses `NativeBinaryLocator` to find the `unity_code_native` binary, providing better error handling and platform compatibility.
+
+## Unity Binary Manager
+
+The Unity Binary Manager provides a unified interface to `unity_code_native`, combining both Unity detection and language server capabilities in a single process.
+
+### Features
+
+- **Unified Process**: Single binary instance for both UDP detection and LSP
+- **C# Language Features**: IntelliSense, hover information, and diagnostics via LSP
+- **Unity Detection**: Real-time Unity Editor state monitoring via UDP
+- **Automatic Management**: Starts and stops with Unity project detection
+- **Resource Efficient**: Eliminates the need for separate processes
+
+### Usage
+
+The binary manager is automatically initialized when:
+1. A Unity project is detected in the workspace
+2. The `unity_code_native` binary is available
+3. The extension activates
+
+### Implementation Details
+
+#### Dual Mode Operation
+- **UDP Mode**: For Unity Editor detection and state monitoring
+- **LSP Mode**: For C# language server functionality
+- **Unified Process**: Both modes run in the same binary instance
+
+#### Server Arguments
+- `projectPath`: Path to the Unity project root
+- `--dual-mode`: Flag to enable both UDP and LSP functionality
+
+#### Document Selector (LSP)
+- **Scheme**: `file`
+- **Language**: `csharp`
+
+#### File Watching (LSP)
+- Monitors `**/*.cs` files for changes
+- Automatically synchronizes with the language server
+
+#### Transport
+- **UDP**: For Unity detection messages
+- **stdio**: For language server communication
+
+### Integration with Unity Detection
+
+The `UnityBinaryManager` uses a single `unity_code_native` binary process that provides both:
+- **UDP Detection**: Communicates via UDP for real-time Unity Editor state monitoring
+- **Language Server**: Communicates via LSP for C# language features
+
+The binary handles both protocols simultaneously, allowing for comprehensive Unity development support.

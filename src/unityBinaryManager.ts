@@ -1,5 +1,7 @@
+import * as vscode from 'vscode';
 import * as dgram from 'dgram';
 import { spawn, ChildProcess } from 'child_process';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 import { EventEmitter } from './eventEmitter';
 import { NativeBinaryLocator } from './nativeBinaryLocator';
 import { wait } from './asyncUtils';
@@ -30,20 +32,30 @@ export interface UnityDetectionEvent {
 }
 
 /**
- * Active Unity detector that communicates with native binary via UDP
- * Monitors Unity Editor state and emits events when state changes
+ * Unified Unity Binary Manager
+ * Manages a single unity_code_native process that provides both:
+ * 1. Unity Editor detection via UDP
+ * 2. Language Server Protocol support
  */
-export class UnityDetector {
+export class UnityBinaryManager {
+    // Binary process management
     private nativeBinary: ChildProcess | null = null;
+    private nativeBinaryLocator: NativeBinaryLocator;
+    private projectPath: string;
+    private isStarted: boolean = false;
+
+    // UDP detection functionality
     private udpClient: dgram.Socket | null = null;
     private port: number = 0;
-    private isConnected: boolean = false;
+    private isUdpConnected: boolean = false;
     private keepAliveInterval: NodeJS.Timeout | null = null;
     private currentState: ProcessState = { UnityProcessId: 0, IsHotReloadEnabled: false };
-    private projectPath: string;
-    private nativeBinaryLocator: NativeBinaryLocator;
     private nextRequestId: number = 1;
     private pendingRequests: Map<number, { resolve: (value: ProcessState | null) => void; timeout: NodeJS.Timeout }> = new Map();
+
+    // Language server functionality
+    private languageClient: LanguageClient | null = null;
+    private isLanguageServerStarted: boolean = false;
 
     /**
      * Constructor
@@ -80,48 +92,78 @@ export class UnityDetector {
     }
 
     /**
-     * Start the Unity detector
-     * Launches native binary and establishes UDP connection
+     * Check if the language server is running
+     */
+    public get isLanguageServerRunning(): boolean {
+        return this.isLanguageServerStarted && this.languageClient !== null;
+    }
+
+    /**
+     * Get the underlying language client instance
+     */
+    public get client(): LanguageClient | null {
+        return this.languageClient;
+    }
+
+    /**
+     * Start the unified Unity binary manager
+     * Launches a single binary process with both UDP and LSP capabilities
      */
     public async start(): Promise<void> {
-        console.log('UnityDetector: Starting Unity detection...');
+        if (this.isStarted) {
+            console.log('UnityBinaryManager: Already started');
+            return;
+        }
 
         // Check if unity_code_native binary exists
         const binaryPath = this.nativeBinaryLocator.getUnityCodeNativePath();
         if (!binaryPath) {
-            console.log('UnityDetector: unity_code_native binary not found, Unity detection disabled');
+            console.log('UnityBinaryManager: unity_code_native binary not found, Unity features disabled');
             return;
         }
 
         try {
+            console.log('UnityBinaryManager: Starting unified Unity binary...');
+
+            // Start the binary process with both UDP and LSP support
             await this.startNativeBinary();
-            await this.connectUdp();
-            this.startKeepAlive();
+            
+            // Initialize UDP detection
+            await this.initializeUdpDetection();
+            
+            // Initialize language server
+            await this.initializeLanguageServer();
 
-            // Request initial state
-            await this.requestUnityState();
-
-            console.log('UnityDetector: Successfully started Unity detection');
+            this.isStarted = true;
+            console.log('UnityBinaryManager: Successfully started unified Unity binary');
         } catch (error) {
-            console.error('UnityDetector: Failed to start:', error);
+            console.error('UnityBinaryManager: Failed to start:', error);
             this.stop();
             throw error;
         }
     }
 
     /**
-     * Stop the Unity detector
-     * Closes UDP connection and terminates native binary
+     * Stop the unified Unity binary manager
      */
-    public stop() {
-        console.log('UnityDetector: Stopping Unity detection...');
+    public async stop(): Promise<void> {
+        if (!this.isStarted) {
+            return;
+        }
 
-        this.stopKeepAlive();
-        this.cleanupPendingRequests();
-        this.closeUdp();
+        console.log('UnityBinaryManager: Stopping unified Unity binary...');
+
+        // Stop language server
+        await this.stopLanguageServer();
+        
+        // Stop UDP detection
+        this.stopUdpDetection();
+        
+        // Stop binary process
         this.stopNativeBinary();
 
-        console.log('UnityDetector: Unity detection stopped');
+        this.isStarted = false;
+        console.log('UnityBinaryManager: Unified Unity binary stopped');
     }
 
     /**
@@ -130,8 +172,8 @@ export class UnityDetector {
      * @returns Promise that resolves to ProcessState or null if timeout
      */
     public async requestUnityState(timeoutMs: number = 1000): Promise<ProcessState | null> {
-        if (!this.isConnected) {
-            throw new Error('Not connected to native binary');
+        if (!this.isUdpConnected) {
+            throw new Error('UDP not connected to native binary');
         }
 
         const requestId = this.nextRequestId++;
@@ -147,7 +189,7 @@ export class UnityDetector {
             this.pendingRequests.set(requestId, { resolve, timeout });
 
             // Send the request
-            this.sendMessage(MessageType.GetUnityState, '', requestId).catch(() => {
+            this.sendUdpMessage(MessageType.GetUnityState, '', requestId).catch(() => {
                 // If sending fails, clean up and resolve with null
                 this.pendingRequests.delete(requestId);
                 clearTimeout(timeout);
@@ -157,7 +199,14 @@ export class UnityDetector {
     }
 
     /**
-     * Start the native binary process
+     * Dispose of the binary manager
+     */
+    public dispose(): void {
+        this.stop();
+    }
+
+    /**
+     * Start the native binary process with both UDP and LSP support
      */
     private async startNativeBinary(): Promise<void> {
         const binaryPath = this.nativeBinaryLocator.getUnityCodeNativePath();
@@ -166,20 +215,21 @@ export class UnityDetector {
             throw new Error('unity_code_native binary not found');
         }
 
-        console.log(`UnityDetector: Starting native binary: ${binaryPath}`);
+        console.log(`UnityBinaryManager: Starting native binary: ${binaryPath}`);
 
-        this.nativeBinary = spawn(binaryPath, [this.projectPath], {
+        // Start binary with both UDP detection and language server capabilities
+        this.nativeBinary = spawn(binaryPath, [this.projectPath, '--dual-mode'], {
             stdio: ['pipe', 'pipe', 'pipe']
         });
 
         this.port = 50000 + (this.nativeBinary.pid ?? 0) % 1000;
 
         this.nativeBinary.on('error', (error) => {
-            console.error('UnityDetector: Native binary error:', error);
+            console.error('UnityBinaryManager: Native binary error:', error);
         });
 
         this.nativeBinary.on('exit', (code) => {
-            console.log(`UnityDetector: Native binary exited with code ${code}`);
+            console.log(`UnityBinaryManager: Native binary exited with code ${code}`);
             this.nativeBinary = null;
         });
 
@@ -190,14 +240,106 @@ export class UnityDetector {
     /**
      * Stop the native binary process
      */
-    private stopNativeBinary() {
+    private stopNativeBinary(): void {
         if (this.nativeBinary) {
             this.nativeBinary.kill();
             this.nativeBinary = null;
         }
     }
 
+    /**
+     * Initialize UDP detection functionality
+     */
+    private async initializeUdpDetection(): Promise<void> {
+        await this.connectUdp();
+        this.startKeepAlive();
+        
+        // Request initial state
+        await this.requestUnityState();
+    }
 
+    /**
+     * Stop UDP detection functionality
+     */
+    private stopUdpDetection(): void {
+        this.stopKeepAlive();
+        this.cleanupPendingRequests();
+        this.closeUdp();
+    }
+
+    /**
+     * Initialize language server functionality
+     */
+    private async initializeLanguageServer(): Promise<void> {
+        if (!this.nativeBinary) {
+            throw new Error('Native binary not started');
+        }
+
+        try {
+            console.log('UnityBinaryManager: Initializing language server...');
+
+            // Configure server options to use the existing binary process
+            const serverOptions: ServerOptions = {
+                command: this.nativeBinaryLocator.getUnityCodeNativePath()!,
+                args: [this.projectPath, '--language-server'],
+                transport: TransportKind.stdio
+            };
+
+            // Configure client options
+            const clientOptions: LanguageClientOptions = {
+                // Register the server for C# documents
+                documentSelector: [
+                    { scheme: 'file', language: 'csharp' }
+                ],
+                synchronize: {
+                    // Notify the server about file changes to C# files
+                    fileEvents: vscode.workspace.createFileSystemWatcher('**/*.cs')
+                },
+                outputChannelName: 'Unity Language Server',
+                // Additional client options
+                initializationOptions: {
+                    projectPath: this.projectPath
+                }
+            };
+
+            // Create the language client
+            this.languageClient = new LanguageClient(
+                'unity-language-server',
+                'Unity Language Server',
+                serverOptions,
+                clientOptions
+            );
+
+            // Start the language client
+            await this.languageClient.start();
+            this.isLanguageServerStarted = true;
+
+            console.log('UnityBinaryManager: Language server initialized successfully');
+        } catch (error) {
+            console.error('UnityBinaryManager: Failed to initialize language server:', error);
+            this.languageClient = null;
+            throw error;
+        }
+    }
+
+    /**
+     * Stop language server functionality
+     */
+    private async stopLanguageServer(): Promise<void> {
+        if (!this.languageClient || !this.isLanguageServerStarted) {
+            return;
+        }
+
+        try {
+            console.log('UnityBinaryManager: Stopping language server...');
+            await this.languageClient.stop();
+            this.languageClient = null;
+            this.isLanguageServerStarted = false;
+            console.log('UnityBinaryManager: Language server stopped');
+        } catch (error) {
+            console.error('UnityBinaryManager: Error stopping language server:', error);
+        }
+    }
 
     /**
      * Connect to the native binary via UDP
@@ -207,17 +349,17 @@ export class UnityDetector {
             this.udpClient = dgram.createSocket('udp4');
 
             this.udpClient.on('message', (msg) => {
-                this.handleMessage(msg);
+                this.handleUdpMessage(msg);
             });
 
             this.udpClient.on('error', (error) => {
-                console.error('UnityDetector: UDP error:', error);
+                console.error('UnityBinaryManager: UDP error:', error);
                 reject(error);
             });
 
             this.udpClient.bind(() => {
-                this.isConnected = true;
-                console.log(`UnityDetector: UDP client connected on port ${this.port}`);
+                this.isUdpConnected = true;
+                console.log(`UnityBinaryManager: UDP client connected on port ${this.port}`);
                 resolve();
             });
         });
@@ -230,7 +372,7 @@ export class UnityDetector {
         if (this.udpClient) {
             this.udpClient.close();
             this.udpClient = null;
-            this.isConnected = false;
+            this.isUdpConnected = false;
         }
     }
 
@@ -240,9 +382,9 @@ export class UnityDetector {
     private startKeepAlive(): void {
         this.keepAliveInterval = setInterval(async () => {
             try {
-                await this.sendMessage(MessageType.None, '');
+                await this.sendUdpMessage(MessageType.None, '');
             } catch (error) {
-                console.error('UnityDetector: Keep-alive failed:', error);
+                console.error('UnityBinaryManager: Keep-alive failed:', error);
             }
         }, 25000); // Send every 25 seconds (before 30 second timeout)
     }
@@ -269,10 +411,10 @@ export class UnityDetector {
     }
 
     /**
-     * Send message to native binary
+     * Send UDP message to native binary
      */
-    private async sendMessage(messageType: MessageType, payload: string, requestId: number = 0): Promise<void> {
-        if (!this.udpClient || !this.isConnected) {
+    private async sendUdpMessage(messageType: MessageType, payload: string, requestId: number = 0): Promise<void> {
+        if (!this.udpClient || !this.isUdpConnected) {
             throw new Error('UDP client not connected');
         }
 
@@ -297,11 +439,11 @@ export class UnityDetector {
     }
 
     /**
-     * Handle incoming message from native binary
+     * Handle incoming UDP message from native binary
      */
-    private handleMessage(buffer: Buffer): void {
+    private handleUdpMessage(buffer: Buffer): void {
         if (buffer.length < 9) {
-            console.error('UnityDetector: Invalid message length');
+            console.error('UnityBinaryManager: Invalid message length');
             return;
         }
 
@@ -310,13 +452,11 @@ export class UnityDetector {
         const payloadLength = buffer.readUInt32LE(5);
 
         if (buffer.length < 9 + payloadLength) {
-            console.error('UnityDetector: Message payload length mismatch');
+            console.error('UnityBinaryManager: Message payload length mismatch');
             return;
         }
 
         const payload = buffer.subarray(9, 9 + payloadLength).toString('utf8');
-
-        //console.log(`UnityDetector: Received message type ${messageType}, request ID ${requestId} with payload: ${payload}`);
 
         switch (messageType) {
             case MessageType.GetUnityState:
@@ -326,7 +466,7 @@ export class UnityDetector {
                 // Keep-alive response, no action needed
                 break;
             default:
-                console.warn(`UnityDetector: Unknown message type: ${messageType}`);
+                console.warn(`UnityBinaryManager: Unknown message type: ${messageType}`);
         }
     }
 
@@ -353,7 +493,7 @@ export class UnityDetector {
                 previousState.IsHotReloadEnabled !== newState.IsHotReloadEnabled;
 
             if (stateChanged) {
-                console.log(`UnityDetector: Unity state changed - PID: ${newState.UnityProcessId}, Hot Reload: ${newState.IsHotReloadEnabled}`);
+                console.log(`UnityBinaryManager: Unity state changed - PID: ${newState.UnityProcessId}, Hot Reload: ${newState.IsHotReloadEnabled}`);
 
                 const eventData: UnityDetectionEvent = {
                     isRunning: newState.UnityProcessId > 0,
@@ -364,7 +504,7 @@ export class UnityDetector {
                 this.onUnityStateChanged.emit(eventData);
             }
         } catch (error) {
-            console.error('UnityDetector: Failed to parse Unity state message:', error);
+            console.error('UnityBinaryManager: Failed to parse Unity state message:', error);
 
             // If this was a response to a pending request, resolve with null
             if (requestId > 0 && this.pendingRequests.has(requestId)) {

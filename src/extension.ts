@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { CSharpDocHoverProvider } from './csharpDocHoverProvider';
-import { UnityDetector } from './unityDetector';
 import { UnityTestProvider } from './unityTestProvider';
 import { UnityMessagingClient } from './unityMessagingClient';
 import { UnityPackageHelper } from './unityPackageHelper';
@@ -9,9 +8,10 @@ import { UnityConsoleManager } from './unityConsole';
 import { NativeBinaryLocator } from './nativeBinaryLocator';
 import { UnityDebuggerManager } from './debugger';
 import { StatusBar } from './statusBar';
+import { UnityBinaryManager } from './unityBinaryManager';
 
 // Global variables for Unity services
-let globalUnityDetector: UnityDetector | null = null;
+let globalUnityBinaryManager: UnityBinaryManager | null = null;
 let globalUnityTestProvider: UnityTestProvider | null = null;
 let globalUnityMessagingClient: UnityMessagingClient | null = null;
 let globalUnityPackageHelper: UnityPackageHelper | null = null;
@@ -87,9 +87,9 @@ async function registerEventListeners(context: vscode.ExtensionContext): Promise
 
     // Register the command to show Hot Reload status
     const showHotReloadStatusDisposable = vscode.commands.registerCommand('unity-code.showHotReloadStatus', function () {
-        if (globalUnityDetector && globalUnityPackageHelper) {
+        if (globalUnityBinaryManager && globalUnityPackageHelper) {
             const isHotReloadInstalled = globalUnityPackageHelper.getPackageByName('com.singularitygroup.hotreload') !== undefined;
-            const isHotReloadRunning = globalUnityDetector.isHotReloadEnabled;
+            const isHotReloadRunning = globalUnityBinaryManager.isHotReloadEnabled;
 
             let statusMessage = '';
             if (isHotReloadInstalled) {
@@ -220,15 +220,16 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
         return;
     }
 
-    globalUnityDetector = new UnityDetector(unityProjectPath, globalNativeBinaryLocator);
+    // Initialize unified Unity Binary Manager (handles both UDP detection and language server)
+    globalUnityBinaryManager = new UnityBinaryManager(unityProjectPath, globalNativeBinaryLocator);
 
-    globalUnityMessagingClient = new UnityMessagingClient(globalUnityDetector);
+    globalUnityMessagingClient = new UnityMessagingClient(globalUnityBinaryManager);
 
     // Initialize test provider for Unity projects
     globalUnityTestProvider = new UnityTestProvider(context, globalUnityMessagingClient, globalUnityProjectManager!);
 
     // Register file event listeners in UnityProjectManager
-    globalUnityProjectManager!.registerEventListeners(context, globalUnityMessagingClient, globalUnityTestProvider, globalUnityDetector);
+    globalUnityProjectManager!.registerEventListeners(context, globalUnityMessagingClient, globalUnityTestProvider, globalUnityBinaryManager);
 
     // Initialize package helper for Unity projects
     const packageHelper = new UnityPackageHelper(unityProjectPath);
@@ -240,7 +241,13 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
     // Register Unity log message handlers
     registerUnityLogHandlers(context);
 
-    await globalUnityDetector.start();
+    // Start unified Unity Binary Manager (both UDP detection and language server)
+    try {
+        await globalUnityBinaryManager.start();
+        console.log('UnityCode: Unity Binary Manager started successfully');
+    } catch (error) {
+        console.error('UnityCode: Failed to start Unity Binary Manager:', error);
+    }
 
     // Initialize package helper and setup compilation finished handler
     if (globalUnityPackageHelper) {
@@ -253,7 +260,7 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
         globalStatusBar = new StatusBar(
             context,
             globalUnityPackageHelper,
-            globalUnityDetector,
+            globalUnityBinaryManager,
             globalUnityMessagingClient
         );
     } else {
@@ -263,13 +270,13 @@ async function initializeUnityServices(context: vscode.ExtensionContext): Promis
 
 function cleanup() {
     globalUnityTestProvider?.dispose();
-    globalUnityDetector?.stop();
+    globalUnityBinaryManager?.dispose();
     globalUnityMessagingClient?.dispose();
     globalUnityConsoleManager?.dispose();
     globalUnityDebuggerManager?.deactivate();
     globalStatusBar?.dispose();
     globalUnityProjectManager?.dispose();
-    globalUnityDetector = null;
+    globalUnityBinaryManager = null;
     globalUnityMessagingClient = null;
     globalUnityTestProvider = null;
     globalUnityPackageHelper = null;

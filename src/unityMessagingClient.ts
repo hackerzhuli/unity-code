@@ -1,6 +1,6 @@
 import * as dgram from 'dgram';
 import * as net from 'net';
-import { UnityDetector, UnityDetectionEvent } from './unityDetector';
+import { UnityBinaryManager, UnityDetectionEvent } from './unityBinaryManager';
 import { logWithLimit } from './utils';
 import { EventEmitter } from './eventEmitter';
 import { wait } from './asyncUtils';
@@ -272,10 +272,10 @@ export class UnityMessagingClient {
     private connectedProcessId: number | null = null;
 
     /**
-     * Unity detector instance for active process monitoring
+     * Unity binary manager instance for active process monitoring
      * @private
      */
-    private unityDetector: UnityDetector;
+    private unityBinaryManager: UnityBinaryManager;
 
     /**
      * Event emitter for connection status changes
@@ -316,12 +316,12 @@ export class UnityMessagingClient {
      */
     public readonly onErrorMessage = new EventEmitter<string>();
 
-    constructor(unityDetector: UnityDetector) {
-        this.unityDetector = unityDetector;
+    constructor(unityBinaryManager: UnityBinaryManager) {
+        this.unityBinaryManager = unityBinaryManager;
         this.setupSocket();
 
-        if (this.unityDetector) {
-            this.initializeUnityDetectorEvents();
+        if (this.unityBinaryManager) {
+            this.initializeUnityBinaryManagerEvents();
         }
 
         // Initialize default rate limits for specific message types
@@ -329,16 +329,16 @@ export class UnityMessagingClient {
     }
 
     /**
-     * Initialize Unity detector events for active monitoring
+     * Initialize Unity binary manager events for active monitoring
      */
-    private async initializeUnityDetectorEvents(): Promise<void> {
-        if (!this.unityDetector) {
+    private async initializeUnityBinaryManagerEvents(): Promise<void> {
+        if (!this.unityBinaryManager) {
             return;
         }
 
         try {
             // Subscribe to Unity state changes
-            this.unityDetector.onUnityStateChanged.subscribe((event: UnityDetectionEvent) => {
+            this.unityBinaryManager.onUnityStateChanged.subscribe((event: UnityDetectionEvent) => {
                 console.log(`UnityMessagingClient: Unity state changed - Running: ${event.isRunning}, PID: ${event.processId}, Hot Reload: ${event.isHotReloadEnabled}`);
 
                 if (event.isRunning && event.processId) {
@@ -356,9 +356,9 @@ export class UnityMessagingClient {
                 }
             });
 
-            console.log('UnityMessagingClient: Unity detector events initialized and started');
+            console.log('UnityMessagingClient: Unity binary manager events initialized and started');
         } catch (error) {
-            console.error('UnityMessagingClient: Failed to initialize Unity detector events:', error);
+            console.error('UnityMessagingClient: Failed to initialize Unity binary manager events:', error);
         }
     }
 

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { UnityPackageHelper } from './unityPackageHelper';
-import { UnityDetector } from './unityDetector';
+import { UnityBinaryManager } from './unityBinaryManager';
 import { UnityMessagingClient } from './unityMessagingClient';
 
 /**
@@ -11,19 +11,19 @@ export class StatusBar {
     private hotReloadStatusBarItem: vscode.StatusBarItem | null = null;
     private context: vscode.ExtensionContext;
     private packageHelper: UnityPackageHelper | null = null;
-    private unityDetector: UnityDetector | null = null;
+    private unityBinaryManager: UnityBinaryManager | null = null;
     private messagingClient: UnityMessagingClient | null = null;
     private hotReloadPollingTimer: NodeJS.Timeout | null = null;
 
     constructor(
         context: vscode.ExtensionContext,
         packageHelper: UnityPackageHelper | null,
-        unityDetector: UnityDetector | null,
+        unityBinaryManager: UnityBinaryManager | null,
         messagingClient: UnityMessagingClient | null
     ) {
         this.context = context;
         this.packageHelper = packageHelper;
-        this.unityDetector = unityDetector;
+        this.unityBinaryManager = unityBinaryManager;
         this.messagingClient = messagingClient;
 
         // Subscribe to package updates to handle Hot Reload status bar changes
@@ -146,15 +146,15 @@ export class StatusBar {
         });
 
         // Subscribe to Unity state changes to update Hot Reload status
-        if (this.unityDetector) {
-            this.unityDetector.onUnityStateChanged.subscribe((event) => {
+        if (this.unityBinaryManager) {
+            this.unityBinaryManager.onUnityStateChanged.subscribe((event) => {
                 if (this.hotReloadStatusBarItem) {
                     this.updateHotReloadStatus(event.isHotReloadEnabled || false);
                 }
             });
 
             // Update Hot Reload status bar immediately with current state
-            this.updateHotReloadStatus(this.unityDetector.isHotReloadEnabled);
+            this.updateHotReloadStatus(this.unityBinaryManager.isHotReloadEnabled);
         }
     }
 
@@ -182,22 +182,22 @@ export class StatusBar {
                     console.log('Status Bar: Creating Hot Reload status bar (package installed, no status bar)');
                     this.createHotReloadStatusBar();
 
-                    // Start monitoring if Unity detector is available
-                    if (this.unityDetector) {
-                        console.log('Status Bar: Setting up Unity detector monitoring for Hot Reload');
-                        this.unityDetector.onUnityStateChanged.subscribe((event) => {
+                    // Start monitoring if Unity binary manager is available
+                    if (this.unityBinaryManager) {
+                        console.log('Status Bar: Setting up Unity binary manager monitoring for Hot Reload');
+                        this.unityBinaryManager.onUnityStateChanged.subscribe((event) => {
                             if (this.hotReloadStatusBarItem) {
                                 this.updateHotReloadStatus(event.isHotReloadEnabled || false);
                             }
                         });
 
                         // Update immediately with current state
-                        this.updateHotReloadStatus(this.unityDetector.isHotReloadEnabled);
+                        this.updateHotReloadStatus(this.unityBinaryManager.isHotReloadEnabled);
 
                         // Start polling for hot reload status every 3 seconds
                         this.startHotReloadPolling();
                     } else {
-                        console.log('Status Bar: No Unity detector available for Hot Reload monitoring');
+                        console.log('Status Bar: No Unity binary manager available for Hot Reload monitoring');
                     }
 
                     console.log('Status Bar: Hot Reload package installed, status bar created');
@@ -212,8 +212,8 @@ export class StatusBar {
             }
 
             // If package is installed and status bar exists, just update the status
-            if (isInstalled && hasStatusBar && this.unityDetector) {
-                this.updateHotReloadStatus(this.unityDetector.isHotReloadEnabled);
+            if (isInstalled && hasStatusBar && this.unityBinaryManager) {
+                this.updateHotReloadStatus(this.unityBinaryManager.isHotReloadEnabled);
             }
 
         } catch (error) {
@@ -232,14 +232,14 @@ export class StatusBar {
         console.log('Status Bar: Starting hot reload status polling (every 5 seconds)');
 
         this.hotReloadPollingTimer = setInterval(async () => {
-            if (!this.unityDetector || !this.hotReloadStatusBarItem) {
+            if (!this.unityBinaryManager || !this.hotReloadStatusBarItem) {
                 return;
             }
 
             try {
                 // We don't need to do anything about the return value here
                 // Because we have subscribed to onUnityStateChanged event 
-                await this.unityDetector.requestUnityState(1000);
+                await this.unityBinaryManager.requestUnityState(1000);
             } catch (error) {
                 console.error('Status Bar: Error polling hot reload status:', error);
             }

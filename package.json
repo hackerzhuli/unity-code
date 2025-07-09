@@ -23,7 +23,10 @@
 		"debugger",
 		"C#",
 		"dotnet",
-		"scripting"
+		"scripting",
+		"unity-integration",
+		"asset-management",
+		"hot-reload"
 	],
   "capabilities": {
 		"virtualWorkspaces": false,
@@ -199,6 +202,7 @@
   },
   "dependencies": {
     "fast-xml-parser": "^5.2.5",
+    "vscode-languageclient": "^9.0.1",
     "yaml": "^2.6.1"
   },
   "devDependencies": {
