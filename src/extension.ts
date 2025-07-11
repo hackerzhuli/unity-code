@@ -26,9 +26,6 @@ let globalUnityDebuggerManager: UnityDebuggerManager | null = null;
 // Global status bar manager
 let globalStatusBar: StatusBar | null = null;
 
-
-
-
 /**
  * Register Unity log message handlers to display logs in Unity Console WebView
  */
