@@ -148,6 +148,33 @@ function processXmlNode(node: unknown): string {
 }
 
 /**
+ * Check if content is effectively empty (null, undefined, empty string, or only whitespace)
+ */
+function isContentEmpty(content: unknown): boolean {
+    if (!content) {
+        return true;
+    }
+    
+    if (typeof content === 'string') {
+        return content.trim().length === 0;
+    }
+    
+    if (Array.isArray(content)) {
+        return content.length === 0 || content.every(item => isContentEmpty(item));
+    }
+    
+    if (typeof content === 'object') {
+        const node = content as XmlNode;
+        // Check if it only has attributes but no actual content
+        const hasText = node['#text'] !== undefined && String(node['#text']).trim().length > 0;
+        const hasElements = Object.keys(node).some(key => !key.startsWith('@_') && key !== '#text' && key !== ':@');
+        return !hasText && !hasElements;
+    }
+    
+    return false;
+}
+
+/**
  * Process a specific XML element and convert it to Markdown
  */
 function processXmlElement(tagName: string, node: unknown): string {
@@ -155,6 +182,18 @@ function processXmlElement(tagName: string, node: unknown): string {
     const content = typeof node === 'object' && node !== null 
         ? (node as Record<string, unknown>)[tagName] 
         : node;
+    
+    // Skip empty top-level tags
+    if (isContentEmpty(content)) {
+        switch (tagName.toLowerCase()) {
+            case 'summary':
+            case 'remarks':
+            case 'returns':
+            case 'value':
+            case 'example':
+                return '';
+        }
+    }
       switch (tagName.toLowerCase()) {        case 'summary':
             return `### Summary\n\n${processContent(content)}\n\n`;
             

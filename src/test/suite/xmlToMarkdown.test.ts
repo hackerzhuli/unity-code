@@ -9,6 +9,28 @@ describe('xmlToMarkdown', () => {
     it('should convert empty or null input', () => {
         assert.strictEqual(xmlToMarkdown(''), '');
         assert.strictEqual(xmlToMarkdown('   '), '');
+    });
+
+    it('should exclude empty top-level tags from output', () => {
+        const input = `<summary>
+This is a valid summary.
+</summary>
+<returns></returns>
+<remarks></remarks>
+<value>   </value>
+<example></example>`;
+        
+        const result = xmlToMarkdown(input);
+        
+        // Should include the non-empty summary
+        assert.ok(result.includes('### Summary'));
+        assert.ok(result.includes('This is a valid summary.'));
+        
+        // Should NOT include empty tags
+        assert.ok(!result.includes('### Return Value'));
+        assert.ok(!result.includes('### Remarks'));
+        assert.ok(!result.includes('### Value'));
+        assert.ok(!result.includes('### Example'));
     });    it('should convert simple summary tag', () => {
         const input = `<summary>
 Every class and member should have a one sentence
