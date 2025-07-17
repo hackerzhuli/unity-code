@@ -5,7 +5,7 @@ import { UnityProjectManager } from './unityProjectManager';
 import { UnityBinaryManager } from './unityBinaryManager';
 import { getQualifiedTypeName, isTypeSymbol, extractXmlDocumentation } from './languageServerUtils';
 import { xmlToMarkdown } from './xmlToMarkdown';
-import { extractMajorMinorVersion } from './utils';
+import { extractMajorMinorVersion, normalizePath } from './utils';
 
 /**
  * Hover provider that adds documentation links to C# symbols
@@ -739,18 +739,24 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         let addedXmlDocs = false;
         let xmlDocsToUse = symbolInfo.xmlDocs;
 
-        // Fallback mechanism: if no XML docs and symbol is from decompiled file, request from native binary
-        let isFallback = false;
-        if ((!xmlDocsToUse || xmlDocsToUse.trim().length === 0) && 
-            symbolInfo.isFromDecompiledFile && 
+        // Fallback mechanism: if no XML docs and symbol is from decompiled file or the xml docs contains inheritdoc, then request from native binary
+        let isRequestedNativeBinary = false;
+        if ((((!xmlDocsToUse || xmlDocsToUse.trim().length === 0) && 
+            symbolInfo.isFromDecompiledFile) || xmlDocsToUse?.includes('inheritdoc')) && 
             this.unityBinaryManager) {
             try {
-                isFallback = true;
+                isRequestedNativeBinary = true;
+                var path = symbolInfo.definitionLocation?.uri.fsPath;
+                
+                if (path){
+                    path = await normalizePath(path);
+                }
+
                 console.log(`CSharpDocHoverProvider: Requesting docs for symbol: ${symbolInfo.fullSymbolName}`);
                 const response = await this.unityBinaryManager.requestSymbolDocs(
                     symbolInfo.fullSymbolName,
                     symbolInfo.assemblyName,
-                    symbolInfo.definitionLocation?.uri.fsPath
+                    path
                 );
                 if (response && response.Documentation) {
                     xmlDocsToUse = response.Documentation;
@@ -761,7 +767,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         }
 
         // Convert XML docs to Markdown format
-        const markdownDocs = xmlToMarkdown(xmlDocsToUse!, isFallback? []: ["summary", "returns", "param", "exception"]);
+        const markdownDocs = xmlToMarkdown(xmlDocsToUse!, isRequestedNativeBinary? []: ["summary", "returns", "param", "exception"]);
         // console.log(`abc Converted to markdown: ${markdownDocs}`);
         if(markdownDocs){
             hoverContent.appendMarkdown(markdownDocs);
