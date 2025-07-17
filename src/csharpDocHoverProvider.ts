@@ -278,9 +278,9 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
     }
 
     /**
-     * Get symbol information for empty range by checking if file contains only one top-level type
+     * Get symbol information for empty range by searching the entire hierarchy for matching symbol name
      */
-    private async getSymbolInfoForEmptyRange(document: vscode.TextDocument, _word: string): Promise<SymbolInfo | undefined> {
+    private async getSymbolInfoForEmptyRange(document: vscode.TextDocument, word: string): Promise<SymbolInfo | undefined> {
         try {
             // Get document symbols
             const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
@@ -291,7 +291,14 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             if (!symbols || symbols.length === 0) {
                 return undefined;
             }
-            // Find the single top-level type, returns undefined if multiple or none found
+            
+            // First, try to find a symbol with matching name in the entire hierarchy
+            const matchingSymbol = this.findSymbolByName(symbols, word, "", false, document, "");
+            if (matchingSymbol) {
+                return matchingSymbol;
+            }
+            
+            // Fallback: Find the single top-level type, returns undefined if multiple or none found
             const topLevelType = this.findTopLevelType(symbols, document);
             
             if (!topLevelType) {
@@ -328,6 +335,83 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         }
     }
     
+    /**
+     * Update top level type path based on symbol type
+     */
+    private updateTopLevelTypePath(symbol: vscode.DocumentSymbol, topLevelTypePath: string, isInTopLevelType: boolean): string {
+        if (!isInTopLevelType) {
+            if (isTypeSymbol(symbol)) {
+                // For Dot Rush, use the constructed path from namespace hierarchy
+                return getQualifiedTypeName(symbol, combinePath(topLevelTypePath, symbol.name));
+            } else {
+                // Not a type yet, continue building the path
+                return combinePath(topLevelTypePath, symbol.name);
+            }
+        }
+        return topLevelTypePath;
+    }
+
+    /**
+     * Find symbol by name in the entire hierarchy
+     */
+    private findSymbolByName(
+        symbols: vscode.DocumentSymbol[],
+        targetName: string,
+        topLevelTypePath: string,
+        isInTopLevelType: boolean,
+        document: vscode.TextDocument,
+        fullPath: string
+    ): SymbolInfo | undefined {
+        for (const symbol of symbols) {
+            const updatedTopLevelTypePath = this.updateTopLevelTypePath(symbol, topLevelTypePath, isInTopLevelType);
+            const currentFullPath = fullPath ? `${fullPath}.${symbol.name}` : symbol.name;
+            
+            // Check if current symbol name matches (for methods, compare only the part before '(')
+            const symbolNameToCompare = symbol.kind === vscode.SymbolKind.Method ? 
+                symbol.name.split('(')[0] : symbol.name;
+            
+            if (symbolNameToCompare === targetName) {
+                // For the target symbol, determine the qualified type name using Dot Rush hierarchy
+                // If this is a type symbol, use its own qualification
+                // Otherwise, use the top-level type path we've been building
+                const qualifiedTypeName = isTypeSymbol(symbol) 
+                    ? getQualifiedTypeName(symbol, updatedTopLevelTypePath)
+                    : updatedTopLevelTypePath;
+                // Extract XML documentation for the symbol
+                const xmlDocs = extractXmlDocumentation(document, symbol);
+                
+                // Generate full symbol name including parameter types for methods
+                // Use the absolutely full path for fullSymbolName
+                const fullSymbolName = this.generateFullSymbolName(symbol, fullPath);
+                
+                return {
+                    name: symbol.name,
+                    type: qualifiedTypeName,
+                    kind: symbol.kind,
+                    fullSymbolName: fullSymbolName,
+                    xmlDocs: xmlDocs
+                };
+            }
+            
+            // Recursively search in children
+            if (symbol.children && symbol.children.length > 0) {
+                const childResult = this.findSymbolByName(
+                    symbol.children,
+                    targetName,
+                    updatedTopLevelTypePath,
+                    true,
+                    document,
+                    currentFullPath
+                );
+                if (childResult) {
+                    return childResult;
+                }
+            }
+        }
+        
+        return undefined;
+    }
+
     /**
      * Find symbol at position and return SymbolInfo directly
      */
@@ -656,7 +740,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         let xmlDocsToUse = symbolInfo.xmlDocs;
 
         // Fallback mechanism: if no XML docs and symbol is from decompiled file, request from native binary
-        var isFallback = false;
+        let isFallback = false;
         if ((!xmlDocsToUse || xmlDocsToUse.trim().length === 0) && 
             symbolInfo.isFromDecompiledFile && 
             this.unityBinaryManager) {
