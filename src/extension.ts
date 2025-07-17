@@ -289,7 +289,7 @@ function cleanup() {
  * @param packageHelper The package helper instance (optional)
  */
 function registerHoverProvider(context: vscode.ExtensionContext, packageHelper?: UnityPackageHelper): void {
-    const hoverProvider = new CSharpDocHoverProvider(packageHelper, globalUnityProjectManager || undefined);
+    const hoverProvider = new CSharpDocHoverProvider(packageHelper, globalUnityProjectManager || undefined, globalUnityBinaryManager || undefined);
     const hoverDisposable = vscode.languages.registerHoverProvider(
         { scheme: 'file', language: 'csharp' },
         hoverProvider

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DecompiledFileHelper, DecompiledFileInfo } from './decompiledFileHelper';
 import { UnityPackageHelper, PackageInfo } from './unityPackageHelper';
 import { UnityProjectManager } from './unityProjectManager';
+import { UnityBinaryManager } from './unityBinaryManager';
 import { getQualifiedTypeName, isTypeSymbol, extractXmlDocumentation } from './languageServerUtils';
 import { xmlToMarkdown } from './xmlToMarkdown';
 import { extractMajorMinorVersion } from './utils';
@@ -16,10 +17,12 @@ import { extractMajorMinorVersion } from './utils';
 export class CSharpDocHoverProvider implements vscode.HoverProvider {
     private readonly unityPackageHelper: UnityPackageHelper | undefined;
     private readonly unityProjectManager: UnityProjectManager | undefined;
+    private readonly unityBinaryManager: UnityBinaryManager | undefined;
 
-    constructor(unityPackageHelper?: UnityPackageHelper, unityProjectManager?: UnityProjectManager) {
+    constructor(unityPackageHelper?: UnityPackageHelper, unityProjectManager?: UnityProjectManager, unityBinaryManager?: UnityBinaryManager) {
         this.unityPackageHelper = unityPackageHelper;
         this.unityProjectManager = unityProjectManager;
+        this.unityBinaryManager = unityBinaryManager;
     }
 
     /**
@@ -85,13 +88,13 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             const symbolInfo = await this.getSymbolInfo(document, position);
             if (!symbolInfo) {
                 return undefined;
-            }            // Generate documentation link based on symbol origin (optional)
+            }            
+            // Generate documentation link based on symbol origin (optional)
             const docLinkInfo = await this.generateDocLink(symbolInfo);
             
             // Create hover content with symbol info and optional documentation link
             // Even if no documentation link is available, we still want to show XML docs
-            return this.createHoverWithDocLink(symbolInfo, docLinkInfo);
-
+            return await this.createHoverWithDocLink(symbolInfo, docLinkInfo);
         } catch (error) {
             console.error('Error in CSharpDocHoverProvider:', error);
             return undefined;
@@ -190,6 +193,13 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             // Add definition location to symbol info for Unity package detection
             if (symbolInfo) {
                 symbolInfo.definitionLocation = definition;
+                
+                // Check if this symbol is from a decompiled file
+                const decompiledInfo = await this.checkDecompiledFile(definition.uri);
+                if (decompiledInfo.isDecompiled) {
+                    symbolInfo.isFromDecompiledFile = true;
+                    symbolInfo.assemblyName = decompiledInfo.assemblyName;
+                }
             }
             
             return symbolInfo;
@@ -199,6 +209,13 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         }
     }
     
+    /**
+     * Check if a file is decompiled using DecompiledFileHelper
+     */
+    private async checkDecompiledFile(uri: vscode.Uri): Promise<DecompiledFileInfo> {
+        return await DecompiledFileHelper.analyzeUri(uri);
+    }
+
     /**
      * Find the single top-level type in the symbol hierarchy.
      * 
@@ -247,14 +264,14 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
               // Extract XML documentation for the symbol
             const xmlDocs = extractXmlDocumentation(document, typeSymbol);
             // console.log(`abc [findTopLevelType] Extracted XML docs for ${typeSymbol.name}: "${xmlDocs}"`);
-            
+
             return {
-                name: typeSymbol.name,
-                type: qualifiedTypeName,
-                kind: typeSymbol.kind,
-                detail: typeSymbol.detail,
-                xmlDocs: xmlDocs
-            };
+                    name: typeSymbol.name,
+                    type: qualifiedTypeName,
+                    kind: typeSymbol.kind,
+                    fullSymbolName: qualifiedTypeName,
+                    xmlDocs: xmlDocs
+                };
         }
         
         return undefined;
@@ -274,7 +291,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             if (!symbols || symbols.length === 0) {
                 return undefined;
             }
-              // Find the single top-level type, returns undefined if multiple or none found
+            // Find the single top-level type, returns undefined if multiple or none found
             const topLevelType = this.findTopLevelType(symbols, document);
             
             if (!topLevelType) {
@@ -304,7 +321,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 return undefined;
             }
 
-            return this.findSymbolAtPosition(symbols, position, "", false, document);
+            return this.findSymbolAtPosition(symbols, position, "", false, document, "");
         } catch (_error) {
             console.error('Error getting detailed symbol info:', _error);
             return undefined;
@@ -320,7 +337,9 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         /* the fully qualified name of the top level type that contains the symbols if exists, otherwise that path we accumulate as we go down the hierarchy */
         topLevelTypePath: string,
         isTopLevelTypeFound:boolean,
-        document: vscode.TextDocument
+        document: vscode.TextDocument,
+        /* the absolutely full path including all nested levels */
+        fullPath: string = ""
     ): SymbolInfo | undefined {
         for (const symbol of symbols) {
             // Check if position is within this symbol's range
@@ -341,7 +360,10 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                         }
                     }
                     
-                    const childResult = this.findSymbolAtPosition(symbol.children, position, updatedTopLevelTypePath, updatedIsTopLevelTypeFound, document);
+                    // Update the full path with current symbol
+                    const updatedFullPath = combinePath(fullPath, symbol.name);
+                    
+                    const childResult = this.findSymbolAtPosition(symbol.children, position, updatedTopLevelTypePath, updatedIsTopLevelTypeFound, document, updatedFullPath);
                     if (childResult) {
                         // Found a more specific symbol within this one
                         return childResult;
@@ -357,17 +379,30 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                 const xmlDocs = extractXmlDocumentation(document, symbol);
                 // console.log(`abc [findSymbolAtPosition] Extracted XML docs for ${symbol.name}: "${xmlDocs}"`);
                 
+                // Generate full symbol name including parameter types for methods
+                // Use the absolutely full path for fullSymbolName
+                const fullSymbolName = this.generateFullSymbolName(symbol, fullPath);
+                
                 return {
                     name: symbol.name,
                     type: qualifiedTypeName,
                     kind: symbol.kind,
-                    detail: symbol.detail,
+                    fullSymbolName: fullSymbolName,
                     xmlDocs: xmlDocs
                 };
             }
         }
         
         return undefined;
+    }
+
+    /**
+     * Generate full symbol name including parameter types for methods
+     * For non-method symbols, returns the qualified type name
+     * For methods, returns the full signature including parameter types
+     */
+    private generateFullSymbolName(symbol: vscode.DocumentSymbol, qualifiedTypeName: string): string {
+        return `${qualifiedTypeName}.${symbol.name}`;
     }
 
     /**
@@ -423,19 +458,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         return url ? { url, packageInfo: undefined } : undefined;
     }
 
-    /**
-     * Check if a file is a decompiled file and extract assembly information
-     * @param uri The URI of the file to check
-     * @returns Promise<DecompiledFileInfo> Information about the decompiled file
-     */
-    private async checkDecompiledFile(uri: vscode.Uri): Promise<DecompiledFileInfo> {
-        try {
-            return await DecompiledFileHelper.analyzeUri(uri);
-        } catch (_error) {
-            console.error('Error checking decompiled file:', _error);
-            return { isDecompiled: false };
-        }
-    }
+
 
     /**
      * Generate package-specific documentation links based on package type
@@ -623,16 +646,36 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
       /**
      * Create hover content with documentation link using type name
      */
-    private createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo?: DocLinkInfo): vscode.Hover {
+    private async createHoverWithDocLink(symbolInfo: SymbolInfo, docLinkInfo?: DocLinkInfo): Promise<vscode.Hover> {
         const hoverContent = new vscode.MarkdownString();
         // Show XML documentation if available (at the top)
         // console.log(`abc Adding XML docs for symbol: ${symbolInfo.name}, docs is: ${symbolInfo.xmlDocs}`);
         // console.log(`abc XML docs length: ${symbolInfo.xmlDocs.length}, trimmed length: ${symbolInfo.xmlDocs.trim().length}`);
         
         let addedXmlDocs = false;
+        let xmlDocsToUse = symbolInfo.xmlDocs;
+
+        // Fallback mechanism: if no XML docs and symbol is from decompiled file, request from native binary
+        if ((!xmlDocsToUse || xmlDocsToUse.trim().length === 0) && 
+            symbolInfo.isFromDecompiledFile && 
+            this.unityBinaryManager) {
+            try {
+                console.log(`CSharpDocHoverProvider: Requesting docs for symbol: ${symbolInfo.fullSymbolName}`);
+                const response = await this.unityBinaryManager.requestSymbolDocs(
+                    symbolInfo.fullSymbolName,
+                    symbolInfo.assemblyName,
+                    symbolInfo.definitionLocation?.uri.fsPath
+                );
+                if (response && response.Documentation) {
+                    xmlDocsToUse = response.Documentation;
+                }
+            } catch (error) {
+                console.warn('CSharpDocHoverProvider: Failed to get symbol documentation from native binary:', error);
+            }
+        }
 
         // Convert XML docs to Markdown format
-        const markdownDocs = xmlToMarkdown(symbolInfo.xmlDocs!, ["summary", "returns", "param", "exception"]);
+        const markdownDocs = xmlToMarkdown(xmlDocsToUse!, ["summary", "returns", "param", "exception"]);
         // console.log(`abc Converted to markdown: ${markdownDocs}`);
         if(markdownDocs){
             hoverContent.appendMarkdown(markdownDocs);
@@ -705,11 +748,15 @@ interface SymbolInfo {
     /** The location where this symbol is defined (used for Unity package detection) */
     definitionLocation?: vscode.Location;
       /** 
-     * The detail field from the document symbol (language server specific)
-     * For C# Dev Kit: Contains fully qualified type name
-     * For Dot Rush: Content unknown/not documented
+     * The fully qualified symbol name including namespace, type, and member name.
+     * For methods, includes parameter types in parentheses.
+     * Examples:
+     * - Type: "MyNamespace.MyClass"
+     * - Method: "MyNamespace.MyClass.MyMethod(int, string)"
+     * - Property: "MyNamespace.MyClass.MyProperty"
+     * This is used for querying the native binary for XML documentation.
      */
-    detail?: string;
+    fullSymbolName: string;
     
     /** 
      * The extracted XML documentation comments for this symbol.
@@ -717,6 +764,18 @@ interface SymbolInfo {
      * with /// markers and leading whitespace removed.
      */
     xmlDocs?: string;
+    
+    /** 
+     * Whether this symbol is from a decompiled file.
+     * Used to determine if we should fallback to native binary for documentation.
+     */
+    isFromDecompiledFile?: boolean;
+    
+    /** 
+     * Assembly name if the symbol is from a decompiled file.
+     * Used for requesting documentation from native binary.
+     */
+    assemblyName?: string;
 }
 
 /**

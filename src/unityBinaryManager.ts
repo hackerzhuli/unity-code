@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as dgram from 'dgram';
 import { spawn, ChildProcess } from 'child_process';
-import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, ErrorAction, CloseAction } from 'vscode-languageclient/node';
+import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node';
 import { EventEmitter } from './eventEmitter';
 import { NativeBinaryLocator } from './nativeBinaryLocator';
 import { wait } from './asyncUtils';
@@ -11,7 +11,8 @@ import { wait } from './asyncUtils';
  */
 enum MessageType {
     None = 0,
-    GetUnityState = 1
+    GetUnityState = 1,
+    GetSymbolDocs = 2
 }
 
 /**
@@ -20,6 +21,24 @@ enum MessageType {
 interface ProcessState {
     UnityProcessId: number; // 0 if Unity is not running
     IsHotReloadEnabled: boolean;
+}
+
+/**
+ * Symbol documentation request for native binary
+ */
+interface SymbolDocsRequest {
+    SymbolName: string;        // Full symbol name including namespace and type
+    AssemblyName?: string;     // Optional assembly name to search in
+    SourceFilePath?: string;   // Optional source file path (must be from user code)
+}
+
+/**
+ * Symbol documentation response from native binary
+ */
+interface SymbolDocsResponse {
+    Success: boolean;
+    Documentation?: string;    // XML documentation string if found
+    ErrorMessage?: string;     // Error message if failed
 }
 
 /**
@@ -51,7 +70,8 @@ export class UnityBinaryManager {
     private keepAliveInterval: NodeJS.Timeout | null = null;
     private currentState: ProcessState = { UnityProcessId: 0, IsHotReloadEnabled: false };
     private nextRequestId: number = 1;
-    private pendingRequests: Map<number, { resolve: (value: ProcessState | null) => void; timeout: NodeJS.Timeout }> = new Map();
+    private pendingUnityStateRequests: Map<number, { resolve: (value: ProcessState | null) => void; timeout: NodeJS.Timeout }> = new Map();
+    private pendingSymbolDocsRequests: Map<number, { resolve: (value: SymbolDocsResponse | null) => void; timeout: NodeJS.Timeout }> = new Map();
 
     // Language server functionality
     private languageClient: LanguageClient | null = null;
@@ -181,17 +201,66 @@ export class UnityBinaryManager {
         return new Promise<ProcessState | null>((resolve) => {
             // Set up timeout
             const timeout = setTimeout(() => {
-                this.pendingRequests.delete(requestId);
+                this.pendingUnityStateRequests.delete(requestId);
                 resolve(null);
             }, timeoutMs);
 
             // Store the pending request
-            this.pendingRequests.set(requestId, { resolve, timeout });
+            this.pendingUnityStateRequests.set(requestId, { resolve, timeout });
 
             // Send the request
             this.sendUdpMessage(MessageType.GetUnityState, '', requestId).catch(() => {
                 // If sending fails, clean up and resolve with null
-                this.pendingRequests.delete(requestId);
+                this.pendingUnityStateRequests.delete(requestId);
+                clearTimeout(timeout);
+                resolve(null);
+            });
+        });
+    }
+
+    /**
+     * Request symbol documentation from native binary
+     * @param symbolName Full symbol name including namespace and type
+     * @param assemblyName Optional assembly name to search in
+     * @param sourceFilePath Optional source file path (must be from user code)
+     * @param timeoutMs Timeout in milliseconds (default: 5000ms)
+     * @returns Promise that resolves to SymbolDocsResponse or null if timeout
+     */
+    public async requestSymbolDocs(
+        symbolName: string,
+        assemblyName?: string,
+        sourceFilePath?: string,
+        timeoutMs: number = 5000
+    ): Promise<SymbolDocsResponse | null> {
+        if (!this.isUdpConnected) {
+            throw new Error('UDP not connected to native binary');
+        }
+
+        const requestId = this.nextRequestId++;
+        const request: SymbolDocsRequest = {
+            SymbolName: symbolName,
+            AssemblyName: assemblyName,
+            SourceFilePath: sourceFilePath
+        };
+
+        console.log(`UnityBinaryManager: Sending symbol docs request [ID: ${requestId}]:`, JSON.stringify(request));
+
+        return new Promise<SymbolDocsResponse | null>((resolve) => {
+            // Set up timeout
+            const timeout = setTimeout(() => {
+                console.log(`UnityBinaryManager: Symbol docs request timeout [ID: ${requestId}]`);
+                this.pendingSymbolDocsRequests.delete(requestId);
+                resolve(null);
+            }, timeoutMs);
+
+            // Store the pending request
+            this.pendingSymbolDocsRequests.set(requestId, { resolve, timeout });
+
+            // Send the request
+            this.sendUdpMessage(MessageType.GetSymbolDocs, JSON.stringify(request), requestId).catch((error) => {
+                // If sending fails, clean up and resolve with null
+                console.error(`UnityBinaryManager: Failed to send symbol docs request [ID: ${requestId}]:`, error);
+                this.pendingSymbolDocsRequests.delete(requestId);
                 clearTimeout(timeout);
                 resolve(null);
             });
@@ -405,11 +474,17 @@ export class UnityBinaryManager {
      * Clean up all pending requests
      */
     private cleanupPendingRequests(): void {
-        for (const [_requestId, pendingRequest] of this.pendingRequests) {
+        for (const [_requestId, pendingRequest] of this.pendingUnityStateRequests) {
             clearTimeout(pendingRequest.timeout);
             pendingRequest.resolve(null);
         }
-        this.pendingRequests.clear();
+        this.pendingUnityStateRequests.clear();
+
+        for (const [_requestId, pendingRequest] of this.pendingSymbolDocsRequests) {
+            clearTimeout(pendingRequest.timeout);
+            pendingRequest.resolve(null);
+        }
+        this.pendingSymbolDocsRequests.clear();
     }
 
     /**
@@ -464,6 +539,9 @@ export class UnityBinaryManager {
             case MessageType.GetUnityState:
                 this.handleUnityStateMessage(payload, requestId);
                 break;
+            case MessageType.GetSymbolDocs:
+                this.handleSymbolDocsMessage(payload, requestId);
+                break;
             case MessageType.None:
                 // Keep-alive response, no action needed
                 break;
@@ -482,10 +560,10 @@ export class UnityBinaryManager {
             this.currentState = newState;
 
             // If this is a response to a pending request, resolve it
-            if (requestId > 0 && this.pendingRequests.has(requestId)) {
-                const pendingRequest = this.pendingRequests.get(requestId)!;
+            if (requestId > 0 && this.pendingUnityStateRequests.has(requestId)) {
+                const pendingRequest = this.pendingUnityStateRequests.get(requestId)!;
                 clearTimeout(pendingRequest.timeout);
-                this.pendingRequests.delete(requestId);
+                this.pendingUnityStateRequests.delete(requestId);
                 pendingRequest.resolve(newState);
             }
 
@@ -509,10 +587,40 @@ export class UnityBinaryManager {
             console.error('UnityBinaryManager: Failed to parse Unity state message:', error);
 
             // If this was a response to a pending request, resolve with null
-            if (requestId > 0 && this.pendingRequests.has(requestId)) {
-                const pendingRequest = this.pendingRequests.get(requestId)!;
+            if (requestId > 0 && this.pendingUnityStateRequests.has(requestId)) {
+                const pendingRequest = this.pendingUnityStateRequests.get(requestId)!;
                 clearTimeout(pendingRequest.timeout);
-                this.pendingRequests.delete(requestId);
+                this.pendingUnityStateRequests.delete(requestId);
+                pendingRequest.resolve(null);
+            }
+        }
+    }
+
+    /**
+     * Handle symbol documentation message
+     */
+    private handleSymbolDocsMessage(payload: string, requestId: number): void {
+        try {
+            const response: SymbolDocsResponse = JSON.parse(payload);
+            console.log(`UnityBinaryManager: Received symbol docs response [ID: ${requestId}]:`, JSON.stringify(response));
+
+            // If this is a response to a pending request, resolve it
+            if (requestId > 0 && this.pendingSymbolDocsRequests.has(requestId)) {
+                const pendingRequest = this.pendingSymbolDocsRequests.get(requestId)!;
+                clearTimeout(pendingRequest.timeout);
+                this.pendingSymbolDocsRequests.delete(requestId);
+                pendingRequest.resolve(response);
+            } else {
+                console.warn(`UnityBinaryManager: Received symbol docs response for unknown request ID: ${requestId}`);
+            }
+        } catch (error) {
+            console.error('UnityBinaryManager: Failed to parse symbol docs message:', error);
+
+            // If this was a response to a pending request, resolve with null
+            if (requestId > 0 && this.pendingSymbolDocsRequests.has(requestId)) {
+                const pendingRequest = this.pendingSymbolDocsRequests.get(requestId)!;
+                clearTimeout(pendingRequest.timeout);
+                this.pendingSymbolDocsRequests.delete(requestId);
                 pendingRequest.resolve(null);
             }
         }
