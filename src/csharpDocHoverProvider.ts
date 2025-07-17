@@ -656,10 +656,12 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         let xmlDocsToUse = symbolInfo.xmlDocs;
 
         // Fallback mechanism: if no XML docs and symbol is from decompiled file, request from native binary
+        var isFallback = false;
         if ((!xmlDocsToUse || xmlDocsToUse.trim().length === 0) && 
             symbolInfo.isFromDecompiledFile && 
             this.unityBinaryManager) {
             try {
+                isFallback = true;
                 console.log(`CSharpDocHoverProvider: Requesting docs for symbol: ${symbolInfo.fullSymbolName}`);
                 const response = await this.unityBinaryManager.requestSymbolDocs(
                     symbolInfo.fullSymbolName,
@@ -675,7 +677,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         }
 
         // Convert XML docs to Markdown format
-        const markdownDocs = xmlToMarkdown(xmlDocsToUse!, ["summary", "returns", "param", "exception"]);
+        const markdownDocs = xmlToMarkdown(xmlDocsToUse!, isFallback? []: ["summary", "returns", "param", "exception"]);
         // console.log(`abc Converted to markdown: ${markdownDocs}`);
         if(markdownDocs){
             hoverContent.appendMarkdown(markdownDocs);
