@@ -360,11 +360,12 @@ export class UnityBinaryManager {
             const clientOptions: LanguageClientOptions = {
                 // Register the server for Unity-related documents
                 documentSelector: [
-                    { scheme: 'file', pattern: '**/*.uss' }
+                    { scheme: 'file', pattern: '**/*.uss' },
+                    { scheme: 'file', pattern: '**/*.tss' }
                 ],
                 synchronize: {
                     // Notify the server about file changes to Unity files
-                    fileEvents: vscode.workspace.createFileSystemWatcher('**/*.uss')
+                    fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{uss,tss}')
                 },
                 outputChannelName: 'Unity Language Server',
                 // Additional client options

@@ -45,6 +45,14 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "uss",
+        "aliases": ["Unity StyleSheet", "uss"],
+        "extensions": [".uss", ".tss"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
     "icons": {
       "unity-cube": {
         "description": "Unity Cube Icon",
