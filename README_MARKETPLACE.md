@@ -56,6 +56,26 @@ Built from the ground up for performance, Unity Code Pro provides powerful featu
 
 ![Debug](./assets/Debug%20in%20VS%20Code.png)
 
+### 🎨 **USS Language Server**
+Includes the first USS language server for VS Code(no one else have done it for VS Code)! 100% built from scratch for Unity Style Sheets (USS)!
+
+- **Blazing fast performance** - Written in Rust and built from the ground up for speed. Get instant feedback on syntax and values as you type!
+- **Complete IDE experience** - Syntax highlighting, comprehensive auto-completion, and advanced diagnostics for Unity Style Sheets (USS)
+- **Smart auto-completion** - Property names, values, selectors, pseudo-classes, and asset URLs. Knows all Unity UXML elements like `Button` and `Label`, and can auto-complete asset paths from `Assets` down to individual sprites
+- **Advanced validation** - 100% USS-native diagnostics that validate syntax, asset paths, and property values with Unity-level accuracy. Even attempts to validate properties with `var()` functions!
+- **Rich hover documentation** - Unity-specific tooltips with syntax examples and direct links to official documentation
+- **Professional formatting** - Document and selection formatting for USS and TSS files
+- **Intelligent refactoring** - Rename operations for ID and class selectors
+
+Auto Completion:
+![USS Auto Completion](./assets/USS%20Auto%20Completion%202.png)
+
+Diagnostics:
+![USS Diagnostics](./assets/USS%20Diagnostics.png)
+
+Hover Docs:
+![USS Hover Documentation](./assets/USS%20Hover%20Docs.png)
+
 ### 📚 **Intelligent Documentation**
 - **Hover documentation** - Show links for C# documentation on mouse hover
 - **Unity API links** - Direct links to official Unity Scripting API documentation

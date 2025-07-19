@@ -51,6 +51,27 @@ Attach to Unity Editor from your code editor using the integrated MonoDebugger a
 
 ![Debug](./assets/ignore/Debug%20in%20Trae.png)
 
+### 🎨 USS Language Server
+Includes the first USS language server for VS Code(no one else have done it for VS Code)! 100% built from scratch for Unity Style Sheets (USS)!
+
+- **High performance** - Written in Rust, built from the ground up for performance. Get instant feedback (diagnostics) on syntax and values as you type! 100% high performance as a game dev's code should be!
+- **Syntax highlighting** - Beautiful, accurate syntax highlighting for USS and TSS files
+- **Comprehensive auto-completion** - Property names, values, selectors, pseudo-classes, and asset URLs. For element names, it knows all Unity Engine UXML elements like `Button` and `Label` and provides auto-completion when you type them. For URLs, auto-completion will complete from `Assets` all the way down to individual sprites in multi-sprite image assets
+- **Advanced diagnostics** - Syntax validation, asset path (e.g., `url()` functions) validation, property value validation - everything you need and more. 100% USS native, validates every property that USS has and checks the values you provide with accuracy, producing almost the same errors (and more) as Unity itself does. It goes above and beyond and tries to validate property values even if they contain `var()`, which no one - not Unity, or any CSS language server - does (though it's not 100% accurate since we can't know variable values at runtime)
+- **Intelligent hover documentation** - Rich tooltips with syntax examples and keyword explanations. No need to check official docs when you have quick hover documentation that's completely Unity-specific, no browser or CSS complications. Also provides links to official (mostly Unity's) documentation
+- **Code formatting** - Document and selection formatting for USS and TSS files
+- **Refactoring** - Rename operations for ID and class selectors
+
+
+Auto Completion:
+![USS Auto Completion](./assets/USS%20Auto%20Completion%202.png)
+
+Diagnostics:
+![USS Diagnostics](./assets/USS%20Diagnostics.png)
+
+Hover Docs:
+![USS Hover Documentation](./assets/USS%20Hover%20Docs.png)
+
 ### 📚 Intelligent Documentation
 Shows beautiful markdown from xml docs for in project classes and members. Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET.
 
