@@ -48,12 +48,15 @@ Includes the first USS language server for VS Code(no one else have done it for 
 - **Intelligent refactoring** - Rename operations for ID and class selectors
 
 Auto Completion:
+
 ![USS Auto Completion](./assets/USS%20Auto%20Completion%202.webp)
 
 Diagnostics:
+
 ![USS Diagnostics](./assets/USS%20Diagnostics.webp)
 
 Hover Docs:
+
 ![USS Hover Documentation](./assets/USS%20Hover%20Docs.webp)
 
 ### 📚 **Intelligent Documentation**

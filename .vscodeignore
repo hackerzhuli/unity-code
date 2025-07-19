@@ -15,7 +15,7 @@ stats.toml
 scripts/**
 .vscodeignore.backup
 README.md.backup
-README_EXTENSION.md
+README_MARKETPLACE.md
 node_modules
 # Temporary platform-specific exclusions
 bin/win_arm64/**
@@ -25,3 +25,4 @@ bin/mac_x64/**
 bin/mac_arm64/**
 # assets that don't need to be included in build
 assets/ignore/**
+assets/*.webp
