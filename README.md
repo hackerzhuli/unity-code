@@ -1,5 +1,5 @@
 ## A word from author
-Hi, long time game developer here. I swtiched to VS Code and forks to develop games this year(2025), said my goodbye to IDEs like Visual Studio and Rider. The Unity extension for VS Code is not good enough, and what's worse, it is not available in VS Code forks. That is why I built Unity Code Pro. So VS Code can become real Unity IDEs. Enabling us to develop games more efficiently.
+Hi, long time game developer here. I swtiched to VS Code to develop games in 2025, said my goodbye to IDEs like Visual Studio and Rider. The Unity extension for VS Code is not good enough. That is why I built Unity Code Pro. So VS Code can become a real Unity IDE. Enabling us to develop games faster.
 
 **⚠️ About the name:** Sorry for the Pro at the end of the name that sounds like a paid extension, I intended to call it Unity Code, but vs marketplace doesn't allow extensions with the same name, and the name is already taken by another extension. I had to add a Pro, but it is still totally free and open source!
 
