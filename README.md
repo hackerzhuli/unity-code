@@ -30,7 +30,7 @@ Displays Unity tests in your code editor's Testing window. Run tests right where
 - **One-click test execution** - Run individual tests or entire test suites with a single click
 - **Run tests reliably** - You can click run test when Unity is compiling, and it will run the test right after compilation finishes
 
-![Unity Tests](./assets/ignore/Run%20Unity%20Tests%20In%20Trae.png)
+![Unity Tests](./assets/Run%20Unity%20Tests%20In%20VS%20Code.webp)
 
 ### 📊 Unity Console
 See Unity logs in your code editor with clickable stack trace!
@@ -39,7 +39,7 @@ See Unity logs in your code editor with clickable stack trace!
 - **Clickable stack traces** - Navigate directly to the source of the logs
 - **Log filtering** - Search specific words to find the logs you need
 
-![Unity Console](./assets/Unity%20Console.png)
+![Unity Console](./assets/Unity%20Console.webp)
 
 ### 🐛 Unity Debugger
 Attach to Unity Editor from your code editor using the integrated MonoDebugger and crush the bugs!
@@ -49,7 +49,7 @@ Attach to Unity Editor from your code editor using the integrated MonoDebugger a
 - **MonoDebugger integration** - Professional-grade debugging capabilities
 - **No external tools required** - Everything you need built right into your editor
 
-![Debug](./assets/ignore/Debug%20in%20Trae.png)
+![Debug](./assets/Debug%20in%20VS%20Code.webp)
 
 ### 🎨 USS Language Server
 Includes a USS language server! This is the first time someone have built an open source language server for USS! I built it from scratch for anyone who want to do UIToolkit development in VS Code!
@@ -65,15 +65,15 @@ Includes a USS language server! This is the first time someone have built an ope
 
 Auto Completion:
 
-![USS Auto Completion](./assets/USS%20Auto%20Completion%202.png)
+![USS Auto Completion](./assets/USS%20Auto%20Completion%202.webp)
 
 Diagnostics:
 
-![USS Diagnostics](./assets/USS%20Diagnostics.png)
+![USS Diagnostics](./assets/USS%20Diagnostics.webp)
 
 Hover Docs:
 
-![USS Hover Documentation](./assets/USS%20Hover%20Docs.png)
+![USS Hover Documentation](./assets/USS%20Hover%20Docs.webp)
 
 ### 📚 Intelligent Documentation
 Shows beautiful markdown from xml docs for in project classes and members. Show docs links for classes from Unity official Scripting API or official Unity packages, also doc links for official classes from .NET.
@@ -82,7 +82,7 @@ Shows beautiful markdown from xml docs for in project classes and members. Show 
 - **Unity API links** - Direct links to official Unity Scripting API documentation
 - **Smart context awareness** - Know which Unity package and version this class is from and show you the link to docs
 
-![Hover Doc Link](./assets/Hover%20Doc%20Link.png)
+![Hover Doc Link](./assets/Hover%20Doc%20Link.webp)
 
 ### 🔍 Advanced Code Analysis
 - **Roslyn-powered static analysis** - Unity-specific code analysis that understands Unity patterns and best practices
@@ -90,7 +90,7 @@ Shows beautiful markdown from xml docs for in project classes and members. Show 
 - **Unity-aware diagnostics** - Specialized analyzers for Unity-specific code patterns and performance optimizations
 - **Instant feedback** - No need to compile or switch to Unity to see code issues
 
-![Static Analysis](./assets/Static%20Analysis.png)
+![Static Analysis](./assets/Static%20Analysis.webp)
 
 ### 🔄 Smart Asset Management
 Automatically renames Unity `.meta` files when you rename assets in your code editor, making refactoring class names more easy. It also does the right thing when you move or delete an asset in your code editor.
@@ -99,7 +99,7 @@ Automatically renames Unity `.meta` files when you rename assets in your code ed
 - **Asset database refresh** - Automatic Unity recompilation when you save C# scripts
 - **Smart Unity awareness** - Knows about whether you're in play mode, whether Unity maybe compiling, and whether you are running Hot Reload for Unity
 
-![Status Bar](./assets/Status%20Bar.png)
+![Status Bar](./assets/Status%20Bar.webp)
 
 ## Dependencies
 To use this extension, you have to first install my Unity package [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code) in Unity. Also this extension depends on [Dot Rush](https://github.com/JaneySprings/DotRush).
