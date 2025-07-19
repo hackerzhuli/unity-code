@@ -52,7 +52,7 @@ Attach to Unity Editor from your code editor using the integrated MonoDebugger a
 ![Debug](./assets/ignore/Debug%20in%20Trae.png)
 
 ### 🎨 USS Language Server
-Includes the first USS language server for VS Code(no one else have done it for VS Code)! 100% built from scratch for Unity Style Sheets (USS)!
+Includes a USS language server! This is the first time someone have built an open source language server for USS! I built it from scratch for anyone who want to do UIToolkit development in VS Code!
 
 - **High performance** - Written in Rust, built from the ground up for performance. Get instant feedback (diagnostics) on syntax and values as you type! 100% high performance as a game dev's code should be!
 - **Syntax highlighting** - Beautiful, accurate syntax highlighting for USS and TSS files
@@ -64,12 +64,15 @@ Includes the first USS language server for VS Code(no one else have done it for 
 
 
 Auto Completion:
+
 ![USS Auto Completion](./assets/USS%20Auto%20Completion%202.png)
 
 Diagnostics:
+
 ![USS Diagnostics](./assets/USS%20Diagnostics.png)
 
 Hover Docs:
+
 ![USS Hover Documentation](./assets/USS%20Hover%20Docs.png)
 
 ### 📚 Intelligent Documentation
