@@ -1,7 +1,7 @@
 ## A word from author
-Hi, I am a long time game developer here. I swtiched to VS Code and forks to develop games this year(2025), said my goodbye to traditional C# IDEs like Visual Studio and Rider. The Unity extension for VS Code is not too bad but not good enough either, and what's worse, it is not available in VS Code forks. That is why I built Unity Code Pro. So VS Code and its forks can become real Unity IDEs. Enable us to develop games more efficiently.
+Hi, long time game developer here. I swtiched to VS Code and forks to develop games this year(2025), said my goodbye to IDEs like Visual Studio and Rider. The Unity extension for VS Code is not good enough, and what's worse, it is not available in VS Code forks. That is why I built Unity Code Pro. So VS Code can become real Unity IDEs. Enabling us to develop games more efficiently.
 
-**⚠️ About the name:** Sorry for the Pro at the end of the name that sounds like a paid extension, I intended to call it Unity Code, but vs marketplace doesn't allow extensions with the same name, and the name is already taken by an extension named Unity Code which was abandoned the day it was published years ago. So I had to change the name to Unity Code Pro, but it is still totally free and open source.
+**⚠️ About the name:** Sorry for the Pro at the end of the name that sounds like a paid extension, I intended to call it Unity Code, but vs marketplace doesn't allow extensions with the same name, and the name is already taken by another extension. I had to add a Pro, but it is still totally free and open source!
 
 **⚠️ Dependency:** This extension depends on [Dot Rush](https://github.com/JaneySprings/DotRush), which is a C# language server. If you're using C# extension or C# dev kit extension, you have to disable them in order for this extension to function correctly.
 

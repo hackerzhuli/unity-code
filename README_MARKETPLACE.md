@@ -37,7 +37,7 @@ Unity Code Pro is a powerful Visual Studio Code extension that brings profession
 ![Debug](./assets/Debug%20in%20VS%20Code.webp)
 
 ### 🎨 **USS Language Server**
-Includes the first USS language server for VS Code(no one else have done it for VS Code)! 100% built from scratch for Unity Style Sheets (USS)!
+Includes a USS language server! This is the first time someone have built an open source language server for USS! I built it from scratch for anyone who want to do UIToolkit development in VS Code!
 
 - **Blazing fast performance** - Written in Rust and built from the ground up for speed. Get instant feedback on syntax and values as you type!
 - **Complete IDE experience** - Syntax highlighting, comprehensive auto-completion, and advanced diagnostics for Unity Style Sheets (USS)
