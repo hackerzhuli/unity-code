@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.1.0] - 2025-07-21
+
+### 🚀 Features
+
+### Added
+- 🎨 **USS Language Server** - Complete IDE experience for Unity Style Sheets (USS) development
+  - **Blazing fast performance** - Written in Rust and built from the ground up for speed
+  - **Smart auto-completion** - Property names, values, selectors, pseudo-classes, and asset URLs
+  - **Advanced validation** - 100% USS-native diagnostics that validate syntax, asset paths, and property values
+  - **Rich hover documentation** - Unity-specific tooltips with syntax examples and direct links to official documentation
+  - **Professional formatting** - Document and selection formatting for USS and TSS files
+  - **Intelligent refactoring** - Rename operations for ID and class selectors
+  - **Asset path completion** - Auto-complete asset paths from `Assets` down to individual sprites
+  - **Unity element awareness** - Knows all Unity UXML elements like `Button` and `Label`
+- 🔧 **Enhanced Documentation System** - Improved fallback C# documentation with native binary support
+
+### 🔧 Improvements & Bug Fixes
+
+### Fixed
+- 🛠️ **Documentation Hover** - Improved handling of inheritdoc and normalized paths for fallback documentation
+- 🛠️ **XML Documentation** - Fixed empty top-level tags exclusion from markdown output
+- 🛠️ **Asset Management** - Enhanced meta file deletion handling for deleted assets
+- 🛠️ **Symbol Lookup** - Better symbol lookup for empty ranges in hover provider
+
+### Improved
+- 🎨 **Assets** - Updated image assets to WebP format for better performance
+
 ## [1.0.3] - 2025-07-07
 
 ### 🔧 Improvements & Bug Fixes
