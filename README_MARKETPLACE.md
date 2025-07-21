@@ -53,7 +53,7 @@ Auto Completion:
 
 Diagnostics:
 
-![USS Diagnostics](./assets/USS%20Diagnostics.webp)
+![USS Diagnostics](./assets/uss-diagnostics.webp)
 
 Hover Docs:
 
@@ -90,9 +90,11 @@ Hover Docs:
 
 *"The hover documentation links saves me so much time."*
 
+*"The best USS language support ever!"*
+
 ## 🚀 Get Started in Minutes
 
-1. **Install Unity Code Pro** from marketplace in your code editor
+1. **Install Unity Code Pro** from extensions view in your code editor
 2. **Install the companion Unity package in your Unity project** - [Visual Studio Code Editor](https://github.com/hackerzhuli/com.hackerzhuli.code)
 3. **Start coding!** - All features work automatically once installed
 
