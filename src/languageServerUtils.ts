@@ -27,7 +27,7 @@ export function isTypeSymbol(symbol: vscode.DocumentSymbol): boolean {
  */
 export function getQualifiedTypeName(symbol: vscode.DocumentSymbol, constructedPath: string): string {
     // For Dot Rush, we build the qualified name by traversing the namespace hierarchy
-    console.log(`Using constructed path for qualified name: ${constructedPath}`);
+    //console.log(`Using constructed path for qualified name: ${constructedPath}`);
     return constructedPath;
 }
 

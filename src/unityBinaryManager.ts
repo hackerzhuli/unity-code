@@ -243,12 +243,12 @@ export class UnityBinaryManager {
             SourceFilePath: sourceFilePath
         };
 
-        console.log(`UnityBinaryManager: Sending symbol docs request [ID: ${requestId}]:`, JSON.stringify(request));
+        //console.log(`UnityBinaryManager: Sending symbol docs request [ID: ${requestId}]:`, JSON.stringify(request));
 
         return new Promise<SymbolDocsResponse | null>((resolve) => {
             // Set up timeout
             const timeout = setTimeout(() => {
-                console.log(`UnityBinaryManager: Symbol docs request timeout [ID: ${requestId}]`);
+                //console.log(`UnityBinaryManager: Symbol docs request timeout [ID: ${requestId}]`);
                 this.pendingSymbolDocsRequests.delete(requestId);
                 resolve(null);
             }, timeoutMs);
@@ -603,7 +603,7 @@ export class UnityBinaryManager {
     private handleSymbolDocsMessage(payload: string, requestId: number): void {
         try {
             const response: SymbolDocsResponse = JSON.parse(payload);
-            console.log(`UnityBinaryManager: Received symbol docs response [ID: ${requestId}]:`, JSON.stringify(response));
+            //console.log(`UnityBinaryManager: Received symbol docs response [ID: ${requestId}]:`, JSON.stringify(response));
 
             // If this is a response to a pending request, resolve it
             if (requestId > 0 && this.pendingSymbolDocsRequests.has(requestId)) {

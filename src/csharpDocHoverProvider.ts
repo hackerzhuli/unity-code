@@ -752,7 +752,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
                     path = await normalizePath(path);
                 }
 
-                console.log(`CSharpDocHoverProvider: Requesting docs for symbol: ${symbolInfo.fullSymbolName}`);
+                //console.log(`CSharpDocHoverProvider: Requesting docs for symbol: ${symbolInfo.fullSymbolName}`);
                 const response = await this.unityBinaryManager.requestSymbolDocs(
                     symbolInfo.fullSymbolName,
                     symbolInfo.assemblyName,
@@ -767,7 +767,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
         }
 
         // Convert XML docs to Markdown format
-        const markdownDocs = xmlToMarkdown(xmlDocsToUse!, isRequestedNativeBinary? []: ["summary", "returns", "param", "exception"]);
+        const markdownDocs = xmlToMarkdown(xmlDocsToUse!, isRequestedNativeBinary? []: ["summary", "returns", "param", "exception", "remarks"]);
         // console.log(`abc Converted to markdown: ${markdownDocs}`);
         if(markdownDocs){
             hoverContent.appendMarkdown(markdownDocs);
