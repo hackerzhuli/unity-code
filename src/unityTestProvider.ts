@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { UnityMessagingClient, MessageType, TestAdaptorContainer, TestResultAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestNodeType, TestAdaptor } from './unityMessagingClient';
+import { UnityMessagingClient, TestAdaptorContainer, TestStatusAdaptor, TestResultAdaptor, TestNodeType, TestAdaptor, TestListRetrievedData, TestResultAdaptorContainer } from './unityMessagingClient';
 import { processTestStackTraceToMarkdown, processConsoleLogStackTraceToMarkdown, isUnityTestStackTrace } from './stackTraceUtils';
 import { findSymbolByPath } from './languageServerUtils';
 import { UnityProjectManager } from './unityProjectManager';
@@ -93,25 +93,25 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
      * Setup message handlers for Unity communication
      */
     private setupMessageHandlers(): void {
-        this.messagingClient.onMessage(MessageType.TestListRetrieved, (message) => {
-            this.handleTestListRetrieved(message.value);
+        this.messagingClient.onTestListRetrieved.subscribe((data) => {
+            this.handleTestListRetrieved(data);
         });
 
-        this.messagingClient.onMessage(MessageType.TestStarted, (message) => {
-            this.handleTestStarted(message.value);
+        this.messagingClient.onTestStarted.subscribe((testContainer) => {
+            this.handleTestStarted(testContainer);
         });
 
-        this.messagingClient.onMessage(MessageType.TestFinished, async (message) => {
-            await this.handleTestFinished(message.value);
+        this.messagingClient.onTestFinished.subscribe(async (testResult) => {
+            await this.handleTestFinished(testResult);
         });
 
-        this.messagingClient.onMessage(MessageType.RunStarted, () => {
+        this.messagingClient.onRunStarted.subscribe(() => {
             // Test run started in Unity
             console.log('UnityCode: Test run started in Unity');
             this.setRunningState(true);
         });
 
-        this.messagingClient.onMessage(MessageType.RunFinished, async () => {
+        this.messagingClient.onRunFinished.subscribe(async () => {
             console.log("Unity Code: Test run finished");
 
             // wait a bit because we may have some test results not received yet
@@ -125,14 +125,15 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
             this.setRunningState(false);
         });
 
-        this.messagingClient.onMessage(MessageType.ExecuteTests, () => {
+        this.messagingClient.onExecuteTests.subscribe(() => {
             // Unity confirmed it received and processed the ExecuteTests request
             console.log('UnityCode: Unity confirmed test execution request received');
             this.clearTestTimeout();
         });
 
-        this.messagingClient.onMessage(MessageType.CompilationFinished, async () => {
+        this.messagingClient.onCompilationFinished.subscribe(async () => {
             // Check if compilation refresh is enabled
+            console.log("TestManager: CompilationFinished");
             const config = vscode.workspace.getConfiguration('unity-code');
             const refreshOnCompilationEnabled = config.get<boolean>('refreshTestsOnCompilation', true);
 
@@ -203,36 +204,12 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     /**
      * Handle test list retrieved from Unity
      */
-    private handleTestListRetrieved(value: string): void {
+    private handleTestListRetrieved(data: TestListRetrievedData): void {
         try {
-            //logWithLimit(`UnityCode: Received test list data: ${value}`);
-
-            const colonIndex = value.indexOf(':');
-            if (colonIndex === -1) {
-                console.error('UnityCode: Invalid test list format - no colon separator found');
-                console.error(`UnityCode: Raw value received: "${value}"`);
-                return;
-            }
-
-            const testMode = value.substring(0, colonIndex) as 'EditMode' | 'PlayMode';
-            const jsonData = value.substring(colonIndex + 1);
-
-            //console.log(`UnityCode: Test mode: ${testMode}`);
-            //logWithLimit(`UnityCode: JSON data: ${jsonData}`);
-
-            if (!jsonData) {
-                console.error(`UnityCode: No tests found for ${testMode}`);
-                return;
-            }
-
-            const testContainer: TestAdaptorContainer = JSON.parse(jsonData);
-            //console.log(`UnityCode: Parsed test container:`, testContainer);
-            //console.log(`UnityCode: Number of tests found: ${testContainer.TestAdaptors?.length || 0}`);
-
-            this.buildTestTree(testContainer, testMode);
-
+            //console.log(`UnityCode: Test mode: ${data.testMode}`);
+            this.buildTestTree(data.testContainer, data.testMode);
         } catch (error) {
-            console.error('UnityCode: Error parsing test list:', error);
+            console.error('UnityCode: Error handling test list:', error);
         }
     }
 
@@ -593,13 +570,11 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     /**
      * Handle test started message from Unity
      */
-    private handleTestStarted(value: string): void {
+    private handleTestStarted(testContainer: TestAdaptorContainer): void {
         if (!this.currentTestRun) {
             return;
         }
         try {
-            const testContainer = JSON.parse(value) as TestAdaptorContainer;
-
             for (const test of testContainer.TestAdaptors) {
                 // we only care about the test at the root level, child test may not actually have started yet
                 if(test.Parent !== -1){
@@ -615,7 +590,7 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
                 }
             }
         } catch (error) {
-            console.error('UnityCode: Error parsing test started message:', error);
+            console.error('UnityCode: Error handling test started message:', error);
         }
     }
 
@@ -632,16 +607,13 @@ export class UnityTestProvider implements vscode.CodeLensProvider {
     /**
      * Handle test finished message from Unity
      */
-    private async handleTestFinished(value: string): Promise<void> {
+    private async handleTestFinished(resultContainer: TestResultAdaptorContainer): Promise<void> {
         try {
-            const resultContainer: TestResultAdaptorContainer = JSON.parse(value);
-
             for (const result of resultContainer.TestResultAdaptors) {
                 await this.updateTestResult(result);
             }
-
         } catch (error) {
-            console.error('UnityCode: Error parsing test finished message:', error);
+            console.error('UnityCode: Error handling test finished message:', error);
         }
     }
 

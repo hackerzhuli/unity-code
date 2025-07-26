@@ -3,7 +3,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 import { isInsideDirectory, normalizePath } from './utils';
 import { VoidEventEmitter } from './eventEmitter';
-import { MessageType, UnityMessagingClient } from './unityMessagingClient';
+import { UnityMessagingClient } from './unityMessagingClient';
 
 const readFile = promisify(fs.readFile);
 const readdir = promisify(fs.readdir);
@@ -413,7 +413,7 @@ export class UnityPackageHelper {
             return;
         }
 
-        messagingClient.onMessage(MessageType.CompilationFinished, async () => {
+        messagingClient.onCompilationFinished.subscribe(async () => {
             console.log('UnityCode: Compilation finished, updating packages...');
             await this.updatePackages();
         });

@@ -2,7 +2,7 @@ import * as dgram from 'dgram';
 import * as net from 'net';
 import { UnityBinaryManager, UnityDetectionEvent } from './unityBinaryManager';
 import { logWithLimit } from './utils';
-import { EventEmitter } from './eventEmitter';
+import { EventEmitter, VoidEventEmitter } from './eventEmitter';
 import { wait } from './asyncUtils';
 
 export enum MessageType {
@@ -66,6 +66,11 @@ export interface TestAdaptor {
 
 export interface TestAdaptorContainer {
     TestAdaptors: TestAdaptor[];
+}
+
+export interface TestListRetrievedData {
+    testMode: 'EditMode' | 'PlayMode';
+    testContainer: TestAdaptorContainer;
 }
 
 export enum TestStatusAdaptor {
@@ -166,11 +171,7 @@ export class UnityMessagingClient {
      */
     private unityAddress: string = '127.0.0.1';
 
-    /**
-     * Map of message type handlers for processing incoming Unity messages
-     * @private
-     */
-    private messageHandlers: Map<MessageType, (message: UnityMessage) => void> = new Map();
+
 
     /**
      * Rate limiting configuration - maps MessageType to minimum interval in milliseconds
@@ -315,6 +316,48 @@ export class UnityMessagingClient {
      * @public
      */
     public readonly onErrorMessage = new EventEmitter<string>();
+
+    /**
+     * Event emitter for test list retrieved messages
+     * @public
+     */
+    public readonly onTestListRetrieved = new EventEmitter<TestListRetrievedData>();
+
+    /**
+     * Event emitter for test started messages
+     * @public
+     */
+    public readonly onTestStarted = new EventEmitter<TestAdaptorContainer>();
+
+    /**
+     * Event emitter for test finished messages
+     * @public
+     */
+    public readonly onTestFinished = new EventEmitter<TestResultAdaptorContainer>();
+
+    /**
+     * Event emitter for test run started messages
+     * @public
+     */
+    public readonly onRunStarted = new VoidEventEmitter();
+
+    /**
+     * Event emitter for test run finished messages
+     * @public
+     */
+    public readonly onRunFinished = new VoidEventEmitter();
+
+    /**
+     * Event emitter for execute tests confirmation messages
+     * @public
+     */
+    public readonly onExecuteTests = new EventEmitter<string>();
+
+    /**
+     * Event emitter for compilation finished messages
+     * @public
+     */
+    public readonly onCompilationFinished = new VoidEventEmitter();
 
     constructor(unityBinaryManager: UnityBinaryManager) {
         this.unityBinaryManager = unityBinaryManager;
@@ -590,10 +633,16 @@ export class UnityMessagingClient {
     }
 
     /**
-     * Register message handler for specific message type
+     * Helper method to safely parse JSON strings
+     * @param value The string value to parse
+     * @returns Parsed object or the original string if parsing fails
      */
-    onMessage(type: MessageType, handler: (message: UnityMessage) => void): void {
-        this.messageHandlers.set(type, handler);
+    private tryParseJson<T>(value: string): T | string {
+        try {
+            return JSON.parse(value) as T;
+        } catch {
+            return value;
+        }
     }
 
     /**
@@ -617,62 +666,109 @@ export class UnityMessagingClient {
             console.log(`UnityMessagingClient: Received message - Type: ${message.type} (${MessageType[message.type] || 'Unknown'}), payload is ${message.value}`);
         }
 
-        // Handle Unity online/offline state changes
-        let messageHandledInternally = false;
-
-        if (message.type === MessageType.Online) {
-            messageHandledInternally = true;
-            console.log('UnityMessagingClient: Unity online');
-            this.isUnityOnline = true;
-            this.onOnlineStatus.emit(true);
-
-            this.handleFirstResponse();
-        } else if (message.type === MessageType.Offline) {
-            messageHandledInternally = true;
-            console.log('UnityMessagingClient: Unity went offline');
-            this.isUnityOnline = false;
-            this.onOnlineStatus.emit(false);
-        } else if (message.type === MessageType.Pong) {
-            messageHandledInternally = true;
-            // Pong response indicates Unity is online and responding
-            if (!this.isUnityOnline) {
-                console.log('UnityMessagingClient: Unity online (pong received)');
+        switch (message.type) {
+            case MessageType.Online:
+                console.log('UnityMessagingClient: Unity online');
                 this.isUnityOnline = true;
                 this.onOnlineStatus.emit(true);
-
+                this.handleFirstResponse();
+                break;
+            case MessageType.Offline:
+                console.log('UnityMessagingClient: Unity went offline');
+                this.isUnityOnline = false;
+                this.onOnlineStatus.emit(false);
+                break;
+            case MessageType.Pong:
+                // Pong response indicates Unity is online and responding
+                if (!this.isUnityOnline) {
+                    console.log('UnityMessagingClient: Unity online (pong received)');
+                    this.isUnityOnline = true;
+                    this.onOnlineStatus.emit(true);
+                }
+                this.handleFirstResponse();
+                break;
+            case MessageType.PackageName:
+                if (message.value) {
+                    this.packageName = message.value;
+                    console.log(`UnityMessagingClient: Detected Unity package: ${this.packageName}`);
+                }
+                break;
+            case MessageType.Info:
+                this.onInfoMessage.emit(message.value);
+                break;
+            case MessageType.Warning:
+                this.onWarningMessage.emit(message.value);
+                break;
+            case MessageType.Error:
+                this.onErrorMessage.emit(message.value);
+                break;
+            case MessageType.IsPlaying: {
+                const isPlaying = message.value === 'true';
+                console.log(`UnityMessagingClient: Unity play mode changed - IsPlaying: ${isPlaying}`);
+                this.isUnityEditorPlaying = isPlaying;
+                this.onPlayStatus.emit(isPlaying);
+                break;
             }
-            this.handleFirstResponse();
-        } else if (message.type === MessageType.PackageName) {
-            messageHandledInternally = true;
-            if (message.value) {
-                this.packageName = message.value;
-                console.log(`UnityMessagingClient: Detected Unity package: ${this.packageName}`);
-            }
-        } else if (message.type === MessageType.Info) {
-            messageHandledInternally = true;
-            this.onInfoMessage.emit(message.value);
-        } else if (message.type === MessageType.Warning) {
-            messageHandledInternally = true;
-            this.onWarningMessage.emit(message.value);
-        } else if (message.type === MessageType.Error) {
-            messageHandledInternally = true;
-            this.onErrorMessage.emit(message.value);
-        } else if (message.type === MessageType.IsPlaying) {
-            messageHandledInternally = true;
-            const isPlaying = message.value === 'true';
-            console.log(`UnityMessagingClient: Unity play mode changed - IsPlaying: ${isPlaying}`);
-            this.isUnityEditorPlaying = isPlaying;
-            this.onPlayStatus.emit(isPlaying);
-        } else if (message.type === MessageType.Tcp) {
-            messageHandledInternally = true;
-            this.handleTcpMessage(message);
-        }
-
-        const handler = this.messageHandlers.get(message.type);
-        if (handler) {
-            handler(message);
-        } else if (!messageHandledInternally) {
-            console.log(`UnityMessagingClient: No handler registered for message type ${message.type} (${MessageType[message.type] || 'Unknown'})`);
+            case MessageType.Tcp:
+                this.handleTcpMessage(message);
+                break;
+            case MessageType.TestListRetrieved:
+                if (this.onTestListRetrieved.hasListeners) {
+                    // Parse TestListRetrieved format: "TestMode:JsonData"
+                    const colonIndex = message.value.indexOf(':');
+                    if (colonIndex > 0) {
+                        const testMode = message.value.substring(0, colonIndex);
+                        const jsonData = message.value.substring(colonIndex + 1);
+                        const testData = this.tryParseJson<TestAdaptorContainer>(jsonData);
+                        if (typeof testData === 'object') {
+                              // Emit with proper type structure
+                              this.onTestListRetrieved.emit({
+                                  testMode: testMode as 'EditMode' | 'PlayMode',
+                                  testContainer: testData
+                              });
+                          }
+                    }
+                }
+                break;
+            case MessageType.TestStarted:
+                if (this.onTestStarted.hasListeners) {
+                    const testContainer = this.tryParseJson<TestAdaptorContainer>(message.value);
+                    if (typeof testContainer === 'object') {
+                        this.onTestStarted.emit(testContainer);
+                    }
+                }
+                break;
+            case MessageType.TestFinished:
+                if (this.onTestFinished.hasListeners) {
+                    const testResult = this.tryParseJson<TestResultAdaptorContainer>(message.value);
+                    if (typeof testResult === 'object') {
+                        this.onTestFinished.emit(testResult);
+                    }
+                }
+                break;
+            case MessageType.RunStarted:
+                if (this.onRunStarted.hasListeners) {
+                    this.onRunStarted.emit();
+                }
+                break;
+            case MessageType.RunFinished:
+                if (this.onRunFinished.hasListeners) {
+                    this.onRunFinished.emit();
+                }
+                break;
+            case MessageType.ExecuteTests:
+                if (this.onExecuteTests.hasListeners) {
+                    this.onExecuteTests.emit(message.value);
+                }
+                break;
+            case MessageType.CompilationFinished:
+                if (this.onCompilationFinished.hasListeners) {
+                    this.onCompilationFinished.emit();
+                }
+                break;
+            default:
+                console.log(`UnityMessagingClient: No handler for message type ${message.type} (${MessageType[message.type] || 'Unknown'})`);
+                break;
         }
     }
 
