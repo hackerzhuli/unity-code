@@ -746,7 +746,7 @@ export class CSharpDocHoverProvider implements vscode.HoverProvider {
             this.unityBinaryManager) {
             try {
                 isRequestedNativeBinary = true;
-                var path = symbolInfo.definitionLocation?.uri.fsPath;
+                let path = symbolInfo.definitionLocation?.uri.fsPath;
                 
                 if (path){
                     path = await normalizePath(path);
