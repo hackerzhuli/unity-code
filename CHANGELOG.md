@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.1] - 2025-08-01
+
+### 🔧 Improvements & Bug Fixes
+
+### Fixed
+- 🛠️ **Unity Messaging** - Fixed message handler conflicts by replacing single handler with typed event emitters, ensuring compilation finished events are properly received by test provider
+
+### Improved
+- 🔄 **Test Provider** - Simplified message handling by moving JSON parsing logic into the messaging client
+
 ## [1.1.0] - 2025-07-21
 
 ### 🚀 Features
